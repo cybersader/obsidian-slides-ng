@@ -54,3 +54,6 @@ debug.log
 .cache/
 dist/
 coverage/
+
+# --- E2E artifacts ---
+test-results/

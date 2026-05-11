@@ -91,6 +91,7 @@ slides.md  ─►  Parser (own module, inspired by Slides Extended syntax)
 3. **No `eval` / `Function()` of user content** beyond what Obsidian's iframe sandbox naturally permits.
 4. **No external CDN calls at render time.** Bundle reveal.js + Shiki + theme CSS into main.js. The whole point is offline-first, network-free authoring.
 5. **Single-file `main.js` output.** Standard Obsidian plugin build. No external runtime deps the user has to install.
+6. **UX-visible features ship with WDIO + screenshot coverage.** Any feature that affects what the user sees (view, theme, layout, animation, modal, command output) gets at least one WebdriverIO spec under `test/e2e/` that drives the feature end-to-end, asserts on the DOM, and saves a screenshot to `test-results/`. Unit tests on rendered HTML are necessary but not sufficient. The rule is about validating pixels through the real Obsidian → iframe → reveal.js stack, not test count. See `.claude/skills/testing-patterns/SKILL.md`.
 
 ### Soft goals
 

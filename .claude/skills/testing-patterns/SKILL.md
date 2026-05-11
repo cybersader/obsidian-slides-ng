@@ -137,22 +137,78 @@ it("renders 5 slides", async () => {
 Leaving the runner inside an iframe contaminates the next spec and
 produces confusing "element not found" errors.
 
-## Visual regression (added in M5)
+## Standing rule: visual features get WDIO + screenshots
 
-Slidev's killer features — magic-move and auto-animate — are visual.
-DOM assertions alone can't catch "this animation looks wrong; the second
-keyframe positions the box at x=200 instead of x=300."
+Any feature that's visible to the user — view rendering, theme, layout,
+animation, toolbar buttons, modal flows, anything pixels-affecting — ships
+with at least one WebdriverIO spec under `test/e2e/` that:
 
-Plan (deferred until M5 actually ships magic-move):
+1. Drives the feature end to end (open the view, advance a slide,
+   click a button, …)
+2. Asserts on the DOM where the feature manifests
+3. Captures a `browser.saveScreenshot('./test-results/<name>.png')`
 
-1. After each magic-move keyframe, `browser.saveScreenshot(path)`
+This is a hard rule, not a guideline. Unit tests on `renderDeck()`
+output passed all 12 assertions for M2, but nobody had seen actual pixels
+through the real Obsidian → iframe → reveal.js stack. That's not
+"validated"; that's "compiled". Don't ship UX work without WDIO evidence.
+
+Pure-logic deltas (parser refactor, internal type change, anything
+invisible) don't need WDIO. The rule is about UX, not about test count.
+
+### Screenshot workflow
+
+```ts
+import { switchToSlideFrame, switchToTop } from "./helpers/iframe";
+
+it("renders the example deck with 6 slides", async () => {
+  // Open the deck, run open-preview command, wait for iframe …
+  await switchToSlideFrame();
+  try {
+    await waitForSlides(6);
+    await browser.saveScreenshot("./test-results/m2-example-deck.png");
+  } finally {
+    await switchToTop();
+  }
+});
+```
+
+Screenshots go in `test-results/` (gitignored). They're not baselines yet
+— just artifacts a reviewer (or future agent) can eyeball. The user
+viewing the PR or branch can scroll through `test-results/` to confirm
+the feature looks right.
+
+### Visual regression (diffs against baselines) — added in M5
+
+For features whose correctness IS visual fidelity — magic-move, auto-animate,
+fragment animation — the screenshots become baselines and we diff:
+
+1. After each animation keyframe, `browser.saveScreenshot(path)`
 2. Store baselines in `test/e2e/baselines/`
 3. Diff with `pixelmatch` or `resemblejs`
-4. Threshold ~1% pixel difference (the cursor/scrollbar position can shift)
+4. Threshold ~1% pixel difference (cursor/scrollbar position can shift)
 5. Gate in CI with `--update-baselines` flag for intentional changes
 
-Don't add visual regression for unit-test-able layout. Reserve it for
-genuinely visual behaviors: magic-move, auto-animate, fragment animation.
+Visual regression diffing is the M5 add-on. Every milestone before that
+still captures screenshots — just doesn't auto-diff them.
+
+## The cheap visual smoke — `bun run smoke:render`
+
+Sometimes you want pixels-on-screen confidence without paying the full
+WDIO + Obsidian boot cost (~3–5 min on first run, 30–60 s thereafter).
+
+`bun run smoke:render` runs `scripts/render-example.mjs`, which feeds
+`Decks/example.md` through `renderDeck()` and writes the resulting
+iframe-srcdoc HTML to `test-results/example-deck.html`. Open that file
+in any browser to visually inspect the renderer's output.
+
+Trade-off: this proves the renderer + reveal.js stack works in a real
+browser. It does NOT prove the Obsidian integration (iframe mounting,
+sandbox attributes, view state, command registration). For those you
+still need the WDIO spec.
+
+Use both: smoke:render for the inner-loop "did I break rendering",
+WDIO for the milestone-end "does it work in real Obsidian".
 
 ## Common pitfalls
 
@@ -165,3 +221,9 @@ genuinely visual behaviors: magic-move, auto-animate, fragment animation.
   the watcher and re-run
 - **`plugin:reload` exits 1 with no output** — Obsidian probably isn't
   running; start it and retry
+- **WDIO hangs at "Opening vault" in WSL2** — Electron + WSLg + chrome
+  sandbox have known interaction issues. `wdio-obsidian-service` already
+  passes `--no-sandbox` on Linux but Obsidian 1.5.x + electron 28 can
+  still hang on first launch. Run `bun run e2e` from a Windows-native
+  Obsidian/Node setup or use `bun run smoke:render` for renderer-only
+  validation
