@@ -35,6 +35,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     iframe-srcdoc HTML to `test-results/example-deck.html` for direct
     browser inspection — complements the full E2E with a fast inner-loop
     check that doesn't require an Obsidian binary
+- M4.5 fixture coverage library:
+  - 13 fixture decks under `Decks/fixtures/`, one per feature category
+    (basic markdown, frontmatter, transitions, vertical slides, v-click,
+    v-clicks, all 10 Shiki languages, Slidev info-string, speaker notes,
+    tables/blockquotes, inline HTML, edge cases)
+  - `tests/fixtures.test.ts` — 24 unit assertions, one focused describe
+    block per fixture
+  - `tests/transitions.test.ts` — 7 transition config tests (config-only
+    coverage per the standing rule; visual fidelity deferred to M5+)
+  - `test/e2e/fixtures.spec.ts` — 13 E2E tests, one per fixture; each
+    opens the fixture in real Obsidian, runs open-preview, captures an
+    iframe-only screenshot to `test-results/fixtures/`
+  - Total: 68 unit tests (was 37), 23 E2E tests (was 10)
+  - Visual audit summary: 11/13 fixtures rendered cleanly on first pass.
+    Two minor issues found:
+      1. `slideNumber: true` correctly enters `Reveal.initialize()` config
+         but the rendered slide number can be low-contrast in some themes
+         (white on white-with-overlay for simple theme). Theme polish for
+         M7 — not a renderer bug.
+      2. `08-shiki-line-step.md` fixture used a nested-backtick escape
+         (`\``) which marked does not process. Replaced with prose
+         description; renderer pipeline was never at fault.
 - M4 Shiki + Slidev fragments:
   - Fine-grained Shiki bundle (`shiki/core` + JS regex engine, no WASM)
     with 11 default langs (ts, js, py, bash, html, css, md, json, yaml,
