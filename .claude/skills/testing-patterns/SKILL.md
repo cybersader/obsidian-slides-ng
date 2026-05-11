@@ -221,9 +221,13 @@ WDIO for the milestone-end "does it work in real Obsidian".
   the watcher and re-run
 - **`plugin:reload` exits 1 with no output** — Obsidian probably isn't
   running; start it and retry
-- **WDIO hangs at "Opening vault" in WSL2** — Electron + WSLg + chrome
-  sandbox have known interaction issues. `wdio-obsidian-service` already
-  passes `--no-sandbox` on Linux but Obsidian 1.5.x + electron 28 can
-  still hang on first launch. Run `bun run e2e` from a Windows-native
-  Obsidian/Node setup or use `bun run smoke:render` for renderer-only
-  validation
+- **WDIO hangs at "Opening vault"** — the cause is almost never Electron
+  startup; it's that `wdio-obsidian-service` *copies* the entire `vault`
+  directory to a sandboxed sibling on every run. Pointing `vault` at the
+  project root copies hundreds of MB of `node_modules` + `.obsidian-cache`
+  + `.git`, which takes 5+ minutes on WSL2's `/mnt/c` mount. Fix: keep
+  vault-as-dev-environment for daily dev, but point WDIO at a tiny
+  dedicated `e2e-vault/` (a few KB, just `Decks/example.md` + minimal
+  `.obsidian/`). That's why `wdio.conf.mts` has
+  `vault: path.resolve("./e2e-vault")` while the project folder remains
+  the day-to-day vault.

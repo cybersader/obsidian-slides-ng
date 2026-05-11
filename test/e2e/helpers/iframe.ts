@@ -3,8 +3,7 @@
  *
  * The rendered deck lives inside an `<iframe srcdoc>` mounted by the
  * SlidesNGView. WDIO can't see elements inside an iframe until it has
- * `switchToFrame`d into it. These helpers centralize that dance so individual
- * specs stay readable.
+ * `switchToFrame`d into it. These helpers centralize that dance.
  *
  * Usage:
  *
@@ -14,20 +13,21 @@
  *     await switchToSlideFrame();
  *     try {
  *       await waitForSlides(5);
- *       const count = await $$("section.present, section:not(.stack)").length;
+ *       const count = await browser.execute(
+ *         () => document.querySelectorAll(".reveal section").length
+ *       );
  *       expect(count).toBeGreaterThanOrEqual(5);
  *     } finally {
  *       await switchToTop();
  *     }
  *   });
  *
- * Always wrap your assertions in try/finally and call `switchToTop()` in the
- * finally — leaving the test runner inside an iframe context contaminates
- * the next test.
+ * Always wrap the iframe body in try/finally and call `switchToTop()` in
+ * the finally — leaving the runner inside an iframe contaminates the
+ * next test.
  */
 
-declare const browser: WebdriverIO.Browser;
-declare const $: (selector: string) => WebdriverIO.Element;
+import { browser, $ } from "@wdio/globals";
 
 /** CSS selector for the iframe element the slides-ng view mounts. */
 export const SLIDE_IFRAME_SELECTOR = "iframe.slides-ng-frame";
@@ -48,8 +48,9 @@ export async function switchToTop(): Promise<void> {
 }
 
 /**
- * Wait for reveal.js to have laid out at least `n` slide sections inside the
- * current iframe context. Assumes you've already called `switchToSlideFrame()`.
+ * Wait for reveal.js to have laid out at least `n` slide sections inside
+ * the current iframe context. Assumes you've already called
+ * `switchToSlideFrame()`.
  */
 export async function waitForSlides(n: number, timeoutMs = 5000): Promise<void> {
   await browser.waitUntil(
@@ -78,8 +79,8 @@ export async function getCurrentSlideText(): Promise<string> {
 }
 
 /**
- * Count visible `.fragment.visible` elements in the current slide. Used for
- * verifying `<v-click>` reveals advance correctly.
+ * Count visible `.fragment.visible` elements in the current slide. Used
+ * for verifying `<v-click>` reveals advance correctly.
  */
 export async function countVisibleFragments(): Promise<number> {
   return await browser.execute(
