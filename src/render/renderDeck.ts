@@ -1,10 +1,30 @@
-import { marked } from "marked";
+import { Marked, type Tokens } from "marked";
 import { parseDeck, type Deck, type Slide } from "../parser/parseDeck";
 import {
   buildIframeHtml,
   type DeckRenderOptions,
   type SlideHtml,
 } from "./revealTemplate";
+import { highlight } from "./shiki";
+import { applyClickReveals } from "./clickReveals";
+
+// Local Marked instance with Shiki wired into the `code` renderer.
+// Using `Marked` (a fresh instance) rather than the global `marked`
+// keeps our renderer override isolated from any other consumer of
+// marked elsewhere in the bundle.
+const md = new Marked();
+md.use({
+  renderer: {
+    code(token: Tokens.Code): string {
+      // Slidev's `[1|2-3|all]` line-step syntax (M5) lives in the info
+      // string after the language identifier — marked passes the whole
+      // info string as `token.lang`. For M4 we just want Shiki-friendly
+      // syntax highlighting, so take the first word and discard the rest.
+      const langOnly = (token.lang ?? "").split(/\s+/)[0];
+      return highlight(token.text, langOnly);
+    },
+  },
+});
 
 /**
  * High-level renderer: takes raw markdown source and returns a complete
@@ -24,11 +44,13 @@ export function renderDeckFromAst(deck: Deck): string {
 }
 
 function slideToHtml(slide: Slide): SlideHtml {
-  const body = marked.parse(slide.content, { async: false }) as string;
-  const noteHtml = slide.note
-    ? (marked.parse(slide.note, { async: false }) as string)
-    : undefined;
+  const body = applyClickReveals(markdownToHtml(slide.content));
+  const noteHtml = slide.note ? markdownToHtml(slide.note) : undefined;
   return { body, noteHtml };
+}
+
+function markdownToHtml(text: string): string {
+  return md.parse(text, { async: false }) as string;
 }
 
 function headmatterToOptions(

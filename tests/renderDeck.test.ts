@@ -1,6 +1,7 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, beforeAll } from "bun:test";
 import { renderDeck, renderDeckFromAst } from "../src/render/renderDeck";
 import { parseDeck } from "../src/parser/parseDeck";
+import { warmHighlighter } from "../src/render/shiki";
 
 const SAMPLE_DECK = `---
 theme: simple
@@ -75,5 +76,78 @@ transition: fade
     // White theme has its own background color rules; simple smoke check
     // for any indicator the white theme made it through.
     expect(html).toContain('"transition":"fade"');
+  });
+
+  test("translates <v-click> in a slide to a fragment span", () => {
+    const md = `---
+---
+
+# Slide
+
+<v-click>peekaboo</v-click>
+`;
+    const html = renderDeck(md);
+    expect(html).toContain('<span class="fragment">peekaboo</span>');
+    expect(html).not.toContain("<v-click");
+  });
+
+  test("translates <v-clicks> wrapping a list", () => {
+    const md = `---
+---
+
+# Slide
+
+<v-clicks>
+
+- One
+- Two
+- Three
+
+</v-clicks>
+`;
+    const html = renderDeck(md);
+    const fragmentLis = html.match(/<li class="fragment">/g) ?? [];
+    expect(fragmentLis.length).toBe(3);
+  });
+});
+
+describe("renderDeck with Shiki warm", () => {
+  beforeAll(async () => {
+    await warmHighlighter();
+  });
+
+  test("code blocks render with Shiki highlighting", () => {
+    const md = `---
+---
+
+# Slide
+
+\`\`\`ts
+const x: number = 1
+console.log(x)
+\`\`\`
+`;
+    const html = renderDeck(md);
+    expect(html).toContain('class="shiki');
+    // Shiki emits per-token <span style="color:...">
+    expect(html).toMatch(/<span style="color:/);
+  });
+
+  test("Slidev info-string suffix (e.g. ts [1|2-3|all]) still highlights", () => {
+    // The `[1|2-3|all]` part is M5 line-stepping syntax that marked passes
+    // through as part of token.lang. The renderer should still resolve
+    // the underlying language (ts) and produce styled tokens.
+    const md = `---
+---
+
+# Slide
+
+\`\`\`ts [1|2-3|all]
+const x = 1
+\`\`\`
+`;
+    const html = renderDeck(md);
+    expect(html).toContain('class="shiki');
+    expect(html).toMatch(/<span style="color:/);
   });
 });

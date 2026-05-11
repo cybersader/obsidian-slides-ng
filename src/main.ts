@@ -1,5 +1,6 @@
 import { Plugin, WorkspaceLeaf, Notice, TFile, MarkdownView } from "obsidian";
 import { SlidesNGView, VIEW_TYPE_SLIDES_NG } from "./SlidesNGView";
+import { warmHighlighter } from "./render/shiki";
 
 export default class SlidesNGPlugin extends Plugin {
   async onload(): Promise<void> {
@@ -15,6 +16,13 @@ export default class SlidesNGPlugin extends Plugin {
       callback: () => {
         void this.activatePreviewLeaf();
       },
+    });
+
+    // Warm Shiki in the background so the first slide render has syntax
+    // highlighting. Until this resolves, code blocks fall back to plain
+    // escaped <pre><code> — the deck still renders, just without colours.
+    void warmHighlighter().catch((err) => {
+      console.warn("slides-ng: Shiki failed to warm", err);
     });
   }
 

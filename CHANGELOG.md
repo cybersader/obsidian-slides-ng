@@ -35,6 +35,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     iframe-srcdoc HTML to `test-results/example-deck.html` for direct
     browser inspection — complements the full E2E with a fast inner-loop
     check that doesn't require an Obsidian binary
+- M4 Shiki + Slidev fragments:
+  - Fine-grained Shiki bundle (`shiki/core` + JS regex engine, no WASM)
+    with 11 default langs (ts, js, py, bash, html, css, md, json, yaml,
+    go, rust) and `github-dark` theme — main.js grew from 483 KB to 1.64 MB,
+    still under the 2 MB soft cap
+  - Singleton highlighter at `src/render/shiki.ts`; warmed asynchronously
+    from `SlidesNGPlugin.onload`. Before warm completes, renders fall
+    back to plain escaped `<pre><code>` so the deck still draws
+  - Slidev's `<v-click>` translates to `<span class="fragment">` and
+    `<v-clicks>` adds the `fragment` class to each immediate child
+    (li/p/h*/blockquote/pre/figure) — implemented via
+    `src/render/clickReveals.ts` post-process pass on the marked output
+  - Code-fence info string handling: `\`\`\`ts [1|2-3|all]` correctly
+    syntax-highlights as TypeScript. The `[1|2-3|all]` line-step syntax
+    is preserved for M5 to parse but doesn't break Shiki resolution
+  - 17 new unit tests (shiki: 6, clickReveals: 7, renderDeck: 4)
+  - E2E `fragments.spec.ts` (3 tests): asserts .fragment + .shiki DOM
+    presence, asserts Shiki produces styled tokens (not plaintext),
+    captures 4 screenshots (frame + slide + v-clicks-only deck + shiki
+    code-block deck)
 - M3 save-watch loop:
   - `SlidesNGView` registers `app.vault.on('modify', ...)` scoped to the
     active deck file, with a 300 ms debounced refresh — editor saves +
