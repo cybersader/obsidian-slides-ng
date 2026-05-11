@@ -150,4 +150,77 @@ const x = 1
     expect(html).toContain('class="shiki');
     expect(html).toMatch(/<span style="color:/);
   });
+
+  describe("M5 line-stepping", () => {
+    test("a ts [1|2-3|all] fence produces 3 stacked step blocks", () => {
+      const md = `---
+---
+
+\`\`\`ts [1|2-3|all]
+const a = 1
+const b = 2
+const c = 3
+\`\`\`
+`;
+      const html = renderDeck(md);
+      expect(html).toContain('class="line-step-container"');
+      expect(html).toContain('data-step-count="3"');
+      const stepBlocks = html.match(/class="line-step-step/g) ?? [];
+      expect(stepBlocks.length).toBe(3);
+      // Step 0 has no fragment class; steps 1+ do.
+      const fragmentSteps = html.match(/class="line-step-step fragment line-step-fade"/g) ?? [];
+      expect(fragmentSteps.length).toBe(2);
+    });
+
+    test("step lines not in the range get a line-dim class", () => {
+      const md = `---
+---
+
+\`\`\`ts [1]
+const a = 1
+const b = 2
+const c = 3
+\`\`\`
+`;
+      const html = renderDeck(md);
+      // Step 0 keeps line 1 active, dims 2 and 3.
+      const dimMatches = html.match(/line line-dim/g) ?? [];
+      expect(dimMatches.length).toBeGreaterThanOrEqual(2);
+    });
+
+    test("'all' / '*' step does NOT add dim classes", () => {
+      const md = `---
+---
+
+\`\`\`ts [all]
+const a = 1
+const b = 2
+\`\`\`
+`;
+      const html = renderDeck(md);
+      // 'all' renders without the dim transformer.
+      expect(html).toContain('class="line-step-container"');
+      // No dim classes should appear in an 'all' step.
+      // (Other lang tests in this file might surface line-dim if they use
+      // line-step syntax, so scope this assertion to the single step block.)
+      const containerStart = html.indexOf('class="line-step-container"');
+      const containerEnd = html.indexOf("</div>", containerStart);
+      const segment = html.substring(containerStart, containerEnd);
+      expect(segment).not.toContain("line-dim");
+    });
+
+    test("plain `ts` fence (no brackets) does NOT trigger line-stepping", () => {
+      const md = `---
+---
+
+\`\`\`ts
+const x = 1
+\`\`\`
+`;
+      const html = renderDeck(md);
+      // Check for the DOM tag, not the CSS selector — the iframe's
+      // styles always contain `.line-step-container` as a rule.
+      expect(html).not.toContain('<div class="line-step-container"');
+    });
+  });
 });

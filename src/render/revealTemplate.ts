@@ -72,6 +72,42 @@ export function buildIframeHtml(
     /* slides-ng iframe overrides */
     html, body { margin: 0; padding: 0; height: 100%; background: var(--r-background-color, #111); }
     .reveal { height: 100%; }
+
+    /* Slidev-style code line-stepping (M5). All step blocks live in the
+     * same grid cell so they stack visually. Step 0 is visible by default.
+     * Reveal.js adds the classes fragment + visible + current-fragment to
+     * whichever fragment the presenter just clicked; we use that to control
+     * which step is shown. */
+    .line-step-container {
+      display: grid;
+      position: relative;
+    }
+    .line-step-container > .line-step-step {
+      grid-column: 1;
+      grid-row: 1;
+      transition: opacity 0.18s ease;
+    }
+    .line-step-step.fragment.line-step-fade {
+      opacity: 0;
+      visibility: visible; /* override reveal's default visibility:hidden */
+    }
+    .line-step-step.fragment.line-step-fade.visible.current-fragment {
+      opacity: 1;
+    }
+    /* When any later step is the current fragment, hide step 0. */
+    .line-step-container:has(.fragment.current-fragment) > .line-step-step:not(.fragment) {
+      opacity: 0;
+    }
+    /* When a later step is visible but no longer current (presenter has
+     * stepped past it), keep it hidden too. */
+    .line-step-step.fragment.line-step-fade.visible:not(.current-fragment) {
+      opacity: 0;
+    }
+    /* Dimmed lines within a step (Shiki transformer marks them). */
+    .line-step-step .shiki .line.line-dim {
+      opacity: 0.32;
+      transition: opacity 0.2s ease;
+    }
   </style>
 </head>
 <body>

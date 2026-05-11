@@ -159,13 +159,11 @@ describe("fixtures: 08-shiki-line-step.md (Slidev info-string)", () => {
     expect(html).toMatch(/<span style="color:/);
   });
 
-  test("the [1|2-3|all] suffix is NOT yet processed into multi-step (M5)", () => {
-    // M4 just highlights — line-stepping fragment expansion arrives in M5.
-    // So we should see one <pre> per fence, not multiple stepped variants.
-    const md4 = `---\n---\n\n\`\`\`ts [1|2-3|all]\nconst x = 1\n\`\`\`\n`;
-    const html = renderDeck(md4);
-    const preCount = (html.match(/<pre class="shiki/g) ?? []).length;
-    expect(preCount).toBe(1);
+  test("the [1|2-3|all] suffix produces a multi-step line-step container (M5)", () => {
+    const m5md = `---\n---\n\n\`\`\`ts [1|2-3|all]\nconst x = 1\n\`\`\`\n`;
+    const html = renderDeck(m5md);
+    expect(html).toContain('<div class="line-step-container"');
+    expect(html).toContain('data-step-count="3"');
   });
 });
 

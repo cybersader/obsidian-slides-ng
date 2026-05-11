@@ -35,3 +35,7 @@
   border: 0;
   background: #000;
 }
+
+/* The line-step CSS below is injected INTO THE IFRAME (via revealTemplate.ts).
+ * Keeping it in src/styles.css means it gets bundled, but it's only effective
+ * inside the iframe-srcdoc — at the plugin level it's harmless dead CSS. */

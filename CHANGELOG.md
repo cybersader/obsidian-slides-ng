@@ -35,6 +35,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     iframe-srcdoc HTML to `test-results/example-deck.html` for direct
     browser inspection — complements the full E2E with a fast inner-loop
     check that doesn't require an Obsidian binary
+- M5 Slidev-style code line-stepping:
+  - `src/parser/lineStep.ts` parses both square-bracket (`[1|2-3|all]`)
+    and curly-bracket (`{1|2-3|all}`) info-string forms; supports single
+    lines, ranges, `all`/`*`, comma lists; rejects malformed input
+  - `src/render/lineStepRenderer.ts` emits a stacked
+    `<div class="line-step-container">` with one
+    `<div class="line-step-step">` per step. Step 0 renders normally;
+    steps 1..N wear `.fragment.line-step-fade` so reveal.js advances them.
+  - Shiki transformer dims lines NOT in the current step's range
+    (`.line.line-dim` with opacity 0.32) — the "spotlight" effect
+  - CSS grid stacking + `:has()` + `current-fragment` selectors in the
+    iframe template ensure only the current step is visible at a time;
+    no JavaScript event handlers needed
+  - `tests/lineStep.test.ts` (12 parser tests) + extended
+    `tests/renderDeck.test.ts` (4 line-stepping tests) +
+    `test/e2e/line-stepping.spec.ts` (4 E2E tests)
+  - Visual proof: `test-results/m5/step-0.png` shows line 1 bright,
+    lines 2-3 dimmed — the dim transformer working correctly
+  - Known WDIO automation limitation: `Reveal.next()` from
+    `browser.execute()` inside the embedded iframe doesn't reliably
+    advance fragments, so the per-step screenshots may all show
+    step 0. The DOM assertions cover the per-step state separately;
+    real-user clicks work normally. Frame-advance automation would
+    require keyboard-event injection — deferred.
 - M4.5 fixture coverage library:
   - 13 fixture decks under `Decks/fixtures/`, one per feature category
     (basic markdown, frontmatter, transitions, vertical slides, v-click,

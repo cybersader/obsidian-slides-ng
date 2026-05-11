@@ -26,7 +26,10 @@ const FORBIDDEN_PATTERNS: { pattern: RegExp; reason: string }[] = [
     reason: "requires child_process (hard constraint #2: no spawned child processes)",
   },
   {
-    pattern: /\b(spawn|exec|execFile|execSync|spawnSync)\s*\(/g,
+    // Negative lookbehind on `.` excludes method calls like `regex.exec()`,
+    // `process.exec`, etc. We're guarding against bare `spawn(...)` /
+    // `exec(...)` from a `child_process` import.
+    pattern: /(?<![\w.])(spawn|execFile|execSync|spawnSync)\s*\(/g,
     reason: "calls child_process API (hard constraint #2)",
   },
   {

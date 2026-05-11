@@ -7,20 +7,28 @@ import {
 } from "./revealTemplate";
 import { highlight } from "./shiki";
 import { applyClickReveals } from "./clickReveals";
+import { parseLineStep } from "../parser/lineStep";
+import { renderLineStep } from "./lineStepRenderer";
 
-// Local Marked instance with Shiki wired into the `code` renderer.
-// Using `Marked` (a fresh instance) rather than the global `marked`
-// keeps our renderer override isolated from any other consumer of
-// marked elsewhere in the bundle.
+// Local Marked instance with Shiki + Slidev line-step wired into the
+// `code` renderer. Using `Marked` (a fresh instance) rather than the
+// global `marked` keeps our renderer override isolated from any other
+// consumer of marked elsewhere in the bundle.
 const md = new Marked();
 md.use({
   renderer: {
     code(token: Tokens.Code): string {
-      // Slidev's `[1|2-3|all]` line-step syntax (M5) lives in the info
-      // string after the language identifier — marked passes the whole
-      // info string as `token.lang`. For M4 we just want Shiki-friendly
-      // syntax highlighting, so take the first word and discard the rest.
-      const langOnly = (token.lang ?? "").split(/\s+/)[0];
+      const info = token.lang ?? "";
+      // Try parsing the info string as a Slidev line-step spec first
+      // (e.g. `ts [1|2-3|all]`). If it matches, render a multi-step
+      // stacked block. Otherwise fall back to plain Shiki highlighting,
+      // taking only the first word as the lang (the info string can
+      // contain trailing non-step junk like `{monaco-diff}`).
+      const stepped = parseLineStep(info);
+      if (stepped) {
+        return renderLineStep(token.text, stepped);
+      }
+      const langOnly = info.split(/\s+/)[0];
       return highlight(token.text, langOnly);
     },
   },

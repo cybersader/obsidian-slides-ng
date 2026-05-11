@@ -9,7 +9,7 @@
  * the grammar defines (so `ts` resolves to typescript automatically).
  */
 
-import type { HighlighterCore } from "shiki/core";
+import type { HighlighterCore, ShikiTransformer } from "shiki/core";
 import { createHighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
@@ -93,6 +93,30 @@ export function highlight(code: string, lang?: string): string {
 /** True iff the highlighter has finished warming. Useful for tests. */
 export function isWarm(): boolean {
   return cached !== null;
+}
+
+/**
+ * Highlight with one or more Shiki transformers attached. Used by the
+ * line-step renderer to dim lines outside the current step's range.
+ * Falls back to plain `highlight()` if the highlighter isn't warm yet
+ * or if Shiki throws (unknown lang etc.).
+ */
+export function highlightWithTransformers(
+  code: string,
+  lang: string | undefined,
+  transformers: ShikiTransformer[]
+): string {
+  if (!cached) return highlight(code, lang);
+  const requested = lang && lang.length > 0 ? lang : "text";
+  try {
+    return cached.codeToHtml(code, {
+      lang: requested,
+      theme: DEFAULT_THEME,
+      transformers,
+    });
+  } catch {
+    return highlight(code, lang);
+  }
 }
 
 /** Test-only: reset the cached highlighter. Don't call this in production code. */
