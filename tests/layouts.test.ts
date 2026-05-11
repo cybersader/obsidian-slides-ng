@@ -1,4 +1,4 @@
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe, spyOn, afterEach } from "bun:test";
 import { renderDeck } from "../src/render/renderDeck";
 import { applyLayout, KNOWN_LAYOUTS, isKnownLayout } from "../src/render/layouts";
 
@@ -72,6 +72,58 @@ describe("applyLayout — layout dispatch", () => {
     // for debugging), but the inner structure is the default layout.
     expect(html).toContain('data-layout="not-a-real-layout"');
     expect(html).toContain("<p>body</p>");
+  });
+});
+
+describe("applyLayout — missing-required-slot warnings", () => {
+  afterEach(() => {
+    // restore console.warn between tests
+    if ((console.warn as unknown as { mockRestore?: () => void }).mockRestore) {
+      (console.warn as unknown as { mockRestore: () => void }).mockRestore();
+    }
+  });
+
+  test("two-cols without left and right warns", () => {
+    const spy = spyOn(console, "warn").mockImplementation(() => undefined);
+    applyLayout("two-cols", { default: "" });
+    expect(spy).toHaveBeenCalled();
+    const arg = spy.mock.calls[0][0] as string;
+    expect(arg).toContain("two-cols");
+    expect(arg).toContain("::left::");
+    expect(arg).toContain("::right::");
+  });
+
+  test("two-cols with only right warns about left", () => {
+    const spy = spyOn(console, "warn").mockImplementation(() => undefined);
+    applyLayout("two-cols", { right: "<p>R</p>" });
+    expect(spy).toHaveBeenCalled();
+    const arg = spy.mock.calls[0][0] as string;
+    expect(arg).toContain("::left::");
+    expect(arg).not.toContain("::right::");
+  });
+
+  test("two-cols with both slots present does NOT warn", () => {
+    const spy = spyOn(console, "warn").mockImplementation(() => undefined);
+    applyLayout("two-cols", { left: "<p>L</p>", right: "<p>R</p>" });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  test("default layout with the default slot does NOT warn", () => {
+    const spy = spyOn(console, "warn").mockImplementation(() => undefined);
+    applyLayout("default", { default: "<p>body</p>" });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  test("whitespace-only slot counts as missing", () => {
+    const spy = spyOn(console, "warn").mockImplementation(() => undefined);
+    applyLayout("two-cols", { left: "   \n\n  ", right: "<p>R</p>" });
+    expect(spy).toHaveBeenCalled();
+  });
+
+  test("unknown layout does NOT trigger a slot warning (it falls back silently)", () => {
+    const spy = spyOn(console, "warn").mockImplementation(() => undefined);
+    applyLayout("not-a-real-layout", { default: "<p>x</p>" });
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 

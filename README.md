@@ -30,7 +30,8 @@ Slides NG aims for the lightest possible authoring substrate:
 - **Slidev code line-stepping** — `\`\`\`ts [1|2-3|all]` advances through line-spotlighting steps on click
 - **Shiki syntax highlighting** — 11 langs (ts, js, py, bash, html, css, md, json, yaml, go, rust); github-dark theme
 - **Speaker notes** — `<!-- ... -->` HTML comments → reveal.js `<aside class="notes">`, surfaced in the speaker view (press `S` in the standalone export)
-- **Slidev-style layouts** — `layout:` frontmatter selects from 9 bundled layouts: `default`, `center`, `cover`, `two-cols`, `two-cols-header`, `quote`, `statement`, `section`, `end`. Slot markers `::left::` / `::right::` partition content within multi-column layouts.
+- **Slidev-style layouts** — `layout:` frontmatter selects from 9 bundled layouts: `default`, `center`, `cover`, `two-cols`, `two-cols-header`, `quote`, `statement`, `section`, `end`. Slot markers `::left::` / `::right::` partition content within multi-column layouts. Missing required slots emit a console warning so silent blank columns can't hide.
+- **In-editor autocomplete** — typing `layout: ` in frontmatter, `::` at line start in the slide body, or `<v-` anywhere fires an autocomplete dropdown with the relevant suggestions. The slot-marker dropdown is context-aware and filters to slots actually used by the current slide's layout.
 - **Open in browser** — writes `.slides-ng-export-<timestamp>.html` to the vault, opens via `electron.shell.openExternal` (no port, no spawned server)
 - **Export for PDF** — same export workflow, opens with `?print-pdf` so reveal.js flattens the deck for browser-side Print → Save as PDF
 
@@ -134,7 +135,7 @@ reveal.js + reveal CSS + all 15 themes are inlined at build time by `scripts/gen
 
 ## Status
 
-v0.2.0 — Slidev layouts. v0.1.0 covered every item in the brief's v0.1 acceptance list (`PROJECT_BRIEF.md` §7); v0.2.0 adds 9 named layouts + the `::name::` slot system. See `CHANGELOG.md` for the full delta.
+v0.2.1 — Layout primitive firmed up. v0.1.0 covered the brief's §7 acceptance list; v0.2.0 added 9 named layouts + the `::name::` slot system; v0.2.1 added a layout metadata registry as the single source of truth for layouts/slots, render-time validation warnings for missing required slots, and in-editor autocomplete via three `EditorSuggest` classes (layout names, slot markers, v-click tags). See `CHANGELOG.md` for the full delta.
 
 | Phase | Description | State |
 |---|---|---|
@@ -149,6 +150,7 @@ v0.2.0 — Slidev layouts. v0.1.0 covered every item in the brief's v0.1 accepta
 | M7 | Themes + settings tab + PDF print + speaker view | ✅ |
 | M8 | v0.1.0 release | ✅ |
 | v0.2 | Slidev layouts (9 layouts + `::name::` slots) | ✅ |
+| v0.2.1 | Layout registry + render-time validation + in-editor autocomplete | ✅ |
 
 ## Features explicitly NOT in v0.1
 

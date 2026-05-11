@@ -102,6 +102,20 @@ if (!prod) {
 
 if (prod) {
   await context.rebuild();
+  // Keep the repo's own .obsidian/plugins/slides-ng/ in sync with prod
+  // artifacts so opening the repo as a vault Just Works. Avoids the
+  // stale-build footgun where `bun run build` only wrote to root but
+  // the dev-vault folder under .obsidian retained an M2-era main.js.
+  const devVaultPluginDir = "./.obsidian/plugins/slides-ng/";
+  if (!existsSync(devVaultPluginDir)) {
+    mkdirSync(devVaultPluginDir, { recursive: true });
+  }
+  for (const f of ["main.js", "manifest.json", "styles.css"]) {
+    if (existsSync(f)) {
+      copyFileSync(f, devVaultPluginDir + f);
+    }
+  }
+  console.log(`[build] synced main.js/manifest.json/styles.css → ${devVaultPluginDir}`);
   process.exit(0);
 } else {
   await context.watch();

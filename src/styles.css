@@ -36,6 +36,21 @@
   background: #000;
 }
 
+/* EditorSuggest items rendered by LayoutNameSuggest / SlotMarkerSuggest /
+ * VClickSuggest. Two-line layout — bold name + dimmed description. */
+.slides-ng-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.slides-ng-suggest .slides-ng-suggest-title {
+  font-weight: 600;
+}
+.slides-ng-suggest .slides-ng-suggest-note {
+  font-size: 0.8em;
+  color: var(--text-muted);
+}
+
 /* The line-step CSS below is injected INTO THE IFRAME (via revealTemplate.ts).
  * Keeping it in src/styles.css means it gets bundled, but it's only effective
  * inside the iframe-srcdoc — at the plugin level it's harmless dead CSS. */

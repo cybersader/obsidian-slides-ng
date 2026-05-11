@@ -6,6 +6,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-05-11
+
+### Added
+
+- **In-editor autocomplete** — three `EditorSuggest` classes registered
+  on plugin load:
+  - **LayoutNameSuggest** — type `layout: ` inside YAML frontmatter and
+    a dropdown lists all 9 layouts with one-line descriptions.
+  - **SlotMarkerSuggest** — type `::` at the start of a line in the
+    slide body and the dropdown suggests the slot names for the
+    current slide's layout (context-aware; e.g. inside a `two-cols`
+    slide you get `left` and `right`). Falls back to all known slot
+    names if no layout is set.
+  - **VClickSuggest** — type `<v-` anywhere in the slide body and the
+    dropdown suggests `<v-click>` / `<v-clicks>` with the matching
+    closing tag.
+- **Layout metadata registry** (`src/render/layoutSchemas.ts`) — single
+  source of truth for the layout list, each layout's slot expectations,
+  and one-line descriptions. The dispatch table in `layouts.ts` derives
+  its `KNOWN_LAYOUTS` from this; the autocomplete suggesters read from
+  it; render-time validation reads from it. A unit test enforces that
+  the dispatch table and the schema list stay aligned.
+- **Render-time validation** — `applyLayout` now warns via `console.warn`
+  when a required slot is missing or whitespace-only. Rendering still
+  proceeds with empty placeholders. Users see the hint in Obsidian's
+  dev console (Ctrl-Shift-I) instead of being confused by a silently
+  blank column.
+
+### Fixed
+
+- **Stale-dev-vault footgun** — opening the repo as an Obsidian vault
+  used to load whichever stale `main.js` happened to be in
+  `.obsidian/plugins/slides-ng/` (often M2-era 482 KB from before Shiki
+  / layouts were bundled). `bun run build` now syncs `main.js`,
+  `manifest.json`, and `styles.css` into that folder automatically, so
+  the repo's own vault always reflects the latest build.
+
+### Tests
+
+- 9 new unit tests for `LAYOUT_SCHEMAS` consistency (registry ↔
+  dispatch table alignment, schemaFor, ALL_KNOWN_SLOTS)
+- 6 new unit tests for validation warnings on missing required slots
+- 11 new unit tests for the suggester helpers
+  (`parseAllFrontmatterBlocks`, `isInFrontmatter`, `currentSlideLayout`)
+- New `test/e2e/autocomplete.spec.ts` (7 tests) — verifies suggesters
+  register and `onTrigger` fires correctly in real Obsidian for each
+  context (frontmatter `layout:`, slide-body `::`, slide-body `<v-`)
+- Totals: 151 unit tests / 11 E2E spec files (was 129 / 10)
+
 ## [0.2.0] — 2026-05-11
 
 ### Added

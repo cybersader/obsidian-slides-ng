@@ -4,6 +4,11 @@ import { warmHighlighter } from "./render/shiki";
 import { exportAndOpen, exportAndOpenForPdf } from "./export/exportStandalone";
 import { SlidesNGSettingTab } from "./SlidesNGSettingTab";
 import { DEFAULT_SETTINGS, type SlidesNGSettings } from "./settings";
+import {
+  LayoutNameSuggest,
+  SlotMarkerSuggest,
+  VClickSuggest,
+} from "./SlidesNGSuggest";
 
 export default class SlidesNGPlugin extends Plugin {
   settings: SlidesNGSettings = { ...DEFAULT_SETTINGS };
@@ -16,6 +21,11 @@ export default class SlidesNGPlugin extends Plugin {
       VIEW_TYPE_SLIDES_NG,
       (leaf) => new SlidesNGView(leaf, () => this.settings)
     );
+
+    // In-editor autocomplete for deck authoring.
+    this.registerEditorSuggest(new LayoutNameSuggest(this.app));
+    this.registerEditorSuggest(new SlotMarkerSuggest(this.app));
+    this.registerEditorSuggest(new VClickSuggest(this.app));
 
     this.addRibbonIcon("presentation", "Open slides preview", () => {
       void this.activatePreviewLeaf();

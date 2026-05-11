@@ -7,50 +7,55 @@
  * each layout's wrapper has a `data-layout="<name>"` attribute that the
  * CSS targets.
  *
- * Layouts implemented for v0.2 (initial slice):
+ * The list of supported layouts + each layout's slot expectations lives in
+ * `layoutSchemas.ts` (the single source of truth). The dispatch table
+ * `LAYOUTS` below maps each schema entry to a render function. A unit
+ * test enforces that the two stay in sync.
  *
- *   default         — single column, no transformation
- *   center          — content vertically + horizontally centered
- *   cover           — title-slide style, large type, centered
- *   two-cols        — left + right side-by-side
- *   two-cols-header — header on top, two columns below
- *   quote           — large blockquote styling
- *   statement       — single emphasised statement
- *   section         — chapter-divider style
- *   end             — closing slide ("fin" / "the end")
- *
- * Image-* layouts and iframe-* layouts are intentionally NOT in this
- * cut — image layouts need Obsidian attachment-path resolution; iframe
- * layouts conflict with our sandbox.
+ * `applyLayout` also warns (via console.warn) when a layout's required
+ * slots are missing — graceful degradation, but the user sees a hint in
+ * Obsidian's dev console when something's silently wrong.
  */
+
+import {
+  LAYOUT_SCHEMAS,
+  KNOWN_LAYOUTS,
+  isKnownLayout,
+  schemaFor,
+  type LayoutName,
+} from "./layoutSchemas";
+
+export { LAYOUT_SCHEMAS, KNOWN_LAYOUTS, isKnownLayout, type LayoutName };
 
 export type RenderedSlots = Record<string, string>;
 
 export type LayoutFn = (slots: RenderedSlots) => string;
 
-export const KNOWN_LAYOUTS = [
-  "default",
-  "center",
-  "cover",
-  "two-cols",
-  "two-cols-header",
-  "quote",
-  "statement",
-  "section",
-  "end",
-] as const;
-
-export type LayoutName = (typeof KNOWN_LAYOUTS)[number];
-
-export function isKnownLayout(name: string): name is LayoutName {
-  return (KNOWN_LAYOUTS as readonly string[]).includes(name);
+export function applyLayout(name: string, slots: RenderedSlots): string {
+  const schema = schemaFor(name);
+  if (schema) {
+    validateSlots(name, schema.required, slots);
+  }
+  const fn: LayoutFn = isKnownLayout(name) ? LAYOUTS[name] : LAYOUTS.default;
+  return wrap(name, fn(slots));
 }
 
-export function applyLayout(name: string, slots: RenderedSlots): string {
-  const fn: LayoutFn = isKnownLayout(name)
-    ? LAYOUTS[name as LayoutName]
-    : LAYOUTS.default;
-  return wrap(name, fn(slots));
+function validateSlots(
+  layoutName: string,
+  required: readonly string[],
+  slots: RenderedSlots
+): void {
+  const missing = required.filter((slot) => {
+    const value = slots[slot];
+    return value === undefined || value === null || value.trim().length === 0;
+  });
+  if (missing.length > 0) {
+    console.warn(
+      `[slides-ng] layout "${layoutName}" expects required slot(s) [${missing
+        .map((s) => `::${s}::`)
+        .join(", ")}] but the slide didn't define them. Rendering will proceed with empty placeholders.`
+    );
+  }
 }
 
 function wrap(name: string, inner: string): string {
@@ -58,7 +63,8 @@ function wrap(name: string, inner: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Individual layout templates
+// Dispatch table — must mirror LAYOUT_SCHEMAS. The consistency test in
+// tests/layoutSchemas.test.ts enforces this.
 // ---------------------------------------------------------------------------
 
 const LAYOUTS: Record<LayoutName, LayoutFn> = {
@@ -97,3 +103,8 @@ const LAYOUTS: Record<LayoutName, LayoutFn> = {
   end: (s) =>
     `<div class="slides-ng-end">${s.default ?? ""}</div>`,
 };
+
+/** Test-only: expose the dispatch keys for the consistency check. */
+export function _dispatchKeys(): string[] {
+  return Object.keys(LAYOUTS);
+}
