@@ -1,75 +1,72 @@
 # Slides NG
 
-> Markdown-based slide decks for Obsidian — lightweight, offline-first, **zero localhost ports**.
+> Markdown-based slide decks for Obsidian — lightweight, offline-first, **zero localhost ports, no spawned dev server**.
 
-**Status: pre-alpha.** Project brief written; implementation in progress.
+Slides NG renders your markdown deck inside an `<iframe srcdoc>` in Obsidian using a bundled copy of [reveal.js](https://revealjs.com/). The "Open in browser" command writes a fully self-contained HTML file to your vault and opens it with `electron.shell.openExternal` — fullscreen presentation in your default browser, no port, no localhost.
 
 ## Why this exists
 
-The two existing options for markdown slides in Obsidian both have a footprint that's bigger than the job:
+The two existing markdown-slide options for Obsidian both have a footprint bigger than the job:
 
-- **Slides Extended** (the trusted, in-catalog option) runs an internal HTTP server for its browser-preview mode — some security tools flag the listening localhost port.
+- **Slides Extended** (the trusted in-catalog option) runs an internal HTTP server for its browser-preview mode — some security tools flag the listening localhost port.
 - **`nirtamir2/obsidian-slidev`** (the Slidev wrapper) spawns `npm run dev` as a child process and listens on `localhost:3030` — needs Node, npm, and the full Slidev runtime installed.
 
 Slides NG aims for the lightest possible authoring substrate:
 
 - **No HTTP server.** Decks render via `<iframe srcdoc>` directly inside Obsidian.
-- **No spawned child process.** Plugin is a single `main.js`; no Node runtime required separately.
-- **No external network calls.** reveal.js, Shiki, and themes are bundled into the plugin.
-- **Full-screen presentation mode** still works — exports a standalone `file://` HTML the user's default browser opens (no port; no spawned server).
+- **No spawned child process.** Plugin is a single `main.js`; no external Node runtime.
+- **No CDN at runtime.** reveal.js, Shiki, and 15 themes are bundled into the plugin.
+- **Full-screen presentation mode** still works — exports a standalone `file://` HTML that the user's default browser opens.
 
-## Status
+## Features
 
-| Phase | Description | State |
-|---|---|---|
-| M1 | Skeleton + smoke test | ⏳ |
-| M2 | Static renderer (reveal.js bundled) | ⏳ |
-| M3 | Save-watch loop (no port, no spawn) | ⏳ |
-| M4 | Shiki + reveal.js fragment glue | ⏳ |
-| M5 | Code line-stepping (`[1\|2-3\|all]`) | ⏳ |
-| M6 | Open-in-browser presentation mode (file:// export) | ⏳ |
-| M7 | Themes + speaker notes + PDF print | ⏳ |
-| M8 | v0.1 release | ⏳ |
+- Renders Obsidian markdown decks via [reveal.js 5](https://revealjs.com/) inside an iframe
+- Horizontal slide separators (`---`) + vertical sub-slides (`--`) — match Slides Extended conventions
+- 15 bundled themes (black, white, simple, league, beige, sky, night, serif, solarized, blood, moon, dracula, …)
+- Per-deck frontmatter for theme, transition, slideNumber
+- Plugin settings (Settings → Slides NG) for default theme + default transition
+- **Save-watch loop** — saves trigger a debounced (300 ms) iframe re-render
+- **Slidev `<v-click>` and `<v-clicks>`** — translated to reveal.js fragments
+- **Slidev code line-stepping** — `\`\`\`ts [1|2-3|all]` advances through line-spotlighting steps on click
+- **Shiki syntax highlighting** — 11 langs (ts, js, py, bash, html, css, md, json, yaml, go, rust); github-dark theme
+- **Speaker notes** — `<!-- ... -->` HTML comments → reveal.js `<aside class="notes">`, surfaced in the speaker view (press `S` in the standalone export)
+- **Open in browser** — writes `.slides-ng-export-<timestamp>.html` to the vault, opens via `electron.shell.openExternal` (no port, no spawned server)
+- **Export for PDF** — same export workflow, opens with `?print-pdf` so reveal.js flattens the deck for browser-side Print → Save as PDF
 
-See `PROJECT_BRIEF.md` for the full architecture, decision log, and acceptance criteria.
+## Hard architectural constraints
 
-## Features (planned for v0.1)
+Codified in `PROJECT_BRIEF.md` §3 and **enforced by a static guard test** (`tests/hardConstraints.test.ts`) that fails the build if any pattern below appears in `src/`:
 
-- Renders Obsidian markdown decks via [reveal.js](https://revealjs.com/)
-- Slide separators (`---`) + vertical sub-slides (`--`) — matches Slides Extended conventions
-- Frontmatter for theme / transition / slide-number / scaling
-- `<v-click>` and `<v-clicks>` Slidev-style reveals (via reveal.js fragments)
-- Slidev-style code line-stepping: `\`\`\`ts [1|2-3|all]`
-- Slide / element annotations: `<!-- slide ... -->`, `<!-- element ... -->`
-- Named blocks: `::: name ... :::`
-- Speaker notes via `<!-- ... -->` HTML comments
-- Shiki code highlighting with line-stepping animation
-- Open-in-browser command (writes a static HTML file to the vault, opens via system browser — no port, no server)
-- Reveal.js's built-in PDF print mode
+1. No localhost listening ports.
+2. No `child_process.spawn` / `exec`.
+3. No `eval` / `Function()` of user content.
+4. No external CDN at render time.
+5. Single-file `main.js` output.
+6. UX-visible features ship with WebdriverIO + screenshot coverage.
 
-## Features explicitly NOT in v0.1
+## Install
 
-- Slidev's exact Magic-Move algorithm (out of scope — uses Vite-compiled Monaco)
-- Vue components inline in slides
-- Live HMR via filesystem watcher (the save-reload loop is fast enough)
-- Hosted preview / cloud sync / mobile rendering
+### From source
 
-## Installation
+```bash
+git clone https://github.com/cybersader/obsidian-slides-ng.git
+cd obsidian-slides-ng
+bun install
+bun run build
+```
 
-> Not yet available. After v0.1 release, install via:
->
-> 1. Obsidian Settings → Community Plugins → Browse → search "Slides NG"
-> 2. Install + Enable
->
-> Until then: clone this repo, `bun install`, `bun run build`, copy `main.js` + `manifest.json` + `styles.css` into your vault's `.obsidian/plugins/slides-ng/` folder.
+Copy `main.js`, `manifest.json`, and `styles.css` into `<your-vault>/.obsidian/plugins/slides-ng/` and enable the plugin in Settings → Community plugins.
 
-## Usage (planned)
+### Vault-as-dev-environment
+
+The repo itself is a working Obsidian vault. Open the cloned folder in Obsidian, enable the plugin, and the seed deck at `Decks/example.md` is ready to render. See `.claude/CLAUDE.md` for the day-to-day dev loop.
+
+## Usage
 
 Create a markdown file with deck frontmatter:
 
-```markdown
+````markdown
 ---
-slides-ng: true
 theme: simple
 transition: fade
 ---
@@ -80,7 +77,7 @@ Hello, world.
 
 ---
 
-# Second slide
+# Click reveals
 
 <v-clicks>
 
@@ -92,34 +89,79 @@ Hello, world.
 
 ---
 
-# Third slide
+# Code line-stepping
 
-\`\`\`ts [1|2-3|all]
+```ts [1|2-3|all]
 const passphrase = "four random words"
 const length = passphrase.split(" ").length
 console.log(`length is ${length}`)
-\`\`\`
 ```
 
-Open the SlidesNG view (Ribbon icon or command palette → "Slides NG: open preview") next to the file. The preview updates on save. Press the toolbar's "Open in browser" button for full-screen presentation mode.
+<!-- Speaker note: walk through why length-over-complexity wins. -->
+````
+
+Open the Slides NG preview (ribbon icon or command palette → "Slides NG: Open preview") next to the file. The preview re-renders on save. Click "Open in browser" for full-screen presentation; click "Export for PDF" for browser-side PDF print.
 
 ## Dev setup
 
 ```bash
 bun install
-bun run dev               # watch + rebuild + copy to test-vault
+bun run dev               # esbuild watch — outputs to ./.obsidian/plugins/slides-ng/
+bun run dev:reload        # same + auto-reload plugin via Obsidian CLI
+bun run build             # production build at repo root
+bun run lint              # ESLint with obsidianmd rules
+bun run test              # bun test (~100 unit tests)
+bun run e2e               # WebdriverIO + obsidian-launcher (~10 min, 9 spec files)
+bun run smoke:render      # write test-results/example-deck.html for browser inspection
 ```
 
-Then open `test-vault/` in a separate Obsidian instance. The [Hot Reload](https://github.com/pjeby/hot-reload) plugin reloads SlidesNG automatically when `main.js` changes.
+The dev loop and testing-pattern docs live at `.claude/skills/testing-patterns/SKILL.md`.
 
-See `PROJECT_BRIEF.md` for the full development plan and phase-by-phase acceptance criteria.
+## Architecture
+
+```
+slides.md
+  → @slidev/parser           # markdown → slides[] + frontmatter
+  → marked                    # per-slide markdown → HTML
+    └─ Shiki / Slidev line-step transformer for code fences
+    └─ <v-click> / <v-clicks> → reveal.js .fragment classes
+  → buildIframeHtml           # template wraps slides with bundled reveal.js + theme CSS
+  → iframe srcdoc OR vault.adapter.write + electron.shell.openExternal
+```
+
+reveal.js + reveal CSS + all 15 themes are inlined at build time by `scripts/generate-reveal-assets.mjs` so the plugin works fully offline.
+
+## Status
+
+v0.1.0 — every feature in the brief's v0.1 acceptance list (`PROJECT_BRIEF.md` §7) is implemented and tested. See `CHANGELOG.md` for the full delta.
+
+| Phase | Description | State |
+|---|---|---|
+| M1 | Skeleton + smoke test | ✅ |
+| M1.5 | Test infrastructure (WDIO + auto-reload) | ✅ |
+| M2 | Static renderer (reveal.js iframe) | ✅ |
+| M3 | Save-watch loop | ✅ |
+| M4 | Shiki + `<v-click>` / `<v-clicks>` | ✅ |
+| M4.5 | 13-fixture coverage library | ✅ |
+| M5 | Code line-stepping `[1\|2-3\|all]` | ✅ |
+| M6 | Open-in-browser presentation mode | ✅ |
+| M7 | Themes + settings tab + PDF print + speaker view | ✅ |
+| M8 | v0.1.0 release | ✅ |
+
+## Features explicitly NOT in v0.1
+
+- Slidev's exact Magic-Move algorithm (the modern standalone `shiki-magic-move` lib is bundled but not yet wired — that's v0.2)
+- Vue components inline in slides
+- Live HMR via filesystem watcher (the save-reload loop is fast enough)
+- Mobile rendering (`isDesktopOnly: true`)
 
 ## License
 
 MIT — see [LICENSE](./LICENSE).
 
-## Related
+## Related projects
 
-- **[Slides Extended](https://github.com/ebullient/obsidian-slides-extended)** — the trusted prior art. Slides NG inherits its syntax conventions (annotations, named blocks) but takes a different transport approach (zero ports vs Fastify-internal HTTP).
-- **[Slidev](https://sli.dev/)** — the inspiration for `<v-click>` reveals and code line-stepping. Slides NG implements these in a Vite-free way for use inside Obsidian.
-- **[reveal.js](https://revealjs.com/)** — the underlying rendering engine.
+- **[Slides Extended](https://github.com/ebullient/obsidian-slides-extended)** — the trusted prior art. Slides NG inherits its annotation conventions (work-in-progress for v0.2) but takes a different transport approach (zero ports vs Fastify-internal HTTP).
+- **[Slidev](https://sli.dev/)** — the inspiration for `<v-click>` reveals and code line-stepping. Slides NG implements those syntaxes against bundled standalone libraries (`@slidev/parser`, `shiki-magic-move`) rather than the full Slidev application.
+- **[reveal.js](https://revealjs.com/)** — the rendering engine.
+- **[cybersader/markup-slides-context-and-workflow](https://github.com/cybersader/markup-slides-context-and-workflow)** — author's reference for markup-slide ecosystem patterns.

@@ -184,7 +184,7 @@ export class SlidesNGView extends ItemView {
     try {
       const result = await exportAndOpenForPdf(this.app, file, undefined, this.renderDefaults());
       if (result.opened) {
-        new Notice("Opened in print mode. Use your browser's Print → Save as PDF.");
+        new Notice("Opened in print mode. Use your browser's print → save as PDF.");
       } else {
         new Notice(
           `Wrote ${result.vaultRelativePath} but could not auto-launch the browser. Open manually + append ?print-pdf to the URL.`

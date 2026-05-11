@@ -71,7 +71,8 @@ export async function openExternalInBrowser(
   // bundle it (the build config also marks it external).
   const electronModuleName = "electron";
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- runtime-only access
+    // Runtime-only access; the rule that would normally fire here isn't
+    // configured in our eslint setup, so no disable directive needed.
     const electron: { shell?: { openExternal: (url: string) => Promise<void> } } =
       require(electronModuleName);
     if (!electron.shell) return false;

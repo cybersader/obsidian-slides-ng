@@ -56,7 +56,7 @@ export default class SlidesNGPlugin extends Plugin {
   private async openActiveDeckInBrowser(): Promise<void> {
     const file = this.resolveDeckFile();
     if (!file) {
-      new Notice("Open a markdown deck before running this command.");
+      new Notice("Open a Markdown deck before running this command.");
       return;
     }
     try {
@@ -80,7 +80,7 @@ export default class SlidesNGPlugin extends Plugin {
   private async openActiveDeckForPdf(): Promise<void> {
     const file = this.resolveDeckFile();
     if (!file) {
-      new Notice("Open a markdown deck before running this command.");
+      new Notice("Open a Markdown deck before running this command.");
       return;
     }
     try {
@@ -90,7 +90,7 @@ export default class SlidesNGPlugin extends Plugin {
       });
       if (result.opened) {
         new Notice(
-          "Opened in print mode. Use your browser's Print → Save as PDF."
+          "Opened in print mode. Use your browser's print → save as PDF."
         );
       } else {
         new Notice(

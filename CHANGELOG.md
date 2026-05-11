@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-05-11
+
+First public release. Every milestone (M1 through M8) of the brief's
+v0.1 plan is implemented + tested.
+
 ### Added
 
 - M1 scaffold: bun + esbuild + TypeScript build pipeline
