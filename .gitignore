@@ -1,0 +1,47 @@
+# --- Build output ---
+# main.js and styles.css are built; canonical source lives in src/ and root respectively
+# The version under .obsidian/plugins/slides-ng/ is a build artifact
+.obsidian/plugins/slides-ng/main.js
+.obsidian/plugins/slides-ng/main.js.map
+.obsidian/plugins/slides-ng/styles.css
+*.map
+
+# Note: .obsidian/plugins/slides-ng/manifest.json IS committed if you want a clean
+# install of this repo to "just work" as a vault. Or gitignore it and let the build
+# regenerate. Pick one — the brief recommends committing it so cloning gives a
+# working vault out of the box.
+
+# --- Dependencies ---
+node_modules/
+bun.lockb
+
+# --- Obsidian vault state (per-user, not the plugin) ---
+.obsidian/workspace*.json
+.obsidian/cache
+.obsidian-cache/
+
+# Other community plugins installed in this dev vault (Hot Reload, etc.) — don't ship
+.obsidian/plugins/hot-reload/
+.obsidian/plugins/!(slides-ng)/
+
+# --- Settings local to dev machine ---
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Standalone export artifacts (generated on demand by the plugin) ---
+.slides-ng-export-*.html
+
+# --- Logs ---
+debug.log
+*.log
+
+# --- Misc ---
+.eslintcache
+.cache/
+dist/
+coverage/

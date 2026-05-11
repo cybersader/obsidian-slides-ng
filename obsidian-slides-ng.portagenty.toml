@@ -1,0 +1,11 @@
+# Workspace file for portagenty. See:
+# https://cybersader.github.io/portagenty/reference/schema/
+name = "obsidian-slides-ng"
+id = "bbe524a8-0be6-446e-8a96-31d9fcfd1e55"
+multiplexer = "zellij"
+
+[[session]]
+name = "shell"
+cwd = "."
+command = "bash"
+kind = "shell"
