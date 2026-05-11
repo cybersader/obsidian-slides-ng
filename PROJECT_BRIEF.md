@@ -318,6 +318,14 @@ This plugin is a means, not an end. The slides-ng authoring substrate backs seve
 - One placeholder command "Open SlidesNG View" that opens an empty pane
 - First commit + push to `https://github.com/cybersader/obsidian-slides-ng`
 
+**Phase M1.5 — Test infrastructure (2-3 hr)**
+- `wdio-obsidian-service` config + smoke spec (real Obsidian boot, plugin loaded, command registered, view opens)
+- Iframe-aware E2E helpers (`switchToSlideFrame`, `waitForSlides`, etc.) — slides-ng-specific; every later spec depends on these
+- `bun test` scaffolding (`tests/preload.ts`, first passing test)
+- Auto-reload esbuild `onEnd` hook gated by `AUTORELOAD=1` — `bun run dev:reload` triggers `plugin:reload id=slides-ng` via the official Obsidian CLI after every successful rebuild (~1–2 s save-to-pixel)
+- `.claude/skills/obsidian-cli/SKILL.md` and `.claude/skills/testing-patterns/SKILL.md` — agent-facing reference docs
+- Five iteration loops documented (unit watch / auto-reload preview / manual reload / E2E smoke / E2E full); visual regression deferred to M5 (magic-move)
+
 **Phase M2 — Static renderer (6-8 hr)**
 - `parseDeck()` — slice on `\n---\n` and `\n--\n`, parse frontmatter
 - `renderDeck()` — template a static reveal.js HTML page with the slides embedded
