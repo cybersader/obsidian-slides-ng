@@ -35,3 +35,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     iframe-srcdoc HTML to `test-results/example-deck.html` for direct
     browser inspection — complements the full E2E with a fast inner-loop
     check that doesn't require an Obsidian binary
+- M3 save-watch loop:
+  - `SlidesNGView` registers `app.vault.on('modify', ...)` scoped to the
+    active deck file, with a 300 ms debounced refresh — editor saves +
+    external writes both trigger an iframe re-render
+  - Cleanup is handled via `registerEvent`; the pending timer is
+    cancelled in `onClose`
+  - E2E save-watch spec proves the loop end-to-end: appends a slide via
+    `app.vault.modify`, asserts the iframe section count increases
+    within the debounce window, plus a runtime negative-assert that the
+    iframe's `document.location` stays at `about:srcdoc` (no localhost)
+  - Static guard test (`tests/hardConstraints.test.ts`) greps `src/`
+    for forbidden patterns (`child_process`, `spawn`, `createServer`,
+    `localhost:`, CDN URLs) and fails the build on any match —
+    defends the brief §3 hard constraints against future drift

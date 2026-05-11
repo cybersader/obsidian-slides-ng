@@ -1,7 +1,9 @@
-import { ItemView, WorkspaceLeaf, TFile, Notice, ViewStateResult } from "obsidian";
+import { ItemView, WorkspaceLeaf, TFile, TAbstractFile, Notice, ViewStateResult } from "obsidian";
 import { renderDeck } from "./render/renderDeck";
 
 export const VIEW_TYPE_SLIDES_NG = "slides-ng-preview";
+
+const REFRESH_DEBOUNCE_MS = 300;
 
 interface SlidesNGViewState extends Record<string, unknown> {
   filePath?: string;
@@ -10,6 +12,7 @@ interface SlidesNGViewState extends Record<string, unknown> {
 export class SlidesNGView extends ItemView {
   private filePath?: string;
   private iframeEl?: HTMLIFrameElement;
+  private refreshTimer: number | null = null;
 
   constructor(leaf: WorkspaceLeaf) {
     super(leaf);
@@ -65,12 +68,38 @@ export class SlidesNGView extends ItemView {
       },
     });
 
+    // Save-watch: when the active deck file is modified anywhere in the
+    // vault (editor save, external write, sync), re-render after a short
+    // debounce. registerEvent ties the lifetime to this view, so the
+    // listener auto-detaches on close — no manual unhook needed.
+    this.registerEvent(
+      this.app.vault.on("modify", (file: TAbstractFile) => {
+        if (this.filePath && file.path === this.filePath) {
+          this.scheduleRefresh();
+        }
+      })
+    );
+
     await this.refresh();
   }
 
   async onClose(): Promise<void> {
+    if (this.refreshTimer !== null) {
+      window.clearTimeout(this.refreshTimer);
+      this.refreshTimer = null;
+    }
     this.iframeEl = undefined;
     this.contentEl.empty();
+  }
+
+  private scheduleRefresh(): void {
+    if (this.refreshTimer !== null) {
+      window.clearTimeout(this.refreshTimer);
+    }
+    this.refreshTimer = window.setTimeout(() => {
+      this.refreshTimer = null;
+      void this.refresh();
+    }, REFRESH_DEBOUNCE_MS);
   }
 
   private async refresh(): Promise<void> {
