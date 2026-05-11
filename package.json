@@ -1,0 +1,42 @@
+{
+  "name": "obsidian-slides-ng",
+  "version": "0.0.1",
+  "description": "Markdown slide decks for Obsidian — zero localhost ports, no spawned dev server, reveal.js + Shiki bundled.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "dev": "bun run esbuild.config.mjs",
+    "build": "bun x tsc -noEmit -skipLibCheck && bun run esbuild.config.mjs production",
+    "lint": "eslint src",
+    "test": "bun test"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "slides",
+    "reveal.js",
+    "slidev",
+    "presentation"
+  ],
+  "author": "cybersader",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/parser": "^8.32.0",
+    "@typescript-eslint/utils": "^8.32.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.17.0",
+    "eslint-plugin-obsidianmd": "latest",
+    "obsidian": "latest",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.32.0"
+  },
+  "dependencies": {
+    "@slidev/parser": "^51.0.0",
+    "reveal.js": "^5.1.0",
+    "shiki": "^1.24.0",
+    "shiki-magic-move": "^0.5.0"
+  }
+}
