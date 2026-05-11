@@ -6,6 +6,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-11
+
+### Added
+
+- **Slidev-style layouts** — `layout:` per-slide frontmatter selects from
+  9 bundled layouts:
+  - `default` — single column (the v0.1 behaviour, now formally a layout)
+  - `center` — content vertically + horizontally centered
+  - `cover` — title-slide style, larger type, centered
+  - `two-cols` — left + right columns via `::left::` / `::right::` slot markers
+  - `two-cols-header` — header on top, two columns below
+  - `quote` — large blockquote styling
+  - `statement` — single emphasised statement
+  - `section` — chapter-divider style
+  - `end` — closing-slide style
+- **Slot splitter** (`src/render/slots.ts`) — `::name::` markers on their
+  own line partition slide content into named slots. The default slot is
+  everything before the first marker.
+- Each slot's markdown is rendered independently, so `<v-clicks>` inside
+  `::left::` stays scoped to that column (no fragment bleed into
+  `::right::`).
+- Image layouts (`image-left`, `image-right`, `image`) are intentionally
+  deferred to v0.2.x — they need Obsidian attachment-path resolution that
+  has its own scope.
+
+### Tests
+
+- 10 new slot-splitter unit tests
+- 16 new layout dispatch + end-to-end unit tests
+- New `test/e2e/layouts.spec.ts` (4 tests + 8 per-layout screenshots)
+- New fixture `Decks/fixtures/13-layouts.md` covering all 9 layouts
+- Totals: 145 unit tests / 10 E2E spec files (was 102 / 9)
+
 ## [0.1.0] — 2026-05-11
 
 First public release. Every milestone (M1 through M8) of the brief's

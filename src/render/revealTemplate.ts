@@ -120,6 +120,143 @@ export function buildIframeHtml(
       opacity: 0.32;
       transition: opacity 0.2s ease;
     }
+
+    /* ----------------------------------------------------------------
+     * Slidev-flavoured layouts (v0.2).
+     * Each <section> wraps its content in
+     *   <div class="slides-ng-layout" data-layout="<name>">
+     * and each layout uses sub-classes (e.g. .slides-ng-cols-2) for its
+     * specific structure.
+     * --------------------------------------------------------------- */
+
+    .slides-ng-layout {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* center: vertically + horizontally centered content */
+    .slides-ng-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      height: 100%;
+    }
+
+    /* cover: title-slide style, larger type, centered */
+    .slides-ng-cover {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      height: 100%;
+      padding: 0 5%;
+    }
+    .slides-ng-cover h1 {
+      font-size: 1.5em;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.4em;
+    }
+    .slides-ng-cover h2,
+    .slides-ng-cover h3 {
+      font-weight: 400;
+      opacity: 0.75;
+    }
+
+    /* two-cols: two equal columns side by side */
+    .slides-ng-cols-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      align-items: start;
+      width: 100%;
+      height: 100%;
+    }
+    .slides-ng-cols-2 .slides-ng-col {
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* two-cols-header: header on top, two columns below */
+    .slides-ng-cols-2-header {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 1rem;
+      height: 100%;
+    }
+    .slides-ng-cols-2-header .slides-ng-cols-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      align-items: start;
+      min-height: 0;
+    }
+    .slides-ng-cols-2-header .slides-ng-col {
+      min-width: 0;
+    }
+
+    /* quote: large blockquote */
+    .slides-ng-quote {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      height: 100%;
+      padding: 0 8%;
+    }
+    .slides-ng-quote > blockquote,
+    .slides-ng-quote blockquote {
+      font-size: 1.15em;
+      font-style: italic;
+      border-left: 0;
+      padding: 0;
+    }
+
+    /* statement: single large emphasised statement */
+    .slides-ng-statement {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      height: 100%;
+      font-size: 1.4em;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      padding: 0 8%;
+    }
+
+    /* section: chapter-divider style */
+    .slides-ng-section {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      height: 100%;
+      padding: 0 8%;
+    }
+    .slides-ng-section h1,
+    .slides-ng-section h2 {
+      font-size: 1.6em;
+      letter-spacing: -0.02em;
+    }
+
+    /* end: closing slide, large centered text */
+    .slides-ng-end {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      height: 100%;
+      font-size: 1.8em;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      padding: 0 5%;
+    }
   </style>
 </head>
 <body>

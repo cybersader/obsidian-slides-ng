@@ -30,6 +30,7 @@ Slides NG aims for the lightest possible authoring substrate:
 - **Slidev code line-stepping** — `\`\`\`ts [1|2-3|all]` advances through line-spotlighting steps on click
 - **Shiki syntax highlighting** — 11 langs (ts, js, py, bash, html, css, md, json, yaml, go, rust); github-dark theme
 - **Speaker notes** — `<!-- ... -->` HTML comments → reveal.js `<aside class="notes">`, surfaced in the speaker view (press `S` in the standalone export)
+- **Slidev-style layouts** — `layout:` frontmatter selects from 9 bundled layouts: `default`, `center`, `cover`, `two-cols`, `two-cols-header`, `quote`, `statement`, `section`, `end`. Slot markers `::left::` / `::right::` partition content within multi-column layouts.
 - **Open in browser** — writes `.slides-ng-export-<timestamp>.html` to the vault, opens via `electron.shell.openExternal` (no port, no spawned server)
 - **Export for PDF** — same export workflow, opens with `?print-pdf` so reveal.js flattens the deck for browser-side Print → Save as PDF
 
@@ -133,7 +134,7 @@ reveal.js + reveal CSS + all 15 themes are inlined at build time by `scripts/gen
 
 ## Status
 
-v0.1.0 — every feature in the brief's v0.1 acceptance list (`PROJECT_BRIEF.md` §7) is implemented and tested. See `CHANGELOG.md` for the full delta.
+v0.2.0 — Slidev layouts. v0.1.0 covered every item in the brief's v0.1 acceptance list (`PROJECT_BRIEF.md` §7); v0.2.0 adds 9 named layouts + the `::name::` slot system. See `CHANGELOG.md` for the full delta.
 
 | Phase | Description | State |
 |---|---|---|
@@ -147,6 +148,7 @@ v0.1.0 — every feature in the brief's v0.1 acceptance list (`PROJECT_BRIEF.md`
 | M6 | Open-in-browser presentation mode | ✅ |
 | M7 | Themes + settings tab + PDF print + speaker view | ✅ |
 | M8 | v0.1.0 release | ✅ |
+| v0.2 | Slidev layouts (9 layouts + `::name::` slots) | ✅ |
 
 ## Features explicitly NOT in v0.1
 

@@ -10,6 +10,8 @@ import { highlight } from "./shiki";
 import { applyClickReveals } from "./clickReveals";
 import { parseLineStep } from "../parser/lineStep";
 import { renderLineStep } from "./lineStepRenderer";
+import { splitSlots, hasSlots } from "./slots";
+import { applyLayout } from "./layouts";
 
 // Local Marked instance with Shiki + Slidev line-step wired into the
 // `code` renderer. Using `Marked` (a fresh instance) rather than the
@@ -96,7 +98,27 @@ export function renderDeckFromAst(
 }
 
 function slideToHtml(slide: Slide): SlideHtml {
-  const body = applyClickReveals(markdownToHtml(slide.content));
+  const layoutName =
+    typeof slide.frontmatter.layout === "string" && slide.frontmatter.layout.length > 0
+      ? slide.frontmatter.layout
+      : "default";
+
+  // Every slide flows through a layout, even `default`, so the iframe
+  // CSS can target `.slides-ng-layout` uniformly. Slot splitting only
+  // matters when the content actually uses `::name::` markers — for
+  // the common case, there's exactly one slot (`default`).
+  const slotMarkdown = hasSlots(slide.content)
+    ? splitSlots(slide.content)
+    : { default: slide.content };
+
+  const slotHtml: Record<string, string> = {};
+  for (const [name, md] of Object.entries(slotMarkdown)) {
+    // Per-slot v-click translation so fragments in `::left::` don't
+    // leak into `::right::` and vice versa.
+    slotHtml[name] = applyClickReveals(markdownToHtml(md));
+  }
+  const body = applyLayout(layoutName, slotHtml);
+
   const noteHtml = slide.note ? markdownToHtml(slide.note) : undefined;
   return { body, noteHtml };
 }
