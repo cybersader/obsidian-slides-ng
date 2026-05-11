@@ -5,23 +5,19 @@
  * (also runs automatically as part of `dev` and `build`) to refresh it
  * from node_modules.
  */
-import {
-  revealJs,
-  revealCss,
-  themeBlack,
-  themeWhite,
-  themeSimple,
-} from "./revealAssets.generated";
+import { revealJs, revealCss, THEMES_BY_NAME } from "./revealAssets.generated";
 
 export { revealJs, revealCss };
 
-const themesByName: Record<string, string> = {
-  black: themeBlack,
-  white: themeWhite,
-  simple: themeSimple,
-};
+/** All theme names we ship. Always includes "black" as the default. */
+export function availableThemes(): string[] {
+  return Object.keys(THEMES_BY_NAME).sort();
+}
 
 /** Look up a theme by name. Falls back to `black` if unknown. */
 export function getTheme(name: string | undefined): string {
-  return themesByName[name ?? "black"] ?? themesByName.black;
+  if (name && Object.prototype.hasOwnProperty.call(THEMES_BY_NAME, name)) {
+    return THEMES_BY_NAME[name];
+  }
+  return THEMES_BY_NAME.black;
 }

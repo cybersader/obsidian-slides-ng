@@ -1,5 +1,5 @@
 import { App, TFile } from "obsidian";
-import { renderDeckStandalone } from "../render/renderDeck";
+import { renderDeckStandalone, type RenderDefaults } from "../render/renderDeck";
 
 /**
  * Result of a single export run.
@@ -29,10 +29,11 @@ export function buildExportFilename(timestamp: number): string {
 export async function exportDeckToFile(
   app: App,
   file: TFile,
-  timestamp: number = Date.now()
+  timestamp: number = Date.now(),
+  defaults: RenderDefaults = {}
 ): Promise<ExportResult> {
   const markdown = await app.vault.read(file);
-  const html = renderDeckStandalone(markdown, file.path);
+  const html = renderDeckStandalone(markdown, file.path, defaults);
   const vaultRelativePath = buildExportFilename(timestamp);
   await app.vault.adapter.write(vaultRelativePath, html);
 
@@ -57,8 +58,14 @@ export async function exportDeckToFile(
  * `shell.openExternal`. Pure-IPC, no spawned process, no listening port.
  * Returns true on success, false if Electron isn't available (e.g. in
  * a unit-test environment) so the caller can show a sensible Notice.
+ *
+ * `urlSuffix` (e.g. `?print-pdf`) is appended verbatim after the file
+ * path so callers can flip reveal.js into print mode.
  */
-export async function openExternalInBrowser(absolutePath: string): Promise<boolean> {
+export async function openExternalInBrowser(
+  absolutePath: string,
+  urlSuffix = ""
+): Promise<boolean> {
   // `electron` is supplied at runtime by Obsidian's renderer host. We
   // require it through a non-static specifier so esbuild doesn't try to
   // bundle it (the build config also marks it external).
@@ -68,7 +75,7 @@ export async function openExternalInBrowser(absolutePath: string): Promise<boole
     const electron: { shell?: { openExternal: (url: string) => Promise<void> } } =
       require(electronModuleName);
     if (!electron.shell) return false;
-    await electron.shell.openExternal("file://" + absolutePath);
+    await electron.shell.openExternal("file://" + absolutePath + urlSuffix);
     return true;
   } catch {
     return false;
@@ -83,9 +90,27 @@ export async function openExternalInBrowser(absolutePath: string): Promise<boole
 export async function exportAndOpen(
   app: App,
   file: TFile,
-  timestamp: number = Date.now()
+  timestamp: number = Date.now(),
+  defaults: RenderDefaults = {}
 ): Promise<ExportResult & { opened: boolean }> {
-  const result = await exportDeckToFile(app, file, timestamp);
+  const result = await exportDeckToFile(app, file, timestamp, defaults);
   const opened = await openExternalInBrowser(result.absolutePath);
+  return { ...result, opened };
+}
+
+/**
+ * PDF-print variant — same export + open flow, but appends `?print-pdf`
+ * to the file:// URL. Reveal.js detects this query string and renders
+ * the deck flattened for printing (one slide per page). The user then
+ * uses their browser's "Print → Save as PDF" to produce the PDF.
+ */
+export async function exportAndOpenForPdf(
+  app: App,
+  file: TFile,
+  timestamp: number = Date.now(),
+  defaults: RenderDefaults = {}
+): Promise<ExportResult & { opened: boolean }> {
+  const result = await exportDeckToFile(app, file, timestamp, defaults);
+  const opened = await openExternalInBrowser(result.absolutePath, "?print-pdf");
   return { ...result, opened };
 }

@@ -1,11 +1,21 @@
 import { Plugin, WorkspaceLeaf, Notice, TFile, MarkdownView } from "obsidian";
 import { SlidesNGView, VIEW_TYPE_SLIDES_NG } from "./SlidesNGView";
 import { warmHighlighter } from "./render/shiki";
-import { exportAndOpen } from "./export/exportStandalone";
+import { exportAndOpen, exportAndOpenForPdf } from "./export/exportStandalone";
+import { SlidesNGSettingTab } from "./SlidesNGSettingTab";
+import { DEFAULT_SETTINGS, type SlidesNGSettings } from "./settings";
 
 export default class SlidesNGPlugin extends Plugin {
+  settings: SlidesNGSettings = { ...DEFAULT_SETTINGS };
+
   async onload(): Promise<void> {
-    this.registerView(VIEW_TYPE_SLIDES_NG, (leaf) => new SlidesNGView(leaf));
+    await this.loadSettings();
+    this.addSettingTab(new SlidesNGSettingTab(this.app, this));
+
+    this.registerView(
+      VIEW_TYPE_SLIDES_NG,
+      (leaf) => new SlidesNGView(leaf, () => this.settings)
+    );
 
     this.addRibbonIcon("presentation", "Open slides preview", () => {
       void this.activatePreviewLeaf();
@@ -27,6 +37,14 @@ export default class SlidesNGPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: "export-for-pdf",
+      name: "Export for PDF print",
+      callback: () => {
+        void this.openActiveDeckForPdf();
+      },
+    });
+
     // Warm Shiki in the background so the first slide render has syntax
     // highlighting. Until this resolves, code blocks fall back to plain
     // escaped <pre><code> — the deck still renders, just without colours.
@@ -36,17 +54,16 @@ export default class SlidesNGPlugin extends Plugin {
   }
 
   private async openActiveDeckInBrowser(): Promise<void> {
-    // Try the active markdown editor first; if not present (e.g. the
-    // slides-ng preview itself is focused), fall back to whatever deck
-    // the existing preview view is showing.
-    let file = this.resolveActiveDeckFile();
-    if (!file) file = this.resolvePreviewedDeckFile();
+    const file = this.resolveDeckFile();
     if (!file) {
       new Notice("Open a markdown deck before running this command.");
       return;
     }
     try {
-      const result = await exportAndOpen(this.app, file);
+      const result = await exportAndOpen(this.app, file, undefined, {
+        defaultTheme: this.settings.defaultTheme,
+        defaultTransition: this.settings.defaultTransition,
+      });
       if (result.opened) {
         new Notice(`Opened ${result.vaultRelativePath} in your default browser.`);
       } else {
@@ -58,6 +75,46 @@ export default class SlidesNGPlugin extends Plugin {
       const msg = err instanceof Error ? err.message : String(err);
       new Notice(`Open-in-browser failed: ${msg}`);
     }
+  }
+
+  private async openActiveDeckForPdf(): Promise<void> {
+    const file = this.resolveDeckFile();
+    if (!file) {
+      new Notice("Open a markdown deck before running this command.");
+      return;
+    }
+    try {
+      const result = await exportAndOpenForPdf(this.app, file, undefined, {
+        defaultTheme: this.settings.defaultTheme,
+        defaultTransition: this.settings.defaultTransition,
+      });
+      if (result.opened) {
+        new Notice(
+          "Opened in print mode. Use your browser's Print → Save as PDF."
+        );
+      } else {
+        new Notice(
+          `Wrote ${result.vaultRelativePath} but could not auto-launch the browser. Open manually + append ?print-pdf to the URL.`
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(`Export for PDF failed: ${msg}`);
+    }
+  }
+
+  /** Active markdown file, falling back to the preview view's loaded file. */
+  private resolveDeckFile(): TFile | null {
+    return this.resolveActiveDeckFile() ?? this.resolvePreviewedDeckFile();
+  }
+
+  async loadSettings(): Promise<void> {
+    const stored = await this.loadData();
+    this.settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+  }
+
+  async saveSettings(): Promise<void> {
+    await this.saveData(this.settings);
   }
 
   async onunload(): Promise<void> {

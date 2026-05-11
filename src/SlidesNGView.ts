@@ -1,6 +1,7 @@
 import { ItemView, WorkspaceLeaf, TFile, TAbstractFile, Notice, ViewStateResult } from "obsidian";
 import { renderDeck } from "./render/renderDeck";
-import { exportAndOpen } from "./export/exportStandalone";
+import { exportAndOpen, exportAndOpenForPdf } from "./export/exportStandalone";
+import type { SlidesNGSettings } from "./settings";
 
 export const VIEW_TYPE_SLIDES_NG = "slides-ng-preview";
 
@@ -10,13 +11,18 @@ interface SlidesNGViewState extends Record<string, unknown> {
   filePath?: string;
 }
 
+/** Lookup the view uses to read the current settings without holding a stale snapshot. */
+export type SettingsAccessor = () => SlidesNGSettings;
+
 export class SlidesNGView extends ItemView {
   private filePath?: string;
   private iframeEl?: HTMLIFrameElement;
   private refreshTimer: number | null = null;
+  private getSettings: SettingsAccessor;
 
-  constructor(leaf: WorkspaceLeaf) {
+  constructor(leaf: WorkspaceLeaf, getSettings: SettingsAccessor) {
     super(leaf);
+    this.getSettings = getSettings;
   }
 
   getViewType(): string {
@@ -67,6 +73,14 @@ export class SlidesNGView extends ItemView {
     });
     openBrowserBtn.addEventListener("click", () => {
       void this.openInBrowser();
+    });
+
+    const printBtn = toolbar.createEl("button", {
+      cls: "slides-ng-toolbar-btn",
+      text: "Export for PDF",
+    });
+    printBtn.addEventListener("click", () => {
+      void this.openInBrowserForPdf();
     });
 
     // Iframe
@@ -127,7 +141,11 @@ export class SlidesNGView extends ItemView {
 
     try {
       const markdown = await this.app.vault.read(file);
-      const html = renderDeck(markdown, file.path);
+      const settings = this.getSettings();
+      const html = renderDeck(markdown, file.path, {
+        defaultTheme: settings.defaultTheme,
+        defaultTransition: settings.defaultTransition,
+      });
       this.iframeEl.srcdoc = html;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -143,17 +161,10 @@ export class SlidesNGView extends ItemView {
   }
 
   async openInBrowser(): Promise<void> {
-    if (!this.filePath) {
-      new Notice("No deck file is loaded.");
-      return;
-    }
-    const file = this.app.vault.getAbstractFileByPath(this.filePath);
-    if (!(file instanceof TFile)) {
-      new Notice(`Deck file not found: ${this.filePath}`);
-      return;
-    }
+    const file = await this.resolveCurrentFile();
+    if (!file) return;
     try {
-      const result = await exportAndOpen(this.app, file);
+      const result = await exportAndOpen(this.app, file, undefined, this.renderDefaults());
       if (result.opened) {
         new Notice(`Opened ${result.vaultRelativePath} in your default browser.`);
       } else {
@@ -165,6 +176,42 @@ export class SlidesNGView extends ItemView {
       const msg = err instanceof Error ? err.message : String(err);
       new Notice(`Open-in-browser failed: ${msg}`);
     }
+  }
+
+  async openInBrowserForPdf(): Promise<void> {
+    const file = await this.resolveCurrentFile();
+    if (!file) return;
+    try {
+      const result = await exportAndOpenForPdf(this.app, file, undefined, this.renderDefaults());
+      if (result.opened) {
+        new Notice("Opened in print mode. Use your browser's Print → Save as PDF.");
+      } else {
+        new Notice(
+          `Wrote ${result.vaultRelativePath} but could not auto-launch the browser. Open manually + append ?print-pdf to the URL.`
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(`Export for PDF failed: ${msg}`);
+    }
+  }
+
+  private async resolveCurrentFile(): Promise<TFile | null> {
+    if (!this.filePath) {
+      new Notice("No deck file is loaded.");
+      return null;
+    }
+    const file = this.app.vault.getAbstractFileByPath(this.filePath);
+    if (!(file instanceof TFile)) {
+      new Notice(`Deck file not found: ${this.filePath}`);
+      return null;
+    }
+    return file;
+  }
+
+  private renderDefaults() {
+    const s = this.getSettings();
+    return { defaultTheme: s.defaultTheme, defaultTransition: s.defaultTransition };
   }
 }
 

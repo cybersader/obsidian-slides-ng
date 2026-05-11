@@ -40,9 +40,19 @@ md.use({
  * iframe-srcdoc HTML document. This is what the view assigns to its
  * `<iframe srcdoc=...>` attribute.
  */
-export function renderDeck(markdown: string, filepath = "deck.md"): string {
+export interface RenderDefaults {
+  /** Plugin-setting defaults — overridden by per-deck frontmatter. */
+  defaultTheme?: string;
+  defaultTransition?: string;
+}
+
+export function renderDeck(
+  markdown: string,
+  filepath = "deck.md",
+  defaults: RenderDefaults = {}
+): string {
   const deck = parseDeck(markdown, filepath);
-  return renderDeckFromAst(deck);
+  return renderDeckFromAst(deck, {}, defaults);
 }
 
 /**
@@ -52,18 +62,33 @@ export function renderDeck(markdown: string, filepath = "deck.md"): string {
  * mode (`?print-pdf` query string). Used by the "Open in browser"
  * export workflow.
  */
-export function renderDeckStandalone(markdown: string, filepath = "deck.md"): string {
+export function renderDeckStandalone(
+  markdown: string,
+  filepath = "deck.md",
+  defaults: RenderDefaults = {}
+): string {
   const deck = parseDeck(markdown, filepath);
-  return renderDeckFromAst(deck, { embedded: false });
+  return renderDeckFromAst(deck, { embedded: false }, defaults);
 }
 
-/** Same as `renderDeck` but starts from a pre-parsed Deck (useful in tests). */
+/**
+ * Resolution order (lowest priority first → each layer overrides previous):
+ *   1. `defaults` from plugin settings (theme, transition)
+ *   2. Per-deck frontmatter values
+ *   3. `overrides` passed in (e.g. {embedded:false} for standalone)
+ */
 export function renderDeckFromAst(
   deck: Deck,
-  overrides: Partial<DeckRenderOptions> = {}
+  overrides: Partial<DeckRenderOptions> = {},
+  defaults: RenderDefaults = {}
 ): string {
   const slides = deck.slides.map(slideToHtml);
+  const defaultLayer: Partial<DeckRenderOptions> = {};
+  if (defaults.defaultTheme) defaultLayer.theme = defaults.defaultTheme;
+  if (defaults.defaultTransition) defaultLayer.transition = defaults.defaultTransition;
+
   const opts: DeckRenderOptions = {
+    ...defaultLayer,
     ...headmatterToOptions(deck.headmatter),
     ...overrides,
   };
@@ -82,11 +107,10 @@ function markdownToHtml(text: string): string {
 
 function headmatterToOptions(
   headmatter: Record<string, unknown>
-): DeckRenderOptions {
-  const theme = typeof headmatter.theme === "string" ? headmatter.theme : undefined;
-  const transition =
-    typeof headmatter.transition === "string" ? headmatter.transition : undefined;
-  const slideNumber =
-    typeof headmatter.slideNumber === "boolean" ? headmatter.slideNumber : undefined;
-  return { theme, transition, slideNumber };
+): Partial<DeckRenderOptions> {
+  const out: Partial<DeckRenderOptions> = {};
+  if (typeof headmatter.theme === "string") out.theme = headmatter.theme;
+  if (typeof headmatter.transition === "string") out.transition = headmatter.transition;
+  if (typeof headmatter.slideNumber === "boolean") out.slideNumber = headmatter.slideNumber;
+  return out;
 }

@@ -35,6 +35,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     iframe-srcdoc HTML to `test-results/example-deck.html` for direct
     browser inspection — complements the full E2E with a fast inner-loop
     check that doesn't require an Obsidian binary
+- M7 themes + settings + PDF print + speaker view:
+  - **Themes:** bundled all 15 reveal.js themes that ship in
+    `node_modules/reveal.js/dist/theme/` (black, white, simple, league,
+    beige, sky, night, serif, solarized, blood, moon, dracula,
+    black-contrast, white-contrast, …). The generator script
+    auto-discovers them so future reveal upgrades pick up new themes
+    for free. `availableThemes()` lists them; `getTheme()` resolves
+    by name with a `black` fallback for unknown values.
+  - **Settings tab:** `src/SlidesNGSettingTab.ts` with dropdowns for
+    Default theme + Default transition. Persisted via Plugin
+    loadData/saveData. Settings resolve in priority order: programmatic
+    overrides (e.g. `embedded:false` for standalone) → per-deck
+    frontmatter → plugin settings → revealTemplate built-in defaults.
+  - **Empty frontmatter fix:** `headmatterToOptions` was returning
+    `{ transition: undefined }` for empty frontmatter which silently
+    overrode plugin defaults during the layered merge. Switched to a
+    partial object that only contains keys actually present in the
+    frontmatter.
+  - **PDF print mode:** new `slides-ng:export-for-pdf` command +
+    "Export for PDF" toolbar button. Same export path as
+    open-in-browser, but appends `?print-pdf` to the
+    `electron.shell.openExternal` URL. Reveal.js detects the query
+    string and renders one slide per page for browser-side
+    Print → Save as PDF.
+  - **Speaker view:** already works (M2 parses notes into
+    `<aside class="notes">`, M6's `embedded:false` enables reveal.js's
+    speaker-view plugin). User presses S in the standalone-export
+    browser tab to open a popup with notes, timer, and next-slide
+    preview. No new code needed.
+  - 9 new unit tests (settings + theme resolution + transition
+    constants); 5 new E2E tests (settings tab renders both controls,
+    captures screenshot, persistence flows into render, export-for-pdf
+    command registered + writes self-contained HTML).
+  - main.js: 1.64 MB → 1.75 MB (15 themes vs 3); still under 2 MB cap.
 - M6 open-in-browser presentation mode:
   - `renderDeckStandalone()` produces the same iframe-srcdoc HTML the
     in-Obsidian preview uses, but with `embedded: false` so reveal.js
