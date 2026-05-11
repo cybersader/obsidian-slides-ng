@@ -5,6 +5,9 @@
   "main": "main.js",
   "private": true,
   "scripts": {
+    "gen:reveal-assets": "bun run scripts/generate-reveal-assets.mjs",
+    "predev": "bun run gen:reveal-assets",
+    "prebuild": "bun run gen:reveal-assets",
     "dev": "bun run esbuild.config.mjs",
     "dev:reload": "AUTORELOAD=1 bun run esbuild.config.mjs",
     "build": "bun x tsc -noEmit -skipLibCheck && bun run esbuild.config.mjs production",
@@ -44,6 +47,7 @@
   },
   "dependencies": {
     "@slidev/parser": "^51.0.0",
+    "marked": "^14.0.0",
     "reveal.js": "^5.1.0",
     "shiki": "^1.24.0",
     "shiki-magic-move": "^0.5.0"

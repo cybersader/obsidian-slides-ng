@@ -10,6 +10,11 @@
 .obsidian/plugins/slides-ng/styles.css
 *.map
 
+# Generated assets — reveal.js + theme CSS inlined as string constants by
+# scripts/generate-reveal-assets.mjs. Regenerated on every `bun run dev`
+# or `bun run build`.
+src/render/revealAssets.generated.ts
+
 # Note: .obsidian/plugins/slides-ng/manifest.json IS committed if you want a clean
 # install of this repo to "just work" as a vault. Or gitignore it and let the build
 # regenerate. Pick one — the brief recommends committing it so cloning gives a
