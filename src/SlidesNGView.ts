@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf, TFile, TAbstractFile, Notice, ViewStateResult } from "obsidian";
 import { renderDeck } from "./render/renderDeck";
+import { exportAndOpen } from "./export/exportStandalone";
 
 export const VIEW_TYPE_SLIDES_NG = "slides-ng-preview";
 
@@ -58,6 +59,14 @@ export class SlidesNGView extends ItemView {
     });
     reloadBtn.addEventListener("click", () => {
       void this.refresh();
+    });
+
+    const openBrowserBtn = toolbar.createEl("button", {
+      cls: "slides-ng-toolbar-btn",
+      text: "Open in browser",
+    });
+    openBrowserBtn.addEventListener("click", () => {
+      void this.openInBrowser();
     });
 
     // Iframe
@@ -131,6 +140,31 @@ export class SlidesNGView extends ItemView {
     if (!this.iframeEl) return;
     const safe = escapeHtml(message);
     this.iframeEl.srcdoc = `<!doctype html><meta charset="utf-8"><body style="font-family:sans-serif;padding:2rem;color:#888;background:#111;height:100%;margin:0;display:flex;align-items:center;justify-content:center;text-align:center"><p>${safe}</p></body>`;
+  }
+
+  async openInBrowser(): Promise<void> {
+    if (!this.filePath) {
+      new Notice("No deck file is loaded.");
+      return;
+    }
+    const file = this.app.vault.getAbstractFileByPath(this.filePath);
+    if (!(file instanceof TFile)) {
+      new Notice(`Deck file not found: ${this.filePath}`);
+      return;
+    }
+    try {
+      const result = await exportAndOpen(this.app, file);
+      if (result.opened) {
+        new Notice(`Opened ${result.vaultRelativePath} in your default browser.`);
+      } else {
+        new Notice(
+          `Wrote ${result.vaultRelativePath} but could not auto-launch the browser. Open it manually.`
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(`Open-in-browser failed: ${msg}`);
+    }
   }
 }
 

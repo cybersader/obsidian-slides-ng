@@ -35,6 +35,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     iframe-srcdoc HTML to `test-results/example-deck.html` for direct
     browser inspection — complements the full E2E with a fast inner-loop
     check that doesn't require an Obsidian binary
+- M6 open-in-browser presentation mode:
+  - `renderDeckStandalone()` produces the same iframe-srcdoc HTML the
+    in-Obsidian preview uses, but with `embedded: false` so reveal.js
+    enables fullscreen (F key), controls, progress bar, and speaker
+    view (S key)
+  - `src/export/exportStandalone.ts` writes the rendered HTML to
+    `.slides-ng-export-<timestamp>.html` at the vault root, then calls
+    `electron.shell.openExternal('file://' + abs)` to open it in the
+    user's default browser. Zero IPC beyond Electron's standard shell;
+    no spawned process, no listening port — same architecture as the
+    rest of the plugin
+  - New toolbar button "Open in browser" next to "Reload"; new command
+    `slides-ng:open-in-browser` in the command palette
+  - The command falls back to the slides-ng preview view's currently-
+    loaded file when no markdown editor is the active view (so clicking
+    the toolbar button on the preview pane itself works)
+  - 11 new unit tests (exportStandalone.test.ts: filename, render
+    config, mock-adapter write); 5 new E2E tests (command registered,
+    file written, HTML self-contained with `embedded:false`, both
+    toolbar buttons present, screenshot capture)
+  - Visual proof: M6 screenshot shows the Notice "Opened
+    .slides-ng-export-<timestamp>.html in your default browser." —
+    confirming the full pipeline (WDIO → command → render → write →
+    electron.shell.openExternal → user-facing Notice) works end-to-end
+  - main.js: 1.57 MB → 1.64 MB (still under 2 MB cap)
 - M5 Slidev-style code line-stepping:
   - `src/parser/lineStep.ts` parses both square-bracket (`[1|2-3|all]`)
     and curly-bracket (`{1|2-3|all}`) info-string forms; supports single

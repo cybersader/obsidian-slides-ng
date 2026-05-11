@@ -5,6 +5,7 @@ import {
   type DeckRenderOptions,
   type SlideHtml,
 } from "./revealTemplate";
+export type { DeckRenderOptions } from "./revealTemplate";
 import { highlight } from "./shiki";
 import { applyClickReveals } from "./clickReveals";
 import { parseLineStep } from "../parser/lineStep";
@@ -44,10 +45,28 @@ export function renderDeck(markdown: string, filepath = "deck.md"): string {
   return renderDeckFromAst(deck);
 }
 
+/**
+ * Standalone variant — same content, but Reveal.js initialises in
+ * non-embedded mode so the user's default browser can drive fullscreen
+ * (F key), keyboard shortcuts, the speaker view (S key), and print
+ * mode (`?print-pdf` query string). Used by the "Open in browser"
+ * export workflow.
+ */
+export function renderDeckStandalone(markdown: string, filepath = "deck.md"): string {
+  const deck = parseDeck(markdown, filepath);
+  return renderDeckFromAst(deck, { embedded: false });
+}
+
 /** Same as `renderDeck` but starts from a pre-parsed Deck (useful in tests). */
-export function renderDeckFromAst(deck: Deck): string {
+export function renderDeckFromAst(
+  deck: Deck,
+  overrides: Partial<DeckRenderOptions> = {}
+): string {
   const slides = deck.slides.map(slideToHtml);
-  const opts = headmatterToOptions(deck.headmatter);
+  const opts: DeckRenderOptions = {
+    ...headmatterToOptions(deck.headmatter),
+    ...overrides,
+  };
   return buildIframeHtml(slides, opts);
 }
 

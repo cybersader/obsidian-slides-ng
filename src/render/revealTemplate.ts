@@ -13,6 +13,13 @@ export interface DeckRenderOptions {
   theme?: string;
   transition?: string;
   slideNumber?: boolean;
+  /**
+   * If true (default), Reveal is initialised with `embedded: true` —
+   * controls hidden, no fullscreen by default. Use this for the in-Obsidian
+   * iframe preview. Set to false for the standalone export (the user's
+   * default browser opens a fullscreen-capable deck via the F key).
+   */
+  embedded?: boolean;
   // Pass-through reveal.js Reveal.initialize() options if the caller
   // wants to override anything specific.
   revealOptions?: Record<string, unknown>;
@@ -30,6 +37,7 @@ export function buildIframeHtml(
   const theme = getTheme(options.theme);
   const transition = options.transition ?? "slide";
   const slideNumber = options.slideNumber ?? false;
+  const embedded = options.embedded ?? true;
   const userOptions = options.revealOptions ?? {};
 
   const sectionsHtml = slides
@@ -50,7 +58,11 @@ export function buildIframeHtml(
     keyboard: true,
     transition,
     slideNumber,
-    embedded: true,
+    embedded,
+    // In standalone mode show reveal's built-in controls and progress
+    // bar; in embedded mode they're hidden by default.
+    controls: !embedded,
+    progress: !embedded,
     ...userOptions,
   });
 
