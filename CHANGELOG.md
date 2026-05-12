@@ -6,6 +6,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-05-12
+
+### Added
+
+- **In-Obsidian Speaker Console** (`src/SlidesNGSpeakerView.ts`) — a new
+  `ItemView` that drives the preview iframe via postMessage. Shows
+  slide N / M, an elapsed timer (start/pause/reset), nav controls
+  (first / prev / next / last), a blackout toggle, the current
+  slide's speaker notes, a next-slide preview, and a slide picker
+  with two modes (compact and full-list) the user can toggle. Open
+  via the new toolbar "Speaker" button or the command palette
+  (`Slides NG: open speaker view`). Opens as a horizontal split so
+  preview + speaker are visible together; drag the tab to a new
+  Obsidian window for a true second-monitor speaker console.
+- **postMessage bridge in the iframe srcdoc** — inline script in
+  `revealTemplate.ts` listens for `{type:'slides-ng-cmd', cmd,
+  idx?}` (cmds: `next`, `prev`, `first`, `last`, `goto`,
+  `toggleBlackout`, `requestState`) and emits
+  `{type:'slides-ng-state', currentIdx, totalSlides, isBlackout,
+  notesHtml, nextTitle, slides:[…]}` on `ready`, `slidechanged`, and
+  fragment events. Sandbox stays at `allow-scripts` — no
+  cross-origin loosening required.
+- **Blackout overlay** — toggleable solid black `#slides-ng-blackout`
+  div over the deck for "pause attention" moments during a talk.
+- **Cursor-follow editor → preview** — when the markdown editor's
+  cursor is in the deck file, the preview iframe jumps to the slide
+  containing that cursor. Default on; togglable via
+  `Settings → Slides NG → Editor → Follow cursor in editor`. Pure
+  helper `slideIndexFromCursor` parses out `---` separators (skipping
+  YAML frontmatter and fenced code blocks) and returns a 0-based
+  slide index for any cursor line.
+- **Toolbar polish** — preview-pane toolbar buttons are now icon +
+  label with proper Obsidian-native styling. Speaker view button
+  uses the accent (CTA) variant so it stands out. On narrow leaves
+  the labels collapse and only icons remain. Tooltips on every
+  button.
+
+### Fixed
+
+- **Scroll-mode auto-activation** — reveal.js 5 silently switched into
+  scroll view in small embedded viewports, rearranging section DOM
+  (`.slides > section` no longer matched) and making
+  `Reveal.slide(idx)` scroll instead of jump. Now forced into
+  presentation mode via `view: "presentation"` +
+  `scrollActivationWidth: 0` in the iframe's `Reveal.initialize()`
+  config. Discrete slide nav + speaker-view drive both work as
+  expected.
+- **Preview-leaf re-activation** — clicking the ribbon button while
+  focused on the preview itself used to blank the deck because there
+  was no active markdown file. Now retains the previously-loaded
+  file when no markdown view is active.
+
+### Tests
+
+- 8 new unit tests for `slideIndexFromCursor` (frontmatter exclusion,
+  code-fence exclusion, vertical-slide `--` handling, cursor past
+  end-of-doc clamp)
+- New `test/e2e/speaker-view.spec.ts` (6 tests): initial state
+  arrival from iframe, Last button jumps to final slide, First
+  button returns to opening slide, blackout toggle adds/removes
+  iframe overlay div, picker mode toggles between compact and list
+  with correct DOM emission, side-by-side screenshot
+- Totals: 247 unit tests / 14 E2E spec files (was 239 / 13)
+
+### Changed
+
+- `harvestSlideMeta()` in the iframe bridge now uses a
+  presentation-mode-robust selector — walks ancestors and excludes
+  sections nested under another section — so vertical sub-slides
+  don't leak into the speaker's slide picker regardless of which
+  reveal view mode is active.
+
 ## [0.4.0] — 2026-05-12
 
 ### Added

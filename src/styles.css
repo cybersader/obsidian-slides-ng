@@ -3,6 +3,7 @@
   flex-direction: column;
   height: 100%;
   padding: 0;
+  container-type: inline-size;
 }
 
 .slides-ng-toolbar {
@@ -10,23 +11,70 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
+  padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
 }
-
+.slides-ng-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.slides-ng-toolbar-spacer {
+  flex: 1 1 auto;
+}
 .slides-ng-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 0.85em;
-  padding: 0.25rem 0.6rem;
-  border-radius: 4px;
+  line-height: 1;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
   border: 1px solid var(--background-modifier-border);
-  background: var(--interactive-normal);
+  background: var(--background-primary);
   color: var(--text-normal);
   cursor: pointer;
+  transition: background-color 80ms ease, border-color 80ms ease, color 80ms ease;
 }
-
 .slides-ng-toolbar-btn:hover {
-  background: var(--interactive-hover);
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+.slides-ng-toolbar-btn:active {
+  background: var(--background-modifier-active-hover, var(--background-modifier-hover));
+}
+.slides-ng-toolbar-btn.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+.slides-ng-toolbar-btn.mod-cta:hover {
+  background: var(--interactive-accent-hover);
+  border-color: var(--interactive-accent-hover);
+}
+.slides-ng-toolbar-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+.slides-ng-toolbar-btn-icon .svg-icon {
+  width: 16px;
+  height: 16px;
+}
+.slides-ng-toolbar-btn-label {
+  white-space: nowrap;
+}
+/* Narrow leaves (user shrunk the preview pane): hide labels, icon-only. */
+@container (max-width: 380px) {
+  .slides-ng-toolbar-btn-label {
+    display: none;
+  }
+  .slides-ng-toolbar-btn {
+    padding: 0.4rem;
+  }
 }
 
 .slides-ng-frame {
@@ -49,6 +97,115 @@
 .slides-ng-suggest .slides-ng-suggest-note {
   font-size: 0.8em;
   color: var(--text-muted);
+}
+
+/* ---------------- Speaker view ---------------- */
+.slides-ng-speaker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  height: 100%;
+  padding: 0.75rem;
+  overflow-y: auto;
+  font-size: 0.95em;
+}
+.slides-ng-speaker-status {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.slides-ng-speaker-position {
+  font-weight: 600;
+}
+.slides-ng-speaker-timer {
+  font-family: var(--font-monospace);
+  font-size: 1.05em;
+}
+.slides-ng-speaker-controls,
+.slides-ng-speaker-timer-ctrls {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.slides-ng-speaker-btn {
+  font-size: 0.85em;
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+.slides-ng-speaker-btn:hover {
+  background: var(--interactive-hover);
+}
+.slides-ng-speaker-btn.on {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.slides-ng-speaker-next {
+  padding: 0.3rem 0.6rem;
+  border-left: 3px solid var(--interactive-accent);
+  color: var(--text-muted);
+  font-style: italic;
+}
+.slides-ng-speaker-section-title {
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+.slides-ng-speaker-notes-wrap {
+  flex: 0 0 auto;
+}
+.slides-ng-speaker-notes {
+  padding: 0.6rem 0.8rem;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  min-height: 4rem;
+  line-height: 1.45;
+}
+.slides-ng-speaker-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.slides-ng-speaker-picker {
+  flex: 1 1 auto;
+  min-height: 4rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  overflow-y: auto;
+}
+.slides-ng-speaker-compact-current {
+  font-weight: 600;
+  color: var(--text-accent);
+  margin-bottom: 0.2rem;
+}
+.slides-ng-speaker-compact-upcoming {
+  color: var(--text-muted);
+  white-space: pre;
+}
+.slides-ng-speaker-list-item {
+  padding: 0.25rem 0.4rem;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.slides-ng-speaker-list-item:hover {
+  background: var(--background-modifier-hover);
+}
+.slides-ng-speaker-list-item.current {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-weight: 600;
 }
 
 /* The line-step CSS below is injected INTO THE IFRAME (via revealTemplate.ts).

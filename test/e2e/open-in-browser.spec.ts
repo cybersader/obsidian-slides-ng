@@ -115,11 +115,14 @@ describe("slides-ng open-in-browser", function () {
   });
 
   it("toolbar shows both Reload + Open-in-browser buttons", async () => {
+    // Use textContent rather than innerText: when the leaf is narrow,
+    // a container query hides the label visually (`display: none`) which
+    // makes innerText return ''. textContent still reflects the DOM text.
     const buttonTexts = await browser.execute(() => {
       const btns = Array.from(
         document.querySelectorAll(".slides-ng-toolbar .slides-ng-toolbar-btn")
       ) as HTMLButtonElement[];
-      return btns.map((b) => b.innerText.trim());
+      return btns.map((b) => (b.textContent ?? "").trim());
     });
     expect(buttonTexts).toContain("Reload");
     expect(buttonTexts).toContain("Open in browser");

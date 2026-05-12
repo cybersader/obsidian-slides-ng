@@ -7,6 +7,12 @@ export interface SlidesNGSettings {
   defaultTheme: string;
   /** Default reveal.js transition name. */
   defaultTransition: string;
+  /**
+   * When the user moves the cursor inside a deck file in the markdown
+   * editor, the preview iframe jumps to the slide containing that cursor.
+   * Default on; users who find it distracting can toggle off.
+   */
+  followCursorInEditor: boolean;
 }
 
 export const REVEAL_TRANSITIONS = [
@@ -21,4 +27,5 @@ export const REVEAL_TRANSITIONS = [
 export const DEFAULT_SETTINGS: SlidesNGSettings = {
   defaultTheme: "black",
   defaultTransition: "slide",
+  followCursorInEditor: true,
 };

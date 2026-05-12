@@ -1,7 +1,19 @@
-import { ItemView, WorkspaceLeaf, TFile, TAbstractFile, Notice, ViewStateResult } from "obsidian";
+import {
+  ItemView,
+  WorkspaceLeaf,
+  TFile,
+  TAbstractFile,
+  Notice,
+  ViewStateResult,
+  MarkdownView,
+  setIcon,
+  setTooltip,
+} from "obsidian";
+import { VIEW_TYPE_SLIDES_NG_SPEAKER } from "./SlidesNGSpeakerView";
 import { renderDeck } from "./render/renderDeck";
 import { exportAndOpen, exportAndOpenForPdf } from "./export/exportStandalone";
 import { warmHighlighter } from "./render/shiki";
+import { slideIndexFromCursor } from "./parser/slideIndexFromCursor";
 import type { SlidesNGSettings } from "./settings";
 
 export const VIEW_TYPE_SLIDES_NG = "slides-ng-preview";
@@ -19,6 +31,8 @@ export class SlidesNGView extends ItemView {
   private filePath?: string;
   private iframeEl?: HTMLIFrameElement;
   private refreshTimer: number | null = null;
+  private cursorFollowTimer: number | null = null;
+  private lastSentSlideIdx: number | null = null;
   private getSettings: SettingsAccessor;
 
   constructor(leaf: WorkspaceLeaf, getSettings: SettingsAccessor) {
@@ -58,30 +72,41 @@ export class SlidesNGView extends ItemView {
     container.empty();
     container.addClass("slides-ng-view");
 
-    // Toolbar
+    // Toolbar — icon + label, grouped: render-controls on the left,
+    // open-out controls + speaker on the right.
     const toolbar = container.createDiv({ cls: "slides-ng-toolbar" });
-    const reloadBtn = toolbar.createEl("button", {
-      cls: "slides-ng-toolbar-btn",
-      text: "Reload",
-    });
-    reloadBtn.addEventListener("click", () => {
-      void this.refresh();
+    const leftGroup = toolbar.createDiv({ cls: "slides-ng-toolbar-group" });
+    const spacer = toolbar.createDiv({ cls: "slides-ng-toolbar-spacer" });
+    void spacer;
+    const rightGroup = toolbar.createDiv({ cls: "slides-ng-toolbar-group" });
+
+    this.addToolbarButton(leftGroup, {
+      icon: "refresh-cw",
+      label: "Reload",
+      tooltip: "Re-render the deck",
+      onClick: () => void this.refresh(),
     });
 
-    const openBrowserBtn = toolbar.createEl("button", {
-      cls: "slides-ng-toolbar-btn",
-      text: "Open in browser",
-    });
-    openBrowserBtn.addEventListener("click", () => {
-      void this.openInBrowser();
+    this.addToolbarButton(rightGroup, {
+      icon: "monitor-play",
+      label: "Speaker",
+      tooltip: "Open speaker view (notes + controls)",
+      variant: "accent",
+      onClick: () => void this.openSpeakerView(),
     });
 
-    const printBtn = toolbar.createEl("button", {
-      cls: "slides-ng-toolbar-btn",
-      text: "Export for PDF",
+    this.addToolbarButton(rightGroup, {
+      icon: "external-link",
+      label: "Open in browser",
+      tooltip: "Export + open fullscreen in your default browser",
+      onClick: () => void this.openInBrowser(),
     });
-    printBtn.addEventListener("click", () => {
-      void this.openInBrowserForPdf();
+
+    this.addToolbarButton(rightGroup, {
+      icon: "file-down",
+      label: "Export PDF",
+      tooltip: "Export + open in print-mode for browser PDF save",
+      onClick: () => void this.openInBrowserForPdf(),
     });
 
     // Iframe
@@ -104,6 +129,15 @@ export class SlidesNGView extends ItemView {
       })
     );
 
+    // Cursor-follow: when the editor selection changes inside the deck
+    // file, postMessage the iframe to jump to the matching slide.
+    // selectionchange fires for every cursor move + every keystroke; the
+    // debounce + active-view guard keep it cheap.
+    this.registerDomEvent(document, "selectionchange", () => {
+      if (!this.getSettings().followCursorInEditor) return;
+      this.scheduleCursorFollow();
+    });
+
     // Ensure Shiki is warm before the first render so syntax highlighting
     // AND magic-move keyed-token computation work on the first frame.
     // (Subsequent renders are unaffected — the highlighter caches itself.)
@@ -116,8 +150,83 @@ export class SlidesNGView extends ItemView {
       window.clearTimeout(this.refreshTimer);
       this.refreshTimer = null;
     }
+    if (this.cursorFollowTimer !== null) {
+      window.clearTimeout(this.cursorFollowTimer);
+      this.cursorFollowTimer = null;
+    }
     this.iframeEl = undefined;
     this.contentEl.empty();
+  }
+
+  private addToolbarButton(
+    parent: HTMLElement,
+    opts: {
+      icon: string;
+      label: string;
+      tooltip?: string;
+      variant?: "accent";
+      onClick: () => void;
+    }
+  ): HTMLButtonElement {
+    const btn = parent.createEl("button", {
+      cls: "slides-ng-toolbar-btn" + (opts.variant === "accent" ? " mod-cta" : ""),
+    });
+    const iconEl = btn.createSpan({ cls: "slides-ng-toolbar-btn-icon" });
+    setIcon(iconEl, opts.icon);
+    btn.createSpan({ cls: "slides-ng-toolbar-btn-label", text: opts.label });
+    if (opts.tooltip) setTooltip(btn, opts.tooltip);
+    btn.addEventListener("click", opts.onClick);
+    return btn;
+  }
+
+  private async openSpeakerView(): Promise<void> {
+    const { workspace } = this.app;
+    const existing = workspace.getLeavesOfType(VIEW_TYPE_SLIDES_NG_SPEAKER);
+    if (existing.length > 0) {
+      workspace.revealLeaf(existing[0]);
+      return;
+    }
+    const leaf = workspace.getLeaf("split", "horizontal");
+    await leaf.setViewState({
+      type: VIEW_TYPE_SLIDES_NG_SPEAKER,
+      active: true,
+    });
+    workspace.revealLeaf(leaf);
+  }
+
+  /**
+   * Post a command to the iframe. Public so the speaker view can drive
+   * navigation without re-finding the iframe itself.
+   */
+  postIframeCommand(cmd: string, idx?: number): void {
+    const win = this.iframeEl?.contentWindow;
+    if (!win) return;
+    win.postMessage({ type: "slides-ng-cmd", cmd, idx }, "*");
+  }
+
+  private scheduleCursorFollow(): void {
+    if (this.cursorFollowTimer !== null) {
+      window.clearTimeout(this.cursorFollowTimer);
+    }
+    this.cursorFollowTimer = window.setTimeout(() => {
+      this.cursorFollowTimer = null;
+      this.applyCursorFollow();
+    }, 150);
+  }
+
+  private applyCursorFollow(): void {
+    if (!this.iframeEl?.contentWindow || !this.filePath) return;
+    const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!mdView?.file || mdView.file.path !== this.filePath) return;
+    const cursor = mdView.editor.getCursor();
+    const md = mdView.editor.getValue();
+    const idx = slideIndexFromCursor(md, cursor.line);
+    if (idx === this.lastSentSlideIdx) return;
+    this.lastSentSlideIdx = idx;
+    this.iframeEl.contentWindow.postMessage(
+      { type: "slides-ng-cmd", cmd: "goto", idx },
+      "*"
+    );
   }
 
   private scheduleRefresh(): void {

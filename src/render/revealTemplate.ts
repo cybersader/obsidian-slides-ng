@@ -63,6 +63,12 @@ export function buildIframeHtml(
     transition,
     slideNumber,
     embedded,
+    // Force presentation mode. reveal.js 5 auto-activates scroll mode in
+    // small embedded viewports, which rearranges section DOM and breaks
+    // discrete slide navigation (Reveal.slide() scrolls instead of
+    // jumping). Slide decks want discrete transitions.
+    view: "presentation",
+    scrollActivationWidth: 0,
     // In standalone mode show reveal's built-in controls and progress
     // bar; in embedded mode they're hidden by default.
     controls: !embedded,
@@ -415,6 +421,109 @@ ${sectionsHtml}
           }
         });
       });
+    })();
+  </script>
+  <script>
+    /* postMessage bridge for the in-Obsidian Speaker Console (v0.5).
+     * Listens for navigation commands from the parent window and posts
+     * state-change events back so the speaker view stays in sync. */
+    (function () {
+      function harvestSlideMeta() {
+        // Robust regardless of reveal view mode: gather all sections under
+        // .reveal, then keep only horizontal (top-level) ones — a top-level
+        // section has no <section> ancestor under .reveal.
+        var all = Array.from(document.querySelectorAll('.reveal section'));
+        var horizontals = all.filter(function (s) {
+          var p = s.parentElement;
+          while (p && !p.classList.contains('reveal')) {
+            if (p.tagName === 'SECTION') return false;
+            p = p.parentElement;
+          }
+          return true;
+        });
+        return horizontals.map(function (s, idx) {
+          var titleEl = s.querySelector('h1, h2, h3');
+          var title = titleEl ? titleEl.innerText.trim().slice(0, 80) : '';
+          return { idx: idx, title: title };
+        });
+      }
+      function currentState() {
+        if (typeof Reveal === 'undefined') return null;
+        var indices = Reveal.getIndices();
+        var current = Reveal.getCurrentSlide();
+        var totalSlides = Reveal.getTotalSlides();
+        var notesEl = current ? current.querySelector('aside.notes') : null;
+        var nextSlide = null;
+        try { nextSlide = Reveal.getSlide(indices.h + 1, 0); } catch (e) { nextSlide = null; }
+        var nextTitleEl = nextSlide ? nextSlide.querySelector('h1, h2, h3') : null;
+        var blackoutEl = document.getElementById('slides-ng-blackout');
+        return {
+          type: 'slides-ng-state',
+          currentIdx: indices.h,
+          fragmentIdx: indices.f != null ? indices.f : -1,
+          totalSlides: totalSlides,
+          isBlackout: !!(blackoutEl && blackoutEl.classList.contains('on')),
+          notesHtml: notesEl ? notesEl.innerHTML : '',
+          nextTitle: nextTitleEl ? nextTitleEl.innerText.trim().slice(0, 80) : '',
+          slides: harvestSlideMeta()
+        };
+      }
+      function postState() {
+        var state = currentState();
+        if (state && window.parent && window.parent !== window) {
+          window.parent.postMessage(state, '*');
+        }
+      }
+      function ensureBlackoutEl() {
+        var el = document.getElementById('slides-ng-blackout');
+        if (el) return el;
+        el = document.createElement('div');
+        el.id = 'slides-ng-blackout';
+        el.style.cssText = 'position:fixed;inset:0;background:#000;z-index:9999;display:none;';
+        document.body.appendChild(el);
+        return el;
+      }
+      window.addEventListener('message', function (event) {
+        var data = event.data;
+        if (!data || data.type !== 'slides-ng-cmd' || typeof Reveal === 'undefined') return;
+        try {
+          switch (data.cmd) {
+            case 'next':   Reveal.next();   break;
+            case 'prev':   Reveal.prev();   break;
+            case 'first':  Reveal.slide(0); break;
+            case 'last':   Reveal.slide(Reveal.getTotalSlides() - 1); break;
+            case 'goto':   if (typeof data.idx === 'number') Reveal.slide(data.idx); break;
+            case 'toggleBlackout': {
+              var el = ensureBlackoutEl();
+              if (el.classList.contains('on')) {
+                el.classList.remove('on');
+                el.style.display = 'none';
+              } else {
+                el.classList.add('on');
+                el.style.display = 'block';
+              }
+              postState();
+              break;
+            }
+            case 'requestState': postState(); break;
+          }
+        } catch (e) {
+          console.warn('[slides-ng] postMessage command failed', e);
+        }
+      });
+      function attachListeners() {
+        if (typeof Reveal === 'undefined') {
+          setTimeout(attachListeners, 50);
+          return;
+        }
+        Reveal.on('ready', postState);
+        Reveal.on('slidechanged', postState);
+        Reveal.on('fragmentshown', postState);
+        Reveal.on('fragmenthidden', postState);
+        // Initial post in case 'ready' has already fired before this attaches.
+        setTimeout(postState, 100);
+      }
+      attachListeners();
     })();
   </script>
 </body>

@@ -37,6 +37,8 @@ Slides NG aims for the lightest possible authoring substrate:
 - **Snippet/template expansion** — type `::name` at line start in the slide body; the autocomplete dropdown surfaces ready-made markdown templates (note, cover, two-cols, auto-animate, v-clicks, fragment, code-ts, …) — selecting one fully replaces the `::name` with multi-line markdown. Plain markdown out, no shortcode rendering at runtime.
 - **Image layouts** — `image-left`, `image-right`, `image` (full-bleed) — image URL from per-slide frontmatter `image:`. Vault-relative attachments are resolved via Obsidian's adapter; absolute URLs and data URIs pass through. Wikilink form `[[attachment.png]]` also works.
 - **Magic-Move** — paired code blocks across consecutive slides sharing `{key=NAME}` get smooth token-morph transitions courtesy of `shiki-magic-move`. Server-side keyed-token computation; bundled vanilla renderer runs inside the iframe.
+- **In-Obsidian Speaker Console** — opens alongside the preview as a horizontal split (drag-out to a new window for a true second monitor). Shows slide N / M, elapsed timer (start/pause/reset), navigation controls, blackout toggle, current slide's speaker notes, next-slide preview, and a slide picker (compact or full-list, user-toggleable). Drives the preview iframe via postMessage; no cross-origin shenanigans.
+- **Cursor-follow** (default on; togglable in settings) — when the markdown cursor is inside a deck file, the preview jumps to that slide. Counts `---` separators while skipping YAML frontmatter and fenced code blocks.
 - **Open in browser** — writes `.slides-ng-export-<timestamp>.html` to the vault, opens via `electron.shell.openExternal` (no port, no spawned server)
 - **Export for PDF** — same export workflow, opens with `?print-pdf` so reveal.js flattens the deck for browser-side Print → Save as PDF
 
@@ -140,7 +142,7 @@ reveal.js + reveal CSS + all 15 themes are inlined at build time by `scripts/gen
 
 ## Status
 
-v0.4.0 — Snippet expansion + image layouts + Magic-Move. v0.1.0 covered the brief's §7 acceptance list; v0.2.0 added 9 named layouts + `::name::` slots; v0.2.1 added the layout metadata registry + validation + in-editor autocomplete; v0.3.0 added Slides-Extended-flavoured `<!-- slide attr -->` / `<!-- element attr -->` annotations; v0.4.0 adds template-expansion snippets via the `::name` summon menu, three image layouts with Obsidian-attachment path resolution, and Magic-Move via bundled `shiki-magic-move`. See `CHANGELOG.md` for the full delta.
+v0.5.0 — In-Obsidian Speaker Console + cursor-follow + toolbar polish. v0.1.0 covered the brief's §7 acceptance list; v0.2.0 added 9 named layouts + `::name::` slots; v0.2.1 added the layout metadata registry + validation + in-editor autocomplete; v0.3.0 added Slides-Extended-flavoured `<!-- slide attr -->` / `<!-- element attr -->` annotations; v0.4.0 added template-expansion snippets, three image layouts with Obsidian-attachment path resolution, and Magic-Move via bundled `shiki-magic-move`; v0.5.0 adds the speaker console (drag-to-popout, notes + timer + blackout + picker, driven via iframe postMessage) and editor cursor-follow. See `CHANGELOG.md` for the full delta.
 
 | Phase | Description | State |
 |---|---|---|
@@ -158,6 +160,7 @@ v0.4.0 — Snippet expansion + image layouts + Magic-Move. v0.1.0 covered the br
 | v0.2.1 | Layout registry + render-time validation + in-editor autocomplete | ✅ |
 | v0.3.0 | Slide + element annotations (auto-animate, custom classes/IDs, fragment attrs) | ✅ |
 | v0.4.0 | Snippet expansion + image layouts + Magic-Move | ✅ |
+| v0.5.0 | Speaker console + cursor-follow + toolbar polish | ✅ |
 
 ## Features explicitly NOT in v0.1
 

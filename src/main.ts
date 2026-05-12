@@ -1,5 +1,9 @@
 import { Plugin, WorkspaceLeaf, Notice, TFile, MarkdownView } from "obsidian";
 import { SlidesNGView, VIEW_TYPE_SLIDES_NG } from "./SlidesNGView";
+import {
+  SlidesNGSpeakerView,
+  VIEW_TYPE_SLIDES_NG_SPEAKER,
+} from "./SlidesNGSpeakerView";
 import { warmHighlighter } from "./render/shiki";
 import { exportAndOpen, exportAndOpenForPdf } from "./export/exportStandalone";
 import { SlidesNGSettingTab } from "./SlidesNGSettingTab";
@@ -20,6 +24,11 @@ export default class SlidesNGPlugin extends Plugin {
     this.registerView(
       VIEW_TYPE_SLIDES_NG,
       (leaf) => new SlidesNGView(leaf, () => this.settings)
+    );
+
+    this.registerView(
+      VIEW_TYPE_SLIDES_NG_SPEAKER,
+      (leaf) => new SlidesNGSpeakerView(leaf)
     );
 
     // In-editor autocomplete for deck authoring.
@@ -52,6 +61,14 @@ export default class SlidesNGPlugin extends Plugin {
       name: "Export for PDF print",
       callback: () => {
         void this.openActiveDeckForPdf();
+      },
+    });
+
+    this.addCommand({
+      id: "open-speaker-view",
+      name: "Open speaker view",
+      callback: () => {
+        void this.activateSpeakerLeaf();
       },
     });
 
@@ -129,19 +146,28 @@ export default class SlidesNGPlugin extends Plugin {
 
   async onunload(): Promise<void> {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_SLIDES_NG);
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_SLIDES_NG_SPEAKER);
   }
 
   private async activatePreviewLeaf(): Promise<void> {
     const { workspace } = this.app;
     const activeFile = this.resolveActiveDeckFile();
-
     const existing = workspace.getLeavesOfType(VIEW_TYPE_SLIDES_NG);
+
     if (existing.length > 0) {
       const leaf = existing[0];
+      // Preserve the previously-loaded deck when the user re-opens preview
+      // from the ribbon while focused on a non-markdown pane (e.g. the
+      // preview itself). Only switch decks if there is an active markdown
+      // file to switch to.
+      const existingPath = (leaf.view instanceof SlidesNGView)
+        ? leaf.view.getState()?.filePath
+        : undefined;
+      const filePath = activeFile?.path ?? existingPath;
       await leaf.setViewState({
         type: VIEW_TYPE_SLIDES_NG,
         active: true,
-        state: { filePath: activeFile?.path },
+        state: { filePath },
       });
       workspace.revealLeaf(leaf);
       return;
@@ -158,6 +184,28 @@ export default class SlidesNGPlugin extends Plugin {
       state: { filePath: activeFile?.path },
     });
     workspace.revealLeaf(leaf);
+  }
+
+  private async activateSpeakerLeaf(): Promise<void> {
+    const { workspace } = this.app;
+    const existing = workspace.getLeavesOfType(VIEW_TYPE_SLIDES_NG_SPEAKER);
+    if (existing.length > 0) {
+      workspace.revealLeaf(existing[0]);
+      return;
+    }
+    // Horizontal split → speaker view sits below the current pane so
+    // preview + speaker are both visible. User can still drag the tab to
+    // a new window for true second-monitor use.
+    const leaf = workspace.getLeaf("split", "horizontal");
+    await leaf.setViewState({
+      type: VIEW_TYPE_SLIDES_NG_SPEAKER,
+      active: true,
+    });
+    workspace.revealLeaf(leaf);
+
+    if (workspace.getLeavesOfType(VIEW_TYPE_SLIDES_NG).length === 0) {
+      new Notice("Speaker view opened — open a slides preview to drive.");
+    }
   }
 
   private resolveActiveDeckFile(): TFile | null {

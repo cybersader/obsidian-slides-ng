@@ -42,5 +42,19 @@ export class SlidesNGSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
       });
+
+    new Setting(containerEl).setName("Editor").setHeading();
+
+    new Setting(containerEl)
+      .setName("Follow cursor in editor")
+      .setDesc(
+        "When you click in the Markdown editor, the preview jumps to the slide your cursor is on."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.followCursorInEditor).onChange(async (v) => {
+          this.plugin.settings.followCursorInEditor = v;
+          await this.plugin.saveSettings();
+        });
+      });
   }
 }
