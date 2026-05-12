@@ -40,7 +40,7 @@ export function parseAllFrontmatterBlocks(
       } else {
         let layout: string | null = null;
         for (let k = openLine + 1; k < i; k++) {
-          const m = /^layout:\s*(\S+)/.exec(editor.getLine(k));
+          const m = /^(?:slides-ng-layout|layout):\s*(\S+)/.exec(editor.getLine(k));
           if (m) {
             layout = m[1].trim();
             break;
@@ -54,7 +54,7 @@ export function parseAllFrontmatterBlocks(
   if (openLine !== -1) {
     let layout: string | null = null;
     for (let k = openLine + 1; k < totalLines; k++) {
-      const m = /^layout:\s*(\S+)/.exec(editor.getLine(k));
+      const m = /^(?:slides-ng-layout|layout):\s*(\S+)/.exec(editor.getLine(k));
       if (m) {
         layout = m[1].trim();
         break;

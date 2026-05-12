@@ -102,20 +102,27 @@ if (!prod) {
 
 if (prod) {
   await context.rebuild();
-  // Keep the repo's own .obsidian/plugins/slides-ng/ in sync with prod
-  // artifacts so opening the repo as a vault Just Works. Avoids the
-  // stale-build footgun where `bun run build` only wrote to root but
-  // the dev-vault folder under .obsidian retained an M2-era main.js.
-  const devVaultPluginDir = "./.obsidian/plugins/slides-ng/";
-  if (!existsSync(devVaultPluginDir)) {
-    mkdirSync(devVaultPluginDir, { recursive: true });
-  }
-  for (const f of ["main.js", "manifest.json", "styles.css"]) {
-    if (existsSync(f)) {
-      copyFileSync(f, devVaultPluginDir + f);
+  // Keep BOTH plugin folders in sync with prod artifacts so manual
+  // testing in either vault Just Works after `bun run build`:
+  //   - ./.obsidian/plugins/slides-ng/ (repo root opened as a vault)
+  //   - ./e2e-vault/.obsidian/plugins/slides-ng/ (the E2E sandbox vault
+  //     the user may also test in manually)
+  // Avoids the stale-build footgun.
+  const syncTargets = [
+    "./.obsidian/plugins/slides-ng/",
+    "./e2e-vault/.obsidian/plugins/slides-ng/",
+  ];
+  for (const dir of syncTargets) {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
     }
+    for (const f of ["main.js", "manifest.json", "styles.css"]) {
+      if (existsSync(f)) {
+        copyFileSync(f, dir + f);
+      }
+    }
+    console.log(`[build] synced main.js/manifest.json/styles.css → ${dir}`);
   }
-  console.log(`[build] synced main.js/manifest.json/styles.css → ${devVaultPluginDir}`);
   process.exit(0);
 } else {
   await context.watch();

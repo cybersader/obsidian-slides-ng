@@ -27,6 +27,14 @@ interface SlidesNGViewState extends Record<string, unknown> {
 /** Lookup the view uses to read the current settings without holding a stale snapshot. */
 export type SettingsAccessor = () => SlidesNGSettings;
 
+/**
+ * Returns the user's intended deck file. Plugin-supplied — combines the
+ * current active MarkdownView with a tracked "last markdown file" so
+ * toolbar clicks that steal focus from the markdown view still resolve
+ * to the right file. See `SlidesNGPlugin.resolveActiveDeckFile`.
+ */
+export type DeckFileAccessor = () => TFile | null;
+
 export class SlidesNGView extends ItemView {
   private filePath?: string;
   private iframeEl?: HTMLIFrameElement;
@@ -34,10 +42,16 @@ export class SlidesNGView extends ItemView {
   private cursorFollowTimer: number | null = null;
   private lastSentSlideIdx: number | null = null;
   private getSettings: SettingsAccessor;
+  private resolveDeckFile: DeckFileAccessor;
 
-  constructor(leaf: WorkspaceLeaf, getSettings: SettingsAccessor) {
+  constructor(
+    leaf: WorkspaceLeaf,
+    getSettings: SettingsAccessor,
+    resolveDeckFile: DeckFileAccessor
+  ) {
     super(leaf);
     this.getSettings = getSettings;
+    this.resolveDeckFile = resolveDeckFile;
   }
 
   getViewType(): string {
@@ -105,7 +119,6 @@ export class SlidesNGView extends ItemView {
       icon: "monitor-play",
       label: "Speaker",
       tooltip: "Open speaker view (notes + controls)",
-      variant: "accent",
       onClick: () => void this.openSpeakerView(),
     });
 
@@ -202,7 +215,13 @@ export class SlidesNGView extends ItemView {
    * No-op if no markdown view is active or it's already the loaded file.
    */
   private async useCurrentFile(): Promise<void> {
-    const file = this.app.workspace.getActiveViewOfType(MarkdownView)?.file;
+    // Don't use `getActiveViewOfType(MarkdownView)?.file` directly here —
+    // clicking the toolbar steals focus from the markdown view BEFORE
+    // the click handler runs, so the active view becomes the preview
+    // itself and the lookup returns null. The plugin-level resolver
+    // tracks `lastMarkdownFile` via active-leaf-change for this exact
+    // case (same fix as the ribbon-button focus-steal in v0.5.4).
+    const file = this.resolveDeckFile();
     if (!file) {
       new Notice("No Markdown file is focused.");
       return;

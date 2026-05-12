@@ -6,10 +6,17 @@ move between sections as work happens. Released versions live in
 
 ## In flight
 
-### 0.8.0 — modular speaker panels
+### 0.8.0 — modular speaker panels + UX polish
 
 - **Light drag-and-drop modular panels** — each speaker panel (status / controls / timer / next / notes / picker / scenes / visual-next-preview) gets a drag handle, vertical reorder, order persists per-user
 - **Per-panel show/hide** — settings toggles to hide panels you don't use during presentation
+- **Compact picker redesign** — current compact mode is sparse; rethink with the modular layout
+- **Clickable slide-N-of-M status label** — opens a slide picker overlay
+- **Editable speaker notes from the speaker view** — click notes panel, edit inline, write back to deck file on debounce
+
+### 0.8.x — PDF export options
+
+- **Export-to-PDF dialog** — currently `?print-pdf` opens a fixed reveal print mode with no controls. Replace with a small dialog: notes on/off, aspect ratio override, theme override, slide-range, page layout. ~3-4 hr.
 
 ### 0.9.0 (tentative) — reverse-follow + presenter overlays
 
@@ -21,6 +28,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.7.1** — patch release: frontmatter keys namespaced `slides-ng-*` (back-compat for legacy keys), Grid CSS rework with aspect-ratio tiles + no horizontal scroll, scene newlines fixed, Menu toolbar button actually toggles, duplicate Blackout removed, "Use current" focus-steal fix
 - **0.7.0** — speaker UX overhaul: visual next-slide preview iframe, OBS-style scene overlays, Grid button real-grid fix with slide numbers, icon-based speaker buttons, Menu toolbar button
 - **0.6.0** — authoring polish bundle: per-slide backgrounds with vault-path resolution, code-block max-height + scroll, `customCSS:` frontmatter injection, `transitionSpeed` setting, `magicMoveDurationMs` setting
 - **0.5.4** — ribbon-button focus-steal recovery

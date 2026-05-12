@@ -134,22 +134,30 @@ describe("'Use current' toolbar button swaps the preview source", function () {
     }, SECOND);
   });
 
-  it("clicking 'Use current' with no markdown view focused shows a notice", async () => {
-    // Close all leaves except the preview so no MarkdownView is active.
+  it("clicking 'Use current' uses the last-focused markdown file when no markdown view is currently active", async () => {
+    // v0.7.1 behaviour: clicking the toolbar steals focus from the
+    // markdown view. The plugin tracks lastMarkdownFile via active-
+    // leaf-change so we still resolve to the user's intended deck.
+    // Open example.md as the most-recently-focused markdown file.
+    await browser.executeObsidian(async ({ app }) => {
+      const file = app.vault.getAbstractFileByPath("Decks/example.md");
+      if (file) {
+        // @ts-expect-error — openFile accepts TFile at runtime
+        await app.workspace.getLeaf(false).openFile(file);
+      }
+    });
+    await browser.pause(200);
+
+    // Now detach all markdown leaves so `getActiveViewOfType(MarkdownView)`
+    // returns null — but lastMarkdownFile still points at example.md.
     await browser.executeObsidian(({ app }) => {
       const leaves = app.workspace.getLeavesOfType("markdown");
       for (const leaf of leaves) leaf.detach();
     });
-    await browser.pause(300);
+    await browser.pause(200);
 
-    // Click "Use current". Should produce a notice — but the preview
-    // should stay on whatever it was last showing.
-    const beforePath = await browser.executeObsidian(({ app }) => {
-      const leaf = app.workspace.getLeavesOfType("slides-ng-preview")[0];
-      // @ts-expect-error
-      return leaf?.view?.getState()?.filePath;
-    });
-
+    // Click "Use current". With the v0.7.1 focus-steal fix, this
+    // resolves to lastMarkdownFile and swaps the preview accordingly.
     await browser.execute(() => {
       const btns = Array.from(
         document.querySelectorAll(".slides-ng-toolbar .slides-ng-toolbar-btn")
@@ -157,13 +165,24 @@ describe("'Use current' toolbar button swaps the preview source", function () {
       const target = btns.find((b) => (b.textContent ?? "").trim().startsWith("Use current"));
       target?.click();
     });
-    await browser.pause(300);
+
+    await browser.waitUntil(
+      async () => {
+        const p = await browser.executeObsidian(({ app }) => {
+          const leaf = app.workspace.getLeavesOfType("slides-ng-preview")[0];
+          // @ts-expect-error
+          return leaf?.view?.getState()?.filePath;
+        });
+        return p === "Decks/example.md";
+      },
+      { timeout: 5000, timeoutMsg: "preview never swapped to last-focused markdown file" }
+    );
 
     const afterPath = await browser.executeObsidian(({ app }) => {
       const leaf = app.workspace.getLeavesOfType("slides-ng-preview")[0];
       // @ts-expect-error
       return leaf?.view?.getState()?.filePath;
     });
-    expect(afterPath).toBe(beforePath);
+    expect(afterPath).toBe("Decks/example.md");
   });
 });

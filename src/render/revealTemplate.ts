@@ -414,60 +414,87 @@ export function buildIframeHtml(
      * Overview mode (the "Grid" button in the speaker view triggers
      * Reveal.toggleOverview()). Reveal's stock overview CSS collapses
      * to a single row in narrow embedded viewports and produces no
-     * scroll. These overrides force a real grid layout + force-show
-     * a slide-number badge on every tile so the user can identify
-     * each slide.
+     * scroll. These overrides force a real responsive grid + each
+     * tile carries the slide's aspect ratio (960×700, reveal's
+     * default) + a slide-number badge. The slide CONTENT is scaled
+     * via transform so the tile shows a (rough) miniature of the
+     * actual slide, anchored top-left so the title is visible.
      * ---------------------------------------------------------------- */
+    .reveal.overview {
+      overflow-x: hidden !important;
+      overflow-y: auto !important;
+    }
     .reveal.overview .slides {
       display: grid !important;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      grid-auto-rows: minmax(120px, auto);
-      gap: 1rem;
-      padding: 1rem;
-      overflow-y: auto !important;
-      box-sizing: border-box;
-      max-height: 100%;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      grid-auto-rows: max-content;
+      gap: 1rem !important;
+      padding: 1rem !important;
+      position: static !important;
       width: 100% !important;
-      height: 100% !important;
+      height: auto !important;
       top: 0 !important;
       left: 0 !important;
       transform: none !important;
+      perspective: none !important;
+      overflow: visible !important;
+      counter-reset: slides-ng-tile;
     }
     .reveal.overview .slides > section {
       position: relative !important;
-      transform: none !important;
+      width: 100% !important;
+      height: auto !important;
+      aspect-ratio: 960 / 700;
       top: 0 !important;
       left: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
+      transform: none !important;
       cursor: pointer;
       overflow: hidden;
-      border-radius: 4px;
-      outline: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 6px;
+      pointer-events: auto !important;
+      visibility: visible !important;
+      display: block !important;
     }
     .reveal.overview .slides > section.present {
-      outline: 2px solid var(--r-link-color, #42affa);
+      border-color: var(--r-link-color, #42affa) !important;
+      border-width: 2px !important;
     }
-    /* Synthetic slide-number badge — visible in overview regardless of
-     * the deck's slideNumber setting. Counter increments per top-level
-     * <section> in document order. */
-    .reveal.overview .slides {
-      counter-reset: slides-ng-tile;
+    /* Scale slide content (the .slides-ng-layout wrapper) to fit. Reveal
+     * sizes slides for 960×700 by default; tiles minimum ~240px wide;
+     * scale ≈ 240/960 = 0.25. Bigger tiles will leave some empty space
+     * on the right + bottom, which we accept — content stays readable
+     * + identifiable. */
+    .reveal.overview .slides > section > .slides-ng-layout {
+      position: absolute !important;
+      top: 0;
+      left: 0;
+      width: 960px !important;
+      height: 700px !important;
+      transform: scale(0.25);
+      transform-origin: 0 0;
+      pointer-events: none;
     }
+    .reveal.overview .slides > section > aside {
+      display: none !important;
+    }
+    /* Slide-number badge — force-shown in overview regardless of the
+     * deck's slideNumber setting. */
     .reveal.overview .slides > section::after {
       counter-increment: slides-ng-tile;
       content: counter(slides-ng-tile);
       position: absolute;
       bottom: 6px;
       right: 8px;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.85);
       color: white;
       padding: 2px 8px;
       border-radius: 4px;
-      font-size: 14px;
+      font-size: 13px;
       font-family: var(--r-main-font, sans-serif);
       pointer-events: none;
-      z-index: 2;
+      z-index: 5;
     }
   </style>
   <style>
@@ -719,13 +746,21 @@ ${sectionsHtml}
             case 'toggleOverview':
               if (typeof Reveal.toggleOverview === 'function') Reveal.toggleOverview();
               break;
-            case 'toggleMenu':
-              // reveal.js-menu exposes both Reveal.toggleMenu and the
-              // plugin's own API. Use whichever is available.
-              if (typeof Reveal.toggleMenu === 'function') Reveal.toggleMenu();
-              else if (window.RevealMenu && typeof window.RevealMenu.toggle === 'function')
+            case 'toggleMenu': {
+              // reveal-menu installs a clickable button in the DOM
+              // (.slide-menu-button). Programmatic click is the most
+              // reliable trigger across plugin versions — the API
+              // surface (Reveal.toggleMenu, RevealMenu.toggle) varies.
+              var menuBtn = document.querySelector('.slide-menu-button');
+              if (menuBtn) {
+                menuBtn.click();
+              } else if (typeof Reveal.toggleMenu === 'function') {
+                Reveal.toggleMenu();
+              } else if (window.RevealMenu && typeof window.RevealMenu.toggle === 'function') {
                 window.RevealMenu.toggle();
+              }
               break;
+            }
             case 'toggleBlackout': {
               // Backwards-compat alias: blackout is now scene id
               // "blackout" with empty content. If blackout is already

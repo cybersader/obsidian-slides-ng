@@ -6,6 +6,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-05-12
+
+### Added
+
+- **Namespaced frontmatter keys** — all deck/slide frontmatter keys
+  now have a `slides-ng-` prefix to avoid collisions with other
+  vault plugins. Renamed: `theme` → `slides-ng-theme`,
+  `transition` → `slides-ng-transition`, `slideNumber` →
+  `slides-ng-slide-number`, `transitionSpeed` →
+  `slides-ng-transition-speed`, `customCSS` → `slides-ng-custom-css`,
+  `layout` → `slides-ng-layout`, `image` → `slides-ng-image`.
+  **Backward-compatible**: legacy unprefixed keys still work; the
+  new prefixed key wins when both are present. Autocomplete
+  recognises both forms.
+
+### Fixed
+
+- **Grid mode visual layout** — replaced the v0.7.0 CSS that
+  collapsed into a row of squares in narrow viewports. Tiles now
+  have a 960:700 aspect-ratio matching reveal's default slide
+  dimensions, content scales to fit via CSS transform, no
+  horizontal scrollbar, slide-number badge force-shown on every
+  tile.
+- **Scene markdown line breaks** — BRB and Q&A overlay defaults
+  rendered without paragraph breaks because marked's default
+  config collapses single `\n`. Switched the scene renderer to
+  `{ breaks: true, gfm: true }` so multi-line scene content
+  honours the line breaks the deck author wrote.
+- **Menu toolbar button now actually toggles the menu** — the
+  reveal-menu plugin's API surface varies (Reveal.toggleMenu vs
+  RevealMenu.toggle). Now uses programmatic click on the
+  `.slide-menu-button` DOM element first (most reliable), with
+  Reveal.toggleMenu and RevealMenu.toggle as fallbacks.
+- **Duplicate Blackout button removed** — Blackout is now exclusively
+  accessed via the Scenes row (where it was duplicated against
+  the util-group button); util-group keeps just the Grid action.
+- **"Use current" focus-steal bug** (same root cause as the v0.5.4
+  ribbon bug): toolbar click steals focus from the markdown view
+  before the click handler runs. Now uses the plugin-level
+  `lastMarkdownFile` tracker (via active-leaf-change) so the
+  intended file is always found.
+- **Speaker toolbar button styling** — toned down from the v0.7.0
+  accent (mod-cta) treatment to match the rest of the toolbar.
+
+### Changed
+
+- **`bun run build`** now also syncs `main.js/manifest.json/styles.css`
+  into `e2e-vault/.obsidian/plugins/slides-ng/`, so manual testing
+  in the E2E sandbox vault picks up the latest build immediately
+  (no need to copy by hand).
+
+### Tests
+
+- New `tests/frontmatter-prefix.test.ts` (13 tests): every renamed
+  key + every legacy fallback + prefixed-wins-over-legacy when both
+  set.
+- Totals: 308 unit / 20 E2E spec files.
+
+### Deferred to 0.8.0+
+
+User feedback this session captured additional ideas that warrant
+bigger work; tracked in `ROADMAP.md`:
+
+- Compact picker mode redesign + clickable slide-N-of-M status label
+- Editable speaker notes from the speaker view
+- PDF export options (notes toggle / aspect ratio / pagination)
+- Custom grid overview (if the v0.7.1 CSS-fix proves insufficient)
+- DnD modular speaker panels (0.8.0 headline)
+
 ## [0.7.0] — 2026-05-12
 
 ### Added

@@ -63,8 +63,9 @@ export class LayoutNameSuggest extends EditorSuggest<LayoutSuggestion> {
   ): EditorSuggestTriggerInfo | null {
     const line = editor.getLine(cursor.line);
     const beforeCursor = line.substring(0, cursor.ch);
-    // `layout:` (optionally with content after) up to the cursor.
-    const m = /^layout:\s*(\S*)$/.exec(beforeCursor);
+    // Match either the v0.7+ namespaced `slides-ng-layout:` OR the
+    // legacy `layout:` (still supported for backward compat).
+    const m = /^(?:slides-ng-layout|layout):\s*(\S*)$/.exec(beforeCursor);
     if (!m) return null;
     const blocks = parseAllFrontmatterBlocks(editor);
     if (!isInFrontmatter(blocks, cursor.line)) return null;

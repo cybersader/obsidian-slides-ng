@@ -154,23 +154,31 @@ describe("slides-ng speaker view drives the preview", function () {
     expect(after).toMatch(/Slide 1 of \d+/);
   });
 
-  it("Blackout toggles an overlay div inside the iframe", async () => {
-    await clickSpeakerButtonByText("Blackout");
+  it("Blackout scene toggles an overlay div inside the iframe", async () => {
+    // In v0.7.1+ Blackout is accessed via the Scenes row (the duplicate
+    // util-group button was removed). We click the Blackout SCENE
+    // button in the scenes row.
+    const clickBlackoutScene = `
+      Array.from(document.querySelectorAll(".slides-ng-speaker-scenes .slides-ng-speaker-btn"))
+        .find((b) => (b.textContent ?? "").trim().includes("Blackout"))
+        ?.click();
+    `;
+    await browser.execute(clickBlackoutScene);
 
-    // Speaker view's blackout button should now read "Blackout on".
+    // Wait until the scene's button has .on class (state event round-trip).
     await browser.waitUntil(
-      async () => {
-        const txt = await browser.execute(() => {
-          const b = document.querySelector(".slides-ng-speaker-blackout") as HTMLElement | null;
-          return b?.textContent?.trim() ?? "";
-        });
-        return txt.toLowerCase().includes("on");
-      },
-      { timeout: 5000, timeoutMsg: "blackout button label never updated to 'on'" }
+      async () =>
+        await browser.execute(() => {
+          const btn = Array.from(
+            document.querySelectorAll(".slides-ng-speaker-scenes .slides-ng-speaker-btn")
+          ).find((b) => (b.textContent ?? "").trim().includes("Blackout"));
+          return btn?.classList.contains("on") ?? false;
+        }),
+      { timeout: 5000, timeoutMsg: "Blackout scene never marked active" }
     );
 
     // And the iframe should have a #slides-ng-scene overlay element
-    // with the .on class (v0.7+ — was #slides-ng-blackout in v0.5/0.6).
+    // with the .on class.
     await switchToSlideFrame();
     try {
       const hasOverlay = await browser.execute(() => {
@@ -182,19 +190,19 @@ describe("slides-ng speaker view drives the preview", function () {
       await switchToTop();
     }
 
-    // Screenshot the blackout state — speaker on + iframe blacked out.
+    // Screenshot the blackout state.
     await browser.saveScreenshot(`${SCREENSHOT_DIR}/speaker-view-blackout.png`);
 
     // Toggle off so subsequent tests aren't affected.
-    await clickSpeakerButtonByText("Blackout");
+    await browser.execute(clickBlackoutScene);
     await browser.waitUntil(
-      async () => {
-        const txt = await browser.execute(() => {
-          const b = document.querySelector(".slides-ng-speaker-blackout") as HTMLElement | null;
-          return b?.textContent?.trim() ?? "";
-        });
-        return !txt.toLowerCase().includes("on");
-      },
+      async () =>
+        await browser.execute(() => {
+          const btn = Array.from(
+            document.querySelectorAll(".slides-ng-speaker-scenes .slides-ng-speaker-btn")
+          ).find((b) => (b.textContent ?? "").trim().includes("Blackout"));
+          return !(btn?.classList.contains("on") ?? false);
+        }),
       { timeout: 5000, timeoutMsg: "blackout did not toggle off" }
     );
   });

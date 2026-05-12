@@ -214,10 +214,17 @@ function slideToHtml(
   // frontmatter uses.
   const slideAttrs = resolveBackgroundAttrs(rawSlideAttrs, defaults.resolveImage);
 
-  const layoutName =
-    typeof slide.frontmatter.layout === "string" && slide.frontmatter.layout.length > 0
-      ? slide.frontmatter.layout
-      : (defaults.defaultLayout ?? "default");
+  // Frontmatter keys: prefer the `slides-ng-`-prefixed namespace
+  // (introduced in v0.7.1 to avoid collisions with other vault plugins);
+  // fall back to the unprefixed form for backward compat with older decks.
+  const fmLayout = readStringFrontmatter(
+    slide.frontmatter,
+    "slides-ng-layout",
+    "layout"
+  );
+  const layoutName = fmLayout && fmLayout.length > 0
+    ? fmLayout
+    : (defaults.defaultLayout ?? "default");
 
   // 2. Every slide flows through a layout, even `default`, so the iframe
   //    CSS can target `.slides-ng-layout` uniformly. Slot splitting only
@@ -239,13 +246,18 @@ function slideToHtml(
     slotHtml[name] = applyClickReveals(html);
   }
 
-  // 4. Image-layout support: when `image:` is in the frontmatter, inject
-  //    a synthesized `image` slot containing the resolved <img> tag. The
-  //    image-* layouts read this slot; non-image layouts ignore it.
-  if (typeof slide.frontmatter.image === "string" && slide.frontmatter.image.length > 0) {
-    const raw = slide.frontmatter.image;
-    const resolved = defaults.resolveImage ? defaults.resolveImage(raw) : null;
-    const src = resolved ?? raw;
+  // 4. Image-layout support: when `slides-ng-image:` (or the legacy
+  //    `image:` for back-compat) is set in the slide frontmatter,
+  //    inject a synthesized `image` slot. The image-* layouts read
+  //    this slot; non-image layouts ignore it.
+  const fmImage = readStringFrontmatter(
+    slide.frontmatter,
+    "slides-ng-image",
+    "image"
+  );
+  if (fmImage && fmImage.length > 0) {
+    const resolved = defaults.resolveImage ? defaults.resolveImage(fmImage) : null;
+    const src = resolved ?? fmImage;
     slotHtml.image = `<img class="slides-ng-image" src="${escapeAttrValue(src)}" alt="">`;
   }
 
@@ -264,27 +276,85 @@ function escapeAttrValue(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
+/**
+ * Read a frontmatter value that may live under the new `slides-ng-`-
+ * prefixed key OR the legacy unprefixed key. Returns the string value
+ * or undefined. Backward-compat for decks authored before v0.7.1.
+ */
+function readStringFrontmatter(
+  matter: Record<string, unknown>,
+  prefixedKey: string,
+  legacyKey: string
+): string | undefined {
+  const prefixed = matter[prefixedKey];
+  if (typeof prefixed === "string") return prefixed;
+  const legacy = matter[legacyKey];
+  if (typeof legacy === "string") return legacy;
+  return undefined;
+}
+
+/**
+ * Read a boolean frontmatter value across the prefixed/legacy keys.
+ */
+function readBoolFrontmatter(
+  matter: Record<string, unknown>,
+  prefixedKey: string,
+  legacyKey: string
+): boolean | undefined {
+  const prefixed = matter[prefixedKey];
+  if (typeof prefixed === "boolean") return prefixed;
+  const legacy = matter[legacyKey];
+  if (typeof legacy === "boolean") return legacy;
+  return undefined;
+}
+
+/** Read a raw value (any type) across the prefixed/legacy keys. */
+function readRawFrontmatter(
+  matter: Record<string, unknown>,
+  prefixedKey: string,
+  legacyKey: string
+): unknown {
+  if (matter[prefixedKey] !== undefined) return matter[prefixedKey];
+  return matter[legacyKey];
+}
+
 function headmatterToOptions(
   headmatter: Record<string, unknown>
 ): Partial<DeckRenderOptions> {
   const out: Partial<DeckRenderOptions> = {};
-  if (typeof headmatter.theme === "string") out.theme = headmatter.theme;
-  if (typeof headmatter.transition === "string") out.transition = headmatter.transition;
-  if (typeof headmatter.slideNumber === "boolean") out.slideNumber = headmatter.slideNumber;
-  if (
-    headmatter.transitionSpeed === "default" ||
-    headmatter.transitionSpeed === "fast" ||
-    headmatter.transitionSpeed === "slow"
-  ) {
-    out.transitionSpeed = headmatter.transitionSpeed;
+  // Each lookup prefers the prefixed key; legacy unprefixed is the
+  // fallback. v0.7.1+ documentation recommends the prefixed form to
+  // avoid collisions with other vault plugins.
+  const theme = readStringFrontmatter(headmatter, "slides-ng-theme", "theme");
+  if (theme) out.theme = theme;
+  const transition = readStringFrontmatter(
+    headmatter,
+    "slides-ng-transition",
+    "transition"
+  );
+  if (transition) out.transition = transition;
+  const slideNumber = readBoolFrontmatter(
+    headmatter,
+    "slides-ng-slide-number",
+    "slideNumber"
+  );
+  if (slideNumber !== undefined) out.slideNumber = slideNumber;
+  const speed = readStringFrontmatter(
+    headmatter,
+    "slides-ng-transition-speed",
+    "transitionSpeed"
+  );
+  if (speed === "default" || speed === "fast" || speed === "slow") {
+    out.transitionSpeed = speed;
   }
   // customCSS: string | string[]. Both forms get sanitized + flattened
   // before reaching the template. Rejecting `<`/`>` blocks accidental
-  // (or attempted) script-tag breakouts within the iframe `<style>` we
-  // emit; the iframe is sandboxed `allow-scripts` anyway, but defense
-  // in depth matters and the sanitization gives a clear console.warn
-  // signal when the deck author makes a mistake.
-  const raw = headmatter.customCSS;
+  // script-tag breakouts within the iframe `<style>` we emit.
+  const raw = readRawFrontmatter(
+    headmatter,
+    "slides-ng-custom-css",
+    "customCSS"
+  );
   if (typeof raw === "string" || Array.isArray(raw)) {
     const blocks = Array.isArray(raw) ? raw : [raw];
     const clean: string[] = [];

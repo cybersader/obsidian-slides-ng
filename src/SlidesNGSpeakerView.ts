@@ -31,7 +31,10 @@ import type { SlidesNGSettings, SceneDefinition } from "./settings";
 // Lightweight markdown → HTML for scene content. Synchronous + fast +
 // no Obsidian-render-cycle hang risk. Scenes are presentational
 // overlays; we don't need wikilinks/embeds/Obsidian-specific bits.
-const sceneMd = new Marked();
+// `breaks: true` honours single `\n` as <br/> so multi-line scene
+// content (the BRB / Q&A defaults) renders with the line breaks the
+// deck author wrote.
+const sceneMd = new Marked({ breaks: true, gfm: true });
 
 export const VIEW_TYPE_SLIDES_NG_SPEAKER = "slides-ng-speaker";
 
@@ -77,7 +80,6 @@ export class SlidesNGSpeakerView extends ItemView {
   private nextLineEl?: HTMLElement;
   private notesEl?: HTMLElement;
   private pickerEl?: HTMLElement;
-  private blackoutBtn?: HTMLButtonElement;
   private modeToggleBtn?: HTMLButtonElement;
   private sceneButtons = new Map<string, HTMLButtonElement>();
   /** Visual next-slide preview mini-iframe (v0.7.0). */
@@ -173,13 +175,9 @@ export class SlidesNGSpeakerView extends ItemView {
       tooltip: "Toggle the slide-grid overview",
       onClick: () => this.send("toggleOverview"),
     });
-    this.blackoutBtn = this.addControlButton(utilGroup, {
-      icon: "monitor-off",
-      label: "Blackout",
-      tooltip: "Blackout the slide window",
-      onClick: () => this.send("toggleBlackout"),
-      extraClass: "slides-ng-speaker-blackout",
-    });
+    // Note: the Blackout button used to live here but it was duplicated
+    // with the Scenes row's Blackout default. Now blackout is a scene
+    // accessed via Scenes; this util-group keeps just the Grid action.
 
     // Timer controls
     const timerCtrls = container.createDiv({ cls: "slides-ng-speaker-timer-ctrls" });
@@ -525,13 +523,6 @@ export class SlidesNGSpeakerView extends ItemView {
     }
     if (this.notesEl) {
       this.notesEl.innerHTML = this.state.notesHtml || "<em>No notes</em>";
-    }
-    if (this.blackoutBtn) {
-      this.blackoutBtn.toggleClass("on", this.state.isBlackout);
-      this.swapButtonLabel(
-        this.blackoutBtn,
-        this.state.isBlackout ? "Blackout on" : "Blackout"
-      );
     }
     // Highlight whichever scene is currently active; clear the others.
     const activeId = this.state.activeSceneId;

@@ -30,7 +30,11 @@ export default class SlidesNGPlugin extends Plugin {
 
     this.registerView(
       VIEW_TYPE_SLIDES_NG,
-      (leaf) => new SlidesNGView(leaf, () => this.settings)
+      (leaf) => new SlidesNGView(
+        leaf,
+        () => this.settings,
+        () => this.resolveActiveDeckFile()
+      )
     );
 
     // Track the user's most recently focused markdown file so the ribbon
