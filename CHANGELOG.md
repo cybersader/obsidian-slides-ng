@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-05-12
+
+### Fixed
+
+- **Toolbar overflow on narrow leaves**: when the preview pane was
+  shrunk horizontally, buttons used to clip off the right edge with no
+  way to reach them. Now the toolbar wraps when needed; the spacer
+  collapses below 220 px; labels hide below 480 px; padding tightens
+  below 220 px. Every button is reachable at any leaf width.
+
+### Tests
+
+- New `test/e2e/toolbar-narrow.spec.ts` (4 tests) — measures button
+  bounding rects against the toolbar at 600 / 400 / 280 / 180 px
+  widths; asserts every button is non-zero-width AND inside the
+  toolbar's horizontal bounds.
+- Totals: 256 unit / 17 E2E spec files.
+
 ## [0.5.2] — 2026-05-12
 
 ### Added

@@ -10,6 +10,7 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--background-modifier-border);
@@ -18,10 +19,13 @@
 .slides-ng-toolbar-group {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.35rem;
+  min-width: 0;
 }
 .slides-ng-toolbar-spacer {
   flex: 1 1 auto;
+  min-width: 0;
 }
 .slides-ng-toolbar-btn {
   display: inline-flex;
@@ -67,13 +71,26 @@
 .slides-ng-toolbar-btn-label {
   white-space: nowrap;
 }
-/* Narrow leaves (user shrunk the preview pane): hide labels, icon-only. */
-@container (max-width: 380px) {
+/* Narrow leaves (user shrunk the preview pane): collapse labels to keep
+ * buttons fitting. Two tiers — labels hide first, then padding tightens. */
+@container (max-width: 480px) {
   .slides-ng-toolbar-btn-label {
     display: none;
   }
   .slides-ng-toolbar-btn {
     padding: 0.4rem;
+  }
+}
+/* Very narrow leaves (< 220px): collapse the spacer entirely so the
+ * left-group and right-group wrap onto one row's worth of buttons.
+ * Toolbar's flex-wrap then puts overflow on a second row. */
+@container (max-width: 220px) {
+  .slides-ng-toolbar-spacer {
+    display: none;
+  }
+  .slides-ng-toolbar {
+    gap: 0.35rem;
+    padding: 0.35rem 0.4rem;
   }
 }
 
