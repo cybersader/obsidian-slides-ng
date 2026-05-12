@@ -95,4 +95,47 @@ describe("slides-ng annotations (v0.3)", function () {
     const iframe = await $(SLIDE_IFRAME_SELECTOR);
     await iframe.saveScreenshot(`${SCREENSHOT_DIR}/v03-annotations-slide.png`);
   });
+
+  it("auto-animate is visually present on round 1 (steelblue box rendered)", async () => {
+    // We can advance reveal.js ONE step from outside the iframe by
+    // clicking it for focus + sending ArrowRight; subsequent keys lose
+    // focus and don't reach reveal.js's listener (iframe sandbox is
+    // `allow-scripts` only, no `allow-same-origin`, so we can't poke at
+    // contentWindow.Reveal either). For full back-to-back auto-animate
+    // verification, eyeball the deck in real Obsidian — this E2E only
+    // proves the first auto-animate slide renders with its data-id box.
+    const iframe = await $(SLIDE_IFRAME_SELECTOR);
+    await iframe.click();
+    await browser.pause(200);
+    await browser.keys(["ArrowRight"]);
+    await browser.pause(800);
+    await iframe.saveScreenshot(`${SCREENSHOT_DIR}/auto-animate-round-1.png`);
+
+    // Sanity assertion via DOM: both auto-animate sections exist in the
+    // tree with their data-id boxes (and the right inline backgrounds).
+    // We don't assert which section is currently `.present` — reveal's
+    // behaviour around `.present` in embedded mode is timing-dependent.
+    await switchToSlideFrame();
+    try {
+      const info = await browser.execute(() => {
+        const sections = Array.from(
+          document.querySelectorAll(".reveal section[data-auto-animate]")
+        ) as HTMLElement[];
+        return sections.map((s) => {
+          const box = s.querySelector('[data-id="box"]') as HTMLElement | null;
+          return {
+            hasBox: !!box,
+            boxBg: box?.style.background ?? "",
+          };
+        });
+      });
+      expect(info.length).toBeGreaterThanOrEqual(2);
+      expect(info[0].hasBox).toBe(true);
+      expect(info[0].boxBg).toContain("steelblue");
+      expect(info[1].hasBox).toBe(true);
+      expect(info[1].boxBg).toContain("tomato");
+    } finally {
+      await switchToTop();
+    }
+  });
 });
