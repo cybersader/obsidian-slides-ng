@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-05-12
+
+### Added
+
+- **"Use current" toolbar button** — explicitly load whichever
+  markdown file you're focused on as the deck. Chosen over an
+  auto-follow setting because the presenting flow often involves
+  pulling up reference notes in other markdown tabs; the preview
+  should stay locked to the deck unless you ask. Falls back with a
+  "No Markdown file is focused." notice if nothing's active. If the
+  focused file is already loaded, just refreshes.
+
+### Tests
+
+- New `test/e2e/use-current-file.spec.ts` (3 tests): initial load
+  state, swap-on-click with iframe-content verification, notice path
+  with no markdown focused
+- Totals: 247 unit / 15 E2E spec files
+
 ## [0.5.0] — 2026-05-12
 
 ### Added

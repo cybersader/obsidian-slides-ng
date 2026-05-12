@@ -87,6 +87,13 @@ export class SlidesNGView extends ItemView {
       onClick: () => void this.refresh(),
     });
 
+    this.addToolbarButton(leftGroup, {
+      icon: "file-input",
+      label: "Use current",
+      tooltip: "Load the currently-focused markdown file as the deck",
+      onClick: () => void this.useCurrentFile(),
+    });
+
     this.addToolbarButton(rightGroup, {
       icon: "monitor-play",
       label: "Speaker",
@@ -177,6 +184,31 @@ export class SlidesNGView extends ItemView {
     if (opts.tooltip) setTooltip(btn, opts.tooltip);
     btn.addEventListener("click", opts.onClick);
     return btn;
+  }
+
+  /**
+   * Swap the previewed deck to the currently-focused markdown file. When
+   * the user is presenting from one deck but glancing at notes in other
+   * markdown files, the preview stays put (no auto-follow); clicking this
+   * button explicitly loads whichever file they're currently editing.
+   *
+   * No-op if no markdown view is active or it's already the loaded file.
+   */
+  private async useCurrentFile(): Promise<void> {
+    const file = this.app.workspace.getActiveViewOfType(MarkdownView)?.file;
+    if (!file) {
+      new Notice("No Markdown file is focused.");
+      return;
+    }
+    if (file.path === this.filePath) {
+      await this.refresh();
+      return;
+    }
+    await this.leaf.setViewState({
+      type: VIEW_TYPE_SLIDES_NG,
+      active: true,
+      state: { filePath: file.path },
+    });
   }
 
   private async openSpeakerView(): Promise<void> {
