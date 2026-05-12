@@ -5,7 +5,11 @@ export interface SlideHtml {
   body: string;
   /** Pre-rendered HTML for speaker notes, or undefined. */
   noteHtml?: string;
-  /** Optional slide-level attributes to put on the `<section>` tag. */
+  /**
+   * Optional slide-level HTML attributes to put on the `<section>` tag.
+   * Produced by the `<!-- slide attr=val -->` annotation parser; consumed
+   * here by interpolating into the opening tag.
+   */
   sectionAttrs?: string;
 }
 

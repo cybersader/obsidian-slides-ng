@@ -209,6 +209,38 @@ const b = 2
       expect(segment).not.toContain("line-dim");
     });
 
+    test("slide annotation `<!-- slide data-auto-animate -->` lands on the section tag", () => {
+      const md = `---
+---
+
+# Slide
+
+<!-- slide data-auto-animate -->
+
+<div data-id="box"></div>
+`;
+      const html = renderDeck(md);
+      // The section tag should now carry the attribute.
+      expect(html).toMatch(/<section[^>]*data-auto-animate/);
+      // And the marker comment is gone from rendered output.
+      expect(html.replace(/[\s\S]*<body>/m, "")).not.toContain("<!-- slide");
+    });
+
+    test("element annotation `<!-- element class -->` folds into previous element", () => {
+      const md = `---
+---
+
+# Slide
+
+A paragraph.
+<!-- element class="fragment" -->
+`;
+      const html = renderDeck(md);
+      // marked emits <p>A paragraph.</p>; the annotation should have
+      // added class="fragment" to it.
+      expect(html).toMatch(/<p class="fragment">A paragraph\.<\/p>/);
+    });
+
     test("plain `ts` fence (no brackets) does NOT trigger line-stepping", () => {
       const md = `---
 ---

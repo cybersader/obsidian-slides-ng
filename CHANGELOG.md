@@ -6,6 +6,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-11
+
+### Added
+
+- **Slide annotations** — Slides Extended / Slidev convention. Place
+  `<!-- slide attr1="value" attr2 -->` anywhere in a slide and the
+  attributes are merged onto that slide's `<section>` tag. Unlocks
+  reveal.js's `data-auto-animate` (smooth element morphing between
+  consecutive slides), per-slide CSS classes, custom `data-*` IDs.
+- **Element annotations** — `<!-- element class="fragment" -->` placed
+  immediately after an element folds those attributes into the element's
+  opening tag. `class` and `style` values concatenate; everything else
+  overwrites. Works for `<p>`, `<li>`, `<h*>`, `<blockquote>`, `<pre>`,
+  etc.
+- **Trailing-annotation recovery** — `@slidev/parser` pulls the last
+  HTML comment in a slide into the speaker note. If that comment is
+  actually a slide-or-element annotation (regex `^(slide|element)\s+`),
+  `parseDeck` now re-injects it back into the slide content so the
+  annotation pipeline can process it. Means `<!-- element class -->` on
+  the last line of a slide still works.
+- **Fixture** `Decks/fixtures/14-annotations.md` — auto-animate pair,
+  fragment paragraphs, custom slide classes.
+- **E2E spec** `test/e2e/annotations.spec.ts` — verifies `data-auto-animate`
+  + custom classes + `.fragment` paragraphs all reach the iframe DOM.
+
+### Tests
+
+- 41 new unit tests for annotations (parseAttrString, extractSlideAttrs,
+  applyElementAnnotations, mergeOpenTag, renderAttrs, edge cases for
+  hyphenated attrs, bare attributes, multi-value styles, marker-mid-
+  paragraph, no-preceding-element, nested elements, layout × annotation
+  interactions, trailing-annotation recovery)
+- 5 new E2E tests for the full pipeline in real Obsidian
+- Totals: 192 unit tests / 12 E2E spec files (was 151 / 11)
+
 ## [0.2.1] — 2026-05-11
 
 ### Added

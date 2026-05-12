@@ -12,6 +12,11 @@ import { parseLineStep } from "../parser/lineStep";
 import { renderLineStep } from "./lineStepRenderer";
 import { splitSlots, hasSlots } from "./slots";
 import { applyLayout } from "./layouts";
+import {
+  extractSlideAttrs,
+  applyElementAnnotations,
+  renderAttrs,
+} from "../parser/annotations";
 
 // Local Marked instance with Shiki + Slidev line-step wired into the
 // `code` renderer. Using `Marked` (a fresh instance) rather than the
@@ -98,29 +103,46 @@ export function renderDeckFromAst(
 }
 
 function slideToHtml(slide: Slide): SlideHtml {
+  // 1. Extract Slides-Extended-style slide annotations from the raw
+  //    markdown before anything else touches it. The cleaned content
+  //    is what flows into the slot splitter / markdown→HTML pass.
+  const { content: cleanedContent, attrs: slideAttrs } = extractSlideAttrs(
+    slide.content
+  );
+
   const layoutName =
     typeof slide.frontmatter.layout === "string" && slide.frontmatter.layout.length > 0
       ? slide.frontmatter.layout
       : "default";
 
-  // Every slide flows through a layout, even `default`, so the iframe
-  // CSS can target `.slides-ng-layout` uniformly. Slot splitting only
-  // matters when the content actually uses `::name::` markers — for
-  // the common case, there's exactly one slot (`default`).
-  const slotMarkdown = hasSlots(slide.content)
-    ? splitSlots(slide.content)
-    : { default: slide.content };
+  // 2. Every slide flows through a layout, even `default`, so the iframe
+  //    CSS can target `.slides-ng-layout` uniformly. Slot splitting only
+  //    matters when the content actually uses `::name::` markers — for
+  //    the common case, there's exactly one slot (`default`).
+  const slotMarkdown = hasSlots(cleanedContent)
+    ? splitSlots(cleanedContent)
+    : { default: cleanedContent };
 
   const slotHtml: Record<string, string> = {};
   for (const [name, md] of Object.entries(slotMarkdown)) {
     // Per-slot v-click translation so fragments in `::left::` don't
     // leak into `::right::` and vice versa.
-    slotHtml[name] = applyClickReveals(markdownToHtml(md));
+    let html = markdownToHtml(md);
+    // 3. Element-level `<!-- element attr=val -->` annotations are
+    //    applied after marked has emitted HTML — they fold into the
+    //    previous sibling element.
+    html = applyElementAnnotations(html);
+    slotHtml[name] = applyClickReveals(html);
   }
   const body = applyLayout(layoutName, slotHtml);
 
   const noteHtml = slide.note ? markdownToHtml(slide.note) : undefined;
-  return { body, noteHtml };
+
+  // 4. Slide-level annotations land on the `<section>` tag itself.
+  const sectionAttrs =
+    Object.keys(slideAttrs).length > 0 ? renderAttrs(slideAttrs) : undefined;
+
+  return { body, noteHtml, sectionAttrs };
 }
 
 function markdownToHtml(text: string): string {
