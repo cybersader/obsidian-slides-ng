@@ -5,6 +5,7 @@ import {
   IMAGE_LAYOUT_SPLITS,
   PICKER_MODES,
   BUNDLED_CODE_THEMES,
+  TRANSITION_SPEEDS,
 } from "./settings";
 import { availableThemes } from "./render/revealAssets";
 import { KNOWN_LAYOUTS } from "./render/layouts";
@@ -46,6 +47,19 @@ export class SlidesNGSettingTab extends PluginSettingTab {
         for (const t of REVEAL_TRANSITIONS) d.addOption(t, t);
         d.setValue(this.plugin.settings.defaultTransition).onChange(async (v) => {
           this.plugin.settings.defaultTransition = v;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Transition speed")
+      .setDesc(
+        "Reveal animation pace. `Default` is reveal's stock; `fast` is ~300 ms; `slow` is ~1200 ms."
+      )
+      .addDropdown((d) => {
+        for (const t of TRANSITION_SPEEDS) d.addOption(t, t);
+        d.setValue(this.plugin.settings.transitionSpeed).onChange(async (v) => {
+          this.plugin.settings.transitionSpeed = v as "default" | "fast" | "slow";
           await this.plugin.saveSettings();
         });
       });
@@ -118,6 +132,49 @@ export class SlidesNGSettingTab extends PluginSettingTab {
             this.plugin.settings.lineStepDimOpacity = v;
             await this.plugin.saveSettings();
           });
+      });
+
+    new Setting(containerEl)
+      .setName("Code block max height")
+      .setDesc(
+        "Any valid CSS length (e.g. `60vh`, `400px`). Long code blocks scroll internally instead of overflowing the slide. Set to `none` to disable the cap entirely."
+      )
+      .addText((t) => {
+        t.setValue(this.plugin.settings.codeBlockMaxHeight).onChange(async (v) => {
+          this.plugin.settings.codeBlockMaxHeight = v.trim() || "60vh";
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Code block overflow scroll")
+      .setDesc(
+        "When the cap above is hit, scroll the overflow internally. Disable to hide instead (forces deck authors to shorten the snippet)."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.codeBlockOverflowScroll).onChange(
+          async (v) => {
+            this.plugin.settings.codeBlockOverflowScroll = v;
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
+    new Setting(containerEl)
+      .setName("Magic-move animation duration (ms)")
+      .setDesc(
+        "Duration of the token-morph animation between paired magic-move code blocks. Stock library default is five hundred milliseconds."
+      )
+      .addText((t) => {
+        t.setValue(String(this.plugin.settings.magicMoveDurationMs)).onChange(
+          async (v) => {
+            const n = parseInt(v, 10);
+            if (Number.isFinite(n) && n >= 100 && n <= 3000) {
+              this.plugin.settings.magicMoveDurationMs = n;
+              await this.plugin.saveSettings();
+            }
+          }
+        );
       });
 
     // ---------- Layouts ----------

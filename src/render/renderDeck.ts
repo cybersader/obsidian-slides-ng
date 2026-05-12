@@ -74,6 +74,14 @@ export interface RenderDefaults {
   showRevealControlsEmbedded?: boolean;
   /** Show reveal.js-menu hamburger plugin in embedded mode. */
   showRevealMenuEmbedded?: boolean;
+  /** Max-height for code blocks before they scroll. CSS length. */
+  codeBlockMaxHeight?: string;
+  /** Whether code blocks scroll overflow when capped. */
+  codeBlockOverflowScroll?: boolean;
+  /** Reveal animation pace: `default | fast | slow`. */
+  transitionSpeed?: "default" | "fast" | "slow";
+  /** Magic-Move animation duration (ms). */
+  magicMoveDurationMs?: number;
   /**
    * Optional image-attachment resolver. Called with the raw `image:`
    * frontmatter value; returns a fully-qualified URL (data: URI,
@@ -137,6 +145,18 @@ export function renderDeckFromAst(
   if (defaults.showRevealMenuEmbedded !== undefined) {
     defaultLayer.showRevealMenuEmbedded = defaults.showRevealMenuEmbedded;
   }
+  if (defaults.codeBlockMaxHeight) {
+    defaultLayer.codeBlockMaxHeight = defaults.codeBlockMaxHeight;
+  }
+  if (defaults.codeBlockOverflowScroll !== undefined) {
+    defaultLayer.codeBlockOverflowScroll = defaults.codeBlockOverflowScroll;
+  }
+  if (defaults.transitionSpeed) {
+    defaultLayer.transitionSpeed = defaults.transitionSpeed;
+  }
+  if (typeof defaults.magicMoveDurationMs === "number") {
+    defaultLayer.magicMoveDurationMs = defaults.magicMoveDurationMs;
+  }
 
   const opts: DeckRenderOptions = {
     ...defaultLayer,
@@ -144,6 +164,38 @@ export function renderDeckFromAst(
     ...overrides,
   };
   return buildIframeHtml(slides, opts);
+}
+
+/**
+ * Slide-attribute keys whose values are URLs the iframe will load.
+ * Vault-relative paths in these need to be resolved to `app://` via the
+ * caller's `resolveImage` callback, same as `image:` frontmatter, or the
+ * iframe-sandbox can't fetch the attachment.
+ */
+const RESOLVABLE_BACKGROUND_ATTRS = [
+  "data-background-image",
+  "data-background-video",
+] as const;
+
+/**
+ * Walk a slide's attrs and rewrite any RESOLVABLE_BACKGROUND_ATTRS that
+ * carry a vault-relative path. Pass-through for `http(s)://`, `data:`,
+ * `file://`, or absolute paths.
+ */
+function resolveBackgroundAttrs(
+  attrs: Record<string, string>,
+  resolveImage: ((path: string) => string | null) | undefined
+): Record<string, string> {
+  if (!resolveImage) return attrs;
+  const out: Record<string, string> = { ...attrs };
+  for (const key of RESOLVABLE_BACKGROUND_ATTRS) {
+    const val = out[key];
+    if (typeof val !== "string" || val.length === 0) continue;
+    if (/^(https?:|data:|file:|\/)/.test(val)) continue;
+    const resolved = resolveImage(val);
+    if (resolved) out[key] = resolved;
+  }
+  return out;
 }
 
 function slideToHtml(
@@ -154,9 +206,13 @@ function slideToHtml(
   // 1. Extract Slides-Extended-style slide annotations from the raw
   //    markdown before anything else touches it. The cleaned content
   //    is what flows into the slot splitter / markdown→HTML pass.
-  const { content: cleanedContent, attrs: slideAttrs } = extractSlideAttrs(
+  const { content: cleanedContent, attrs: rawSlideAttrs } = extractSlideAttrs(
     slide.content
   );
+  // 1b. Resolve any vault-relative `data-background-image` /
+  // `data-background-video` paths via the same callback the `image:`
+  // frontmatter uses.
+  const slideAttrs = resolveBackgroundAttrs(rawSlideAttrs, defaults.resolveImage);
 
   const layoutName =
     typeof slide.frontmatter.layout === "string" && slide.frontmatter.layout.length > 0
@@ -215,5 +271,36 @@ function headmatterToOptions(
   if (typeof headmatter.theme === "string") out.theme = headmatter.theme;
   if (typeof headmatter.transition === "string") out.transition = headmatter.transition;
   if (typeof headmatter.slideNumber === "boolean") out.slideNumber = headmatter.slideNumber;
+  if (
+    headmatter.transitionSpeed === "default" ||
+    headmatter.transitionSpeed === "fast" ||
+    headmatter.transitionSpeed === "slow"
+  ) {
+    out.transitionSpeed = headmatter.transitionSpeed;
+  }
+  // customCSS: string | string[]. Both forms get sanitized + flattened
+  // before reaching the template. Rejecting `<`/`>` blocks accidental
+  // (or attempted) script-tag breakouts within the iframe `<style>` we
+  // emit; the iframe is sandboxed `allow-scripts` anyway, but defense
+  // in depth matters and the sanitization gives a clear console.warn
+  // signal when the deck author makes a mistake.
+  const raw = headmatter.customCSS;
+  if (typeof raw === "string" || Array.isArray(raw)) {
+    const blocks = Array.isArray(raw) ? raw : [raw];
+    const clean: string[] = [];
+    for (const block of blocks) {
+      if (typeof block !== "string") continue;
+      if (block.includes("<") || block.includes(">")) {
+        console.warn(
+          "[slides-ng] customCSS contains `<` or `>` — rejected for safety. " +
+            "Use CSS rules only (no HTML, no comments containing those chars)."
+        );
+        continue;
+      }
+      const trimmed = block.trim();
+      if (trimmed.length > 0) clean.push(trimmed);
+    }
+    if (clean.length > 0) out.customCSS = clean.join("\n");
+  }
   return out;
 }

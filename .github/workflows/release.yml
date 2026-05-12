@@ -105,16 +105,22 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
 
-          # Delete existing tag if re-running
-          git tag -d "$tag" 2>/dev/null || true
-          git push origin ":refs/tags/$tag" 2>/dev/null || true
+          # Idempotent tag handling. The user usually pushes the tag
+          # locally (so it's already on origin when this job runs); the
+          # previous delete-and-recreate dance caused a race where
+          # `gh release create` ran before the GitHub API recognised
+          # the re-push. Now we just ensure the tag exists.
+          git tag "$tag" 2>/dev/null || true
+          git push origin "$tag" 2>/dev/null || true
 
-          # Create and push tag
-          git tag "$tag"
-          git push origin "$tag"
-
-          # Create GitHub release with build artifacts
-          gh release create "$tag" \
-            --title="$tag" \
-            --notes-file release_notes.md \
-            main.js manifest.json styles.css
+          # Idempotent release. On re-runs the release may already
+          # exist — upload (overwriting) instead of failing.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; updating artifacts."
+            gh release upload "$tag" main.js manifest.json styles.css --clobber
+          else
+            gh release create "$tag" \
+              --title="$tag" \
+              --notes-file release_notes.md \
+              main.js manifest.json styles.css
+          fi

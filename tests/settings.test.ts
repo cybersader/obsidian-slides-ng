@@ -7,6 +7,7 @@ import {
   IMAGE_LAYOUT_SPLITS,
   PICKER_MODES,
   BUNDLED_CODE_THEMES,
+  TRANSITION_SPEEDS,
 } from "../src/settings";
 
 describe("settings defaults", () => {
@@ -195,5 +196,76 @@ describe("renderDeck toggleOverview bridge command", () => {
     const html = renderDeck(md, "deck.md", {});
     expect(html).toContain("toggleOverview");
     expect(html).toContain("Reveal.toggleOverview");
+  });
+});
+
+describe("0.6.0 settings defaults", () => {
+  test("codeBlockMaxHeight is '60vh'", () => {
+    expect(DEFAULT_SETTINGS.codeBlockMaxHeight).toBe("60vh");
+  });
+  test("codeBlockOverflowScroll is true", () => {
+    expect(DEFAULT_SETTINGS.codeBlockOverflowScroll).toBe(true);
+  });
+  test("transitionSpeed is 'default'", () => {
+    expect(DEFAULT_SETTINGS.transitionSpeed).toBe("default");
+  });
+  test("magicMoveDurationMs is 500", () => {
+    expect(DEFAULT_SETTINGS.magicMoveDurationMs).toBe(500);
+  });
+});
+
+describe("0.6.0 settings enums", () => {
+  test("TRANSITION_SPEEDS covers default/fast/slow", () => {
+    expect(TRANSITION_SPEEDS).toEqual(["default", "fast", "slow"]);
+  });
+});
+
+describe("renderDeck threads 0.6.0 settings into iframe HTML", () => {
+  test("codeBlockMaxHeight lands in CSS", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { codeBlockMaxHeight: "30vh" });
+    expect(html).toContain("max-height: 30vh");
+  });
+
+  test("codeBlockMaxHeight='none' omits the CSS rule entirely", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { codeBlockMaxHeight: "none" });
+    expect(html).not.toContain(".reveal .shiki,\n    .reveal pre code");
+  });
+
+  test("codeBlockOverflowScroll=false → overflow-y: hidden", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", {
+      codeBlockMaxHeight: "30vh",
+      codeBlockOverflowScroll: false,
+    });
+    expect(html).toContain("overflow-y: hidden");
+  });
+
+  test("transitionSpeed lands in Reveal init config", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { transitionSpeed: "fast" });
+    expect(html).toContain('"transitionSpeed":"fast"');
+  });
+
+  test("magicMoveDurationMs lands in iframe bootstrap as SLIDES_NG_MM_DURATION", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { magicMoveDurationMs: 1234 });
+    expect(html).toContain("SLIDES_NG_MM_DURATION = 1234");
+  });
+});
+
+describe("headmatter customCSS + transitionSpeed override settings", () => {
+  test("deck-level customCSS string overrides any settings default", () => {
+    const md =
+      "---\ncustomCSS: '.deck-marker { display: block }'\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", {});
+    expect(html).toContain(".deck-marker { display: block }");
+  });
+
+  test("deck-level transitionSpeed overrides plugin setting", () => {
+    const md = "---\ntransitionSpeed: slow\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { transitionSpeed: "fast" });
+    expect(html).toContain('"transitionSpeed":"slow"');
   });
 });

@@ -297,6 +297,10 @@ export class SlidesNGView extends ItemView {
         lineStepDimOpacity: settings.lineStepDimOpacity,
         showRevealControlsEmbedded: settings.showRevealControlsEmbedded,
         showRevealMenuEmbedded: settings.showRevealMenuEmbedded,
+        codeBlockMaxHeight: settings.codeBlockMaxHeight,
+        codeBlockOverflowScroll: settings.codeBlockOverflowScroll,
+        transitionSpeed: settings.transitionSpeed,
+        magicMoveDurationMs: settings.magicMoveDurationMs,
         resolveImage: (raw) => this.resolveImageAttachment(raw, file.path),
       });
       this.iframeEl.srcdoc = html;
@@ -371,6 +375,10 @@ export class SlidesNGView extends ItemView {
       codeTheme: s.codeTheme,
       imageLayoutSplit: s.imageLayoutSplit,
       lineStepDimOpacity: s.lineStepDimOpacity,
+      codeBlockMaxHeight: s.codeBlockMaxHeight,
+      codeBlockOverflowScroll: s.codeBlockOverflowScroll,
+      transitionSpeed: s.transitionSpeed,
+      magicMoveDurationMs: s.magicMoveDurationMs,
       // showRevealControlsEmbedded + showRevealMenuEmbedded intentionally
       // not threaded into standalone exports — standalone mode shows
       // controls + menu regardless.

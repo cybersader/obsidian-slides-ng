@@ -6,6 +6,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-05-12
+
+### Added
+
+- **Per-slide background image / video** — `<!-- slide
+  data-background-image="path" -->` (and `data-background-video`) now
+  resolve vault-relative paths through the same `resolveImage`
+  callback as the `image:` frontmatter, so attachments work the same
+  way they do in image layouts. External URLs (`http(s)://`,
+  `data:`, absolute paths) pass through unchanged.
+- **Code-block max-height + internal scroll** — long fenced code
+  blocks no longer overflow off slides. New settings
+  `codeBlockMaxHeight` (default `"60vh"`, accepts any CSS length or
+  `"none"`) and `codeBlockOverflowScroll` (default `true`).
+- **`customCSS:` deck frontmatter** — inject arbitrary CSS rules into
+  the iframe scoped to a single deck. Accepts a string or array of
+  strings. Sanitization rejects any value containing `<` or `>` with
+  a console warning (defense-in-depth — the iframe is sandboxed but
+  the rejection prevents accidental script-tag breakouts within the
+  emitted `<style>` block).
+- **Reveal transition speed setting** —
+  `transitionSpeed: "default" | "fast" | "slow"`. Also accepted as
+  per-deck frontmatter. Passes through to `Reveal.initialize()`.
+- **Magic-Move animation duration setting** —
+  `magicMoveDurationMs` (default `500`, range 100–3000). Threaded
+  into the iframe's bootstrap script so each token-morph render uses
+  the configured duration.
+
+### Fixed
+
+- **Release workflow race** — `release.yml`'s old delete-and-recreate
+  tag step caused `gh release create` to outrace the GitHub API after
+  the re-push. Now: idempotent. The tag the user pushed is reused as-is
+  (`git tag` / `git push` are no-ops if already present); if the
+  release already exists from a prior run, the workflow uploads
+  artifacts with `--clobber` instead of failing.
+
+### Tests
+
+- New `tests/backgroundImage.test.ts` (8 tests) — http pass-through,
+  data:/file:/absolute pass-through, vault-relative resolution, video
+  attr, missing resolver fallback, mixing with other slide attrs.
+- New `tests/customCss.test.ts` (7 tests) — string + array forms,
+  sanitization of `<`/`>`, mixed clean+dirty arrays.
+- `tests/settings.test.ts` extended (+12 tests) — 0.6.0 defaults
+  (codeBlockMaxHeight, codeBlockOverflowScroll, transitionSpeed,
+  magicMoveDurationMs), threading into iframe srcdoc, headmatter
+  overrides for customCSS + transitionSpeed.
+- New `test/e2e/authoring-polish.spec.ts` (4 tests) — customCSS
+  injected; data-background-image resolved or passed through; code-
+  block max-height CSS rule present; magic-move duration literal in
+  bootstrap.
+- New fixtures `Decks/fixtures/16-slide-backgrounds.md` and
+  `Decks/fixtures/17-custom-css.md` (copied to `e2e-vault/` too).
+- Totals: 286 unit / 19 E2E spec files.
+
+### Notes
+
+- **More Shiki languages on-demand** is deferred indefinitely — the
+  current static-import + sync `highlight()` contract would require
+  a significant refactor to support runtime language loading, for
+  marginal value (the 11 bundled langs cover ~95% of typical decks).
+  Documented in ROADMAP.md.
+
 ## [0.5.4] — 2026-05-12
 
 ### Fixed

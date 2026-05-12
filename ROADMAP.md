@@ -6,21 +6,28 @@ move between sections as work happens. Released versions live in
 
 ## In flight
 
-### 0.5.2 — bug fixes + in-window controls + settings expansion
-
-- Slide-number-click → black overlay bug (suppress the slide-number `<a>` click that falls into reveal's pause handler)
-- Speaker view Start/Pause visual state — button label flips, accent color when running, predictable 1Hz tick
-- In-window reveal.js controls toggle — show reveal's arrows + progress bar inside the embedded iframe when wanted
-- Reveal.js menu plugin bundled — hamburger menu in the iframe corner with heading outline + slide list (Extended-Slides-parity nav)
-- "Grid" button in the speaker view → reveal.js overview mode (free thumbnail nav)
-- 6 new settings: `defaultLayout`, `codeTheme`, `imageLayoutSplit`, `speakerTimerTickMs`, `speakerPickerDefaultMode`, `lineStepDimOpacity`
-- Settings tab grouped with section headings (Rendering / Editor / Speaker / Code / Layouts)
-
-### 0.6.0 — visual speaker UX + modular panels
+### 0.7.0 — visual speaker UX + modular panels
 
 - **True visual next-slide preview** — second mini-iframe in the speaker view rendering the next slide at scale (theme, fonts, code highlighting, layouts intact)
 - **Light drag-and-drop modular panels** — each speaker panel (status / controls / timer / next / notes / picker) gets a drag handle, vertical reorder, order persists per-user
 - **Per-panel show/hide** — settings toggles to hide panels you don't use during presentation
+
+### 0.8.0 (tentative) — reverse-follow + presenter overlays
+
+- **Reverse follow** — preview → editor cursor. Fires only on horizontal `slidechanged`, never on fragment events (where Slides-Extended jittered)
+- **Presenter overlay tools** — drawing layer, laser pointer, color swatches (Slides-Extended parity)
+
+## Shipped
+
+See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
+Most recent:
+
+- **0.6.0** — authoring polish bundle: per-slide backgrounds with vault-path resolution, code-block max-height + scroll, `customCSS:` frontmatter injection, `transitionSpeed` setting, `magicMoveDurationMs` setting
+- **0.5.4** — ribbon-button focus-steal recovery
+- **0.5.3** — toolbar wrap on narrow leaves
+- **0.5.2** — in-window controls + reveal-menu plugin + Grid (overview) button + 6 new settings
+- **0.5.1** — "Use current" toolbar button
+- **0.5.0** — In-Obsidian Speaker Console + cursor-follow + toolbar polish
 
 ## Idea jar
 
@@ -41,15 +48,12 @@ ballpark.
 
 | Idea | Priority | Effort |
 |---|---|---|
-| Per-slide background image / video — reveal supports `data-background-image` natively; works today via `<!-- slide data-background-image="..." -->` but untested + undocumented | Medium | <1 hr (verify + doc) |
 | pretext (`chenglou/pretext`) overflow detection at render time — warn or auto-fit slides whose content will clip the bounding box | Low | 2-3 hr (lib is heavy ~200 KB+) |
 | pretext-driven auto-fit for `cover` / `statement` / `quote` layouts (currently fixed font sizes) | Low | 2-3 hr (same lib) |
-| Magic-Move animation duration setting | Low | <1 hr |
-| Reveal.js transition speed setting (`default` / `fast` / `slow`) | Low | <1 hr |
 | Fragment animation timing setting | Low | <1 hr |
-| Code block max-height with internal scroll (long blocks currently overflow slides) | Low | 1 hr |
-| More Shiki languages on-demand (currently bundles 11) | Low | 1 hr |
-| Slide-level CSS injection per deck — `<style>` block in frontmatter, scoped to that deck | Low | 1 hr |
+| Per-slide `customCSS:` (scoped via generated `[data-slide-uid]` selectors) | Medium | 2 hr — needs slide-uid assignment in parseDeck |
+| Code-fence line numbers (Shiki transformer) | Low | 1 hr |
+| More Shiki languages on-demand | Deferred | Static-bundle pattern locks at build time; dynamic loading breaks the sync `highlight()` contract — significant refactor for marginal value |
 
 ### Authoring / workflow
 

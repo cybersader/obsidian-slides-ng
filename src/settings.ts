@@ -67,6 +67,34 @@ export interface SlidesNGSettings {
    * Extended.
    */
   showRevealMenuEmbedded: boolean;
+
+  /**
+   * Max-height for fenced code blocks before they scroll internally.
+   * Any valid CSS length (e.g. `"60vh"`, `"400px"`). Use `"none"` to
+   * remove the cap entirely.
+   */
+  codeBlockMaxHeight: string;
+
+  /**
+   * Whether code blocks scroll their overflow content. When false +
+   * codeBlockMaxHeight is non-`none`, overflow is hidden — useful for
+   * presentation modes where you'd rather the deck author shortened
+   * the block.
+   */
+  codeBlockOverflowScroll: boolean;
+
+  /**
+   * Reveal.js animation pace. `default` is reveal's stock; `fast` is
+   * 300 ms transitions; `slow` is 1200 ms.
+   */
+  transitionSpeed: "default" | "fast" | "slow";
+
+  /**
+   * Magic-Move animation duration in ms. shiki-magic-move's
+   * MagicMoveRenderer accepts this as `duration`. Stock library
+   * default is 500.
+   */
+  magicMoveDurationMs: number;
 }
 
 export const REVEAL_TRANSITIONS = [
@@ -80,6 +108,7 @@ export const REVEAL_TRANSITIONS = [
 
 export const IMAGE_LAYOUT_SPLITS = ["50/50", "60/40", "40/60"] as const;
 export const PICKER_MODES = ["compact", "list"] as const;
+export const TRANSITION_SPEEDS = ["default", "fast", "slow"] as const;
 
 /**
  * Shiki themes bundled into main.js. Adding a theme = importing it in
@@ -105,4 +134,8 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   lineStepDimOpacity: 0.32,
   showRevealControlsEmbedded: false,
   showRevealMenuEmbedded: true,
+  codeBlockMaxHeight: "60vh",
+  codeBlockOverflowScroll: true,
+  transitionSpeed: "default",
+  magicMoveDurationMs: 500,
 };

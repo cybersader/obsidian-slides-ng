@@ -40,6 +40,16 @@ export interface DeckRenderOptions {
   imageLayoutSplit?: "50/50" | "60/40" | "40/60";
   /** Line-step dimming opacity (0–1). */
   lineStepDimOpacity?: number;
+  /** Max-height for code blocks (CSS length, or `"none"`). */
+  codeBlockMaxHeight?: string;
+  /** Whether code blocks scroll overflow when capped. */
+  codeBlockOverflowScroll?: boolean;
+  /** Reveal animation pace. */
+  transitionSpeed?: "default" | "fast" | "slow";
+  /** Magic-Move animation duration in ms. */
+  magicMoveDurationMs?: number;
+  /** Custom CSS rules to inject as the last <style> block. */
+  customCSS?: string;
   // Pass-through reveal.js Reveal.initialize() options if the caller
   // wants to override anything specific.
   revealOptions?: Record<string, unknown>;
@@ -63,6 +73,11 @@ export function buildIframeHtml(
   const showMenuEmbedded = options.showRevealMenuEmbedded ?? false;
   const imageSplit = options.imageLayoutSplit ?? "50/50";
   const lineStepDim = options.lineStepDimOpacity ?? 0.32;
+  const codeBlockMaxHeight = options.codeBlockMaxHeight ?? "60vh";
+  const codeBlockOverflow = options.codeBlockOverflowScroll ?? true;
+  const transitionSpeed = options.transitionSpeed ?? "default";
+  const magicMoveDuration = options.magicMoveDurationMs ?? 500;
+  const customCss = options.customCSS ?? "";
   // Reveal's controls + progress bar visibility. Standalone mode always
   // shows them (helps presenters drive in a browser); embedded mode hides
   // by default but the user can opt in via setting.
@@ -92,6 +107,7 @@ export function buildIframeHtml(
     history: false,
     keyboard: true,
     transition,
+    transitionSpeed,
     slideNumber,
     embedded,
     // Force presentation mode. reveal.js 5 auto-activates scroll mode in
@@ -401,6 +417,18 @@ export function buildIframeHtml(
       width: 100%;
     }
   </style>
+  <style>
+    /* Code-block max-height + internal scroll. Long blocks used to
+     * overflow off the slide; now they cap at codeBlockMaxHeight and
+     * scroll internally (or hide overflow if scroll is disabled). */
+    ${codeBlockMaxHeight !== "none" ? `
+    .reveal .shiki,
+    .reveal pre code {
+      max-height: ${codeBlockMaxHeight};
+      overflow-y: ${codeBlockOverflow ? "auto" : "hidden"};
+      overflow-x: auto;
+    }` : ""}
+  </style>
   ${showMenu ? `<style>
     /* reveal.js-menu plugin. font-awesome is intentionally NOT bundled
      * (would add ~100 KB for cosmetic icons); the icon-mode CSS rules
@@ -416,6 +444,11 @@ export function buildIframeHtml(
       line-height: 1;
       color: white;
     }
+  </style>` : ""}
+  ${customCss ? `<style>
+    /* customCSS from deck headmatter — last block, so it overrides
+     * everything above (themes, layouts, line-step, magic-move, menu). */
+    ${customCss}
   </style>` : ""}
 </head>
 <body>
@@ -465,6 +498,7 @@ ${sectionsHtml}
        morphs the current key's renderer to the new slide's keyed tokens. */
     (function () {
       if (!window.SlidesNgMagicMove) return;
+      var SLIDES_NG_MM_DURATION = ${magicMoveDuration};
       var renderers = new Map(); // key → { renderer, lastKey }
       var allMarkers = Array.from(document.querySelectorAll('.slides-ng-magic-move'));
       allMarkers.forEach(function (el) {
@@ -513,7 +547,7 @@ ${sectionsHtml}
             // for the first marker with this key). This is the element
             // that will animate — the later markers are non-interactive
             // placeholders.
-            entry.renderer.render(tokens);
+            entry.renderer.render(tokens, { duration: SLIDES_NG_MM_DURATION });
           } catch (e) {
             console.warn('[slides-ng] magic-move slidechanged failed', e);
           }
