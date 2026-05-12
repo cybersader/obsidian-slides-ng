@@ -12,6 +12,7 @@
 import type { HighlighterCore, ShikiTransformer } from "shiki/core";
 import { createHighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
+import { codeToKeyedTokens as smmCodeToKeyedTokens } from "shiki-magic-move/core";
 
 import githubDark from "shiki/themes/github-dark.mjs";
 
@@ -93,6 +94,43 @@ export function highlight(code: string, lang?: string): string {
 /** True iff the highlighter has finished warming. Useful for tests. */
 export function isWarm(): boolean {
   return cached !== null;
+}
+
+/**
+ * Compute Shiki "keyed tokens" for shiki-magic-move. Returns the
+ * `KeyedTokensInfo` object that shiki-magic-move's `MagicMoveRenderer`
+ * consumes. We compute this server-side so the iframe doesn't have to
+ * run Shiki — it just deserializes the JSON we embed in data-attrs.
+ *
+ * Returns `null` if Shiki isn't warm yet or if the lang fails to
+ * resolve. In that case the caller should fall back to plain
+ * `highlight(code, lang)` and skip magic-move.
+ */
+export async function getKeyedTokens(
+  code: string,
+  lang: string
+): Promise<unknown | null> {
+  if (!cached) return null;
+  try {
+    const { codeToKeyedTokens } = await import("shiki-magic-move/core");
+    return codeToKeyedTokens(cached, code, { lang, theme: DEFAULT_THEME });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Synchronous variant for use during the marked render pass. Requires
+ * the highlighter to be warm; `shiki-magic-move/core` is statically
+ * imported so it's always available.
+ */
+export function getKeyedTokensSync(code: string, lang: string): unknown | null {
+  if (!cached) return null;
+  try {
+    return smmCodeToKeyedTokens(cached, code, { lang, theme: DEFAULT_THEME });
+  } catch {
+    return null;
+  }
 }
 
 /**

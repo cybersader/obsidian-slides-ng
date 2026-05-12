@@ -37,6 +37,7 @@ const FIXTURES = [
   "12-edge-cases.md",
   "13-layouts.md",
   "14-annotations.md",
+  "15-magic-move.md",
 ] as const;
 
 describe("slides-ng renders each feature-coverage fixture", function () {

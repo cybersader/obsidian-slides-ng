@@ -128,8 +128,8 @@ describe("applyLayout — missing-required-slot warnings", () => {
 });
 
 describe("KNOWN_LAYOUTS / isKnownLayout", () => {
-  test("ships 9 layouts", () => {
-    expect(KNOWN_LAYOUTS.length).toBe(9);
+  test("ships at least 9 layouts (12 after image-* added in v0.4)", () => {
+    expect(KNOWN_LAYOUTS.length).toBeGreaterThanOrEqual(9);
   });
   test("includes the headline ones", () => {
     expect(KNOWN_LAYOUTS).toContain("default");

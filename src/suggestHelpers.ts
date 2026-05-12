@@ -95,3 +95,21 @@ export function currentSlideLayout(
   }
   return null;
 }
+
+/**
+ * Is the cursor inside a fenced code block? Scans from start of file to
+ * the cursor, toggling on every line whose trimmed form starts with
+ * ` ``` ` or `~~~`. Used to suppress autocomplete inside code blocks
+ * (we don't want the `::` menu firing while someone types a code sample).
+ */
+export function isInsideCodeFence(
+  editor: EditorLike,
+  cursorLine: number
+): boolean {
+  let inside = false;
+  for (let i = 0; i < cursorLine; i++) {
+    const line = editor.getLine(i).trim();
+    if (line.startsWith("```") || line.startsWith("~~~")) inside = !inside;
+  }
+  return inside;
+}

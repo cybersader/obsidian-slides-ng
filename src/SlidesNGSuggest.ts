@@ -37,8 +37,10 @@ import {
   parseAllFrontmatterBlocks,
   isInFrontmatter,
   currentSlideLayout,
+  isInsideCodeFence,
   type EditorLike,
 } from "./suggestHelpers";
+import { TEMPLATES, findTemplate, locateCursor } from "./templates";
 
 // ---------------------------------------------------------------------------
 // LayoutNameSuggest
@@ -103,9 +105,12 @@ export class LayoutNameSuggest extends EditorSuggest<LayoutSuggestion> {
 // ---------------------------------------------------------------------------
 
 interface SlotSuggestion {
+  kind: "slot" | "template";
   name: string;
-  /** True if this slot is in the current layout's expected set. */
-  forCurrentLayout: boolean;
+  /** For slots: true if this slot is in the current layout's expected set. */
+  forCurrentLayout?: boolean;
+  /** For templates: short description for the dropdown sublabel. */
+  description?: string;
 }
 
 export class SlotMarkerSuggest extends EditorSuggest<SlotSuggestion> {
@@ -125,6 +130,7 @@ export class SlotMarkerSuggest extends EditorSuggest<SlotSuggestion> {
     if (!m) return null;
     const blocks = parseAllFrontmatterBlocks(editor);
     if (isInFrontmatter(blocks, cursor.line)) return null;
+    if (isInsideCodeFence(editor, cursor.line)) return null;
     const partial = m[1] ?? "";
     const queryStart = 2; // after the `::`
     return {
@@ -142,35 +148,73 @@ export class SlotMarkerSuggest extends EditorSuggest<SlotSuggestion> {
     const expected = new Set(schema?.slots ?? []);
     const pool = expected.size > 0 ? Array.from(expected) : [...ALL_KNOWN_SLOTS];
     const q = context.query.toLowerCase();
-    return pool
+
+    // 1. Slot suggestions, sorted: layout's expected slots first.
+    const slotSuggestions: SlotSuggestion[] = pool
       .filter((n) => n.toLowerCase().startsWith(q))
       .sort()
-      .map((name) => ({ name, forCurrentLayout: expected.has(name) }));
+      .map((name) => ({
+        kind: "slot",
+        name,
+        forCurrentLayout: expected.has(name),
+      }));
+
+    // 2. Template suggestions whose name starts with the query.
+    const templateSuggestions: SlotSuggestion[] = TEMPLATES.filter((t) =>
+      t.name.toLowerCase().startsWith(q)
+    ).map((t) => ({
+      kind: "template",
+      name: t.name,
+      description: t.description,
+    }));
+
+    return [...slotSuggestions, ...templateSuggestions];
   }
 
   renderSuggestion(s: SlotSuggestion, el: HTMLElement): void {
     el.empty();
     el.addClass("slides-ng-suggest");
-    el.createEl("div", { text: s.name, cls: "slides-ng-suggest-title" });
-    el.createEl("div", {
-      text: s.forCurrentLayout ? "expected by this layout" : "not used by this layout",
-      cls: "slides-ng-suggest-note",
-    });
+    if (s.kind === "slot") {
+      el.createEl("div", { text: `::${s.name}::`, cls: "slides-ng-suggest-title" });
+      el.createEl("div", {
+        text: s.forCurrentLayout
+          ? "slot expected by this layout"
+          : "slot not used by this layout",
+        cls: "slides-ng-suggest-note",
+      });
+    } else {
+      el.createEl("div", {
+        text: `${s.name} template`,
+        cls: "slides-ng-suggest-title",
+      });
+      el.createEl("div", {
+        text: s.description ?? "",
+        cls: "slides-ng-suggest-note",
+      });
+    }
   }
 
   selectSuggestion(s: SlotSuggestion, _evt: MouseEvent | KeyboardEvent): void {
     if (!this.context) return;
-    // Replace the `::` plus query with `::name::` so the line ends as a
-    // complete slot marker.
-    const fullStart = {
-      line: this.context.start.line,
-      ch: 0,
-    };
-    this.context.editor.replaceRange(
-      `::${s.name}::`,
-      fullStart,
-      this.context.end
-    );
+    const lineStart = { line: this.context.start.line, ch: 0 };
+    if (s.kind === "slot") {
+      // Replace the `::` plus query with `::name::` so the line ends as a
+      // complete slot marker.
+      this.context.editor.replaceRange(
+        `::${s.name}::`,
+        lineStart,
+        this.context.end
+      );
+      return;
+    }
+    // Template: fully replace the `::name` typed text with the
+    // template's expansion. Cursor lands at the template's marker.
+    const template = findTemplate(s.name);
+    if (!template) return;
+    const { text, cursorOffset } = template.expand();
+    this.context.editor.replaceRange(text, lineStart, this.context.end);
+    const cursorPos = locateCursor(lineStart.line, text, cursorOffset);
+    this.context.editor.setCursor(cursorPos);
   }
 }
 
@@ -205,6 +249,7 @@ export class VClickSuggest extends EditorSuggest<VClickSuggestion> {
     if (!m) return null;
     const blocks = parseAllFrontmatterBlocks(editor);
     if (isInFrontmatter(blocks, cursor.line)) return null;
+    if (isInsideCodeFence(editor, cursor.line)) return null;
     const partial = m[1] ?? "";
     const queryStart = beforeCursor.length - partial.length - 3; // `<v-` is 3 chars
     return {

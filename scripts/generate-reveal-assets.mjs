@@ -10,6 +10,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "fs";
 import { dirname, basename } from "path";
+import esbuild from "esbuild";
 
 const OUT = "src/render/revealAssets.generated.ts";
 
@@ -55,6 +56,45 @@ for (const [slug, path] of Object.entries(themes)) {
 exports.push(
   `\nexport const THEMES_BY_NAME: Record<string, string> = {\n${indexEntries.join("\n")}\n};`
 );
+
+// ---------------------------------------------------------------------------
+// Bundle shiki-magic-move's vanilla renderer (renderer.mjs + core.mjs +
+// diff-match-patch-es + ohash) into a single IIFE that we can drop into
+// the iframe srcdoc as a <script>. The runtime exposes window.SlidesNgMagicMove
+// = { MagicMoveRenderer, toKeyedTokens }.
+// ---------------------------------------------------------------------------
+const magicMoveEntry = "scripts/magic-move-bundle-entry.mjs";
+if (!existsSync(magicMoveEntry)) {
+  writeFileSync(
+    magicMoveEntry,
+    [
+      "// Auto-generated entry — bundled into iframe runtime by",
+      "// scripts/generate-reveal-assets.mjs",
+      "import { MagicMoveRenderer } from 'shiki-magic-move/renderer';",
+      "import { toKeyedTokens } from 'shiki-magic-move/core';",
+      "globalThis.SlidesNgMagicMove = { MagicMoveRenderer, toKeyedTokens };",
+      "",
+    ].join("\n")
+  );
+}
+
+const mmResult = await esbuild.build({
+  entryPoints: [magicMoveEntry],
+  bundle: true,
+  format: "iife",
+  target: "es2018",
+  minify: true,
+  treeShaking: true,
+  write: false,
+  logLevel: "silent",
+});
+const magicMoveJs = mmResult.outputFiles[0].text;
+const magicMoveCss = readFileSync(
+  "node_modules/shiki-magic-move/dist/style.css",
+  "utf-8"
+);
+exports.push(`export const magicMoveJs = ${JSON.stringify(magicMoveJs)};`);
+exports.push(`export const magicMoveCss = ${JSON.stringify(magicMoveCss)};`);
 
 if (!existsSync(dirname(OUT))) {
   mkdirSync(dirname(OUT), { recursive: true });

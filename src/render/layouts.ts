@@ -102,6 +102,24 @@ const LAYOUTS: Record<LayoutName, LayoutFn> = {
 
   end: (s) =>
     `<div class="slides-ng-end">${s.default ?? ""}</div>`,
+
+  "image-left": (s) =>
+    `<div class="slides-ng-image-left">` +
+    `<div class="slides-ng-image-side">${s.image ?? ""}</div>` +
+    `<div class="slides-ng-image-content">${s.default ?? ""}</div>` +
+    `</div>`,
+
+  "image-right": (s) =>
+    `<div class="slides-ng-image-right">` +
+    `<div class="slides-ng-image-content">${s.default ?? ""}</div>` +
+    `<div class="slides-ng-image-side">${s.image ?? ""}</div>` +
+    `</div>`,
+
+  image: (s) =>
+    `<div class="slides-ng-image-full">` +
+    `<div class="slides-ng-image-bg">${s.image ?? ""}</div>` +
+    `<div class="slides-ng-image-overlay">${s.default ?? ""}</div>` +
+    `</div>`,
 };
 
 /** Test-only: expose the dispatch keys for the consistency check. */

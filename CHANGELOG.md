@@ -6,6 +6,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-12
+
+### Added
+
+- **Snippet/template expansion** — type `::name` at the start of a
+  line in the slide body and the autocomplete dropdown surfaces
+  matching templates alongside slot suggestions. Selecting a template
+  replaces the entire `::name` with a multi-line markdown expansion
+  (the `::` is summon-only — never part of the output). 15 built-ins:
+  `note`, `cover`, `center`, `two-cols`, `two-cols-header`, `quote`,
+  `statement`, `section`, `end`, `auto-animate`, `v-clicks`,
+  `v-click`, `fragment`, `code-ts`, `code-step`.
+- **Image layouts** — three new layouts: `image-left`, `image-right`,
+  `image` (full-bleed). Image URL comes from per-slide frontmatter
+  `image: path/to/file.png`. View resolves Obsidian-vault paths via
+  `app.vault.adapter.getResourcePath()`; absolute URLs and `data:`
+  URIs pass through. Wikilink-form (`[[attachment.png]]`) is also
+  supported.
+- **Magic-Move** — paired code blocks across consecutive slides
+  sharing `{key=NAME}` (or `[key=NAME]`) get smooth token-morph
+  transitions via `shiki-magic-move`. Token computation happens
+  server-side (during `renderDeck`); the iframe srcdoc embeds a
+  bundled vanilla `MagicMoveRenderer` + the keyed-token JSON in
+  data-attrs; bootstrap script wires reveal.js's `slidechanged`
+  events to morph between paired states.
+- **Code-fence autocomplete safeguard** — `::` and `<v-` triggers now
+  skip inside ```…``` and ~~~…~~~ blocks. Authors writing markdown
+  code samples don't get the suggester popping up.
+- **Fixture** `Decks/fixtures/15-magic-move.md` — three-step
+  passphrase morph + a plain ts block + a single `key=other` block.
+
+### Tests
+
+- 18 new unit tests for templates (registry shape, cursor-offset
+  computation, expansion contents)
+- 9 new unit tests for `parseMagicMoveKey` (square + curly brackets,
+  hyphenated keys, malformed input)
+- 9 new unit tests for image layouts (applyLayout output, renderDeck
+  integration, resolver fallbacks, URL passthrough, attribute escaping)
+- 4 new unit tests for `isInsideCodeFence` (the autocomplete safeguard)
+- New E2E spec `test/e2e/magic-move.spec.ts` (4 tests): marker emission,
+  data-mm-key attrs, plain-ts non-wrapping, runtime presence
+- Updated `tests/layouts.test.ts` to allow more than 9 layouts (we now
+  ship 12 with the image layouts)
+- Totals: 231 unit tests / 13 E2E spec files (was 192 / 12)
+
+### Changed
+
+- **First-render Shiki warmup** — `SlidesNGView.onOpen` now awaits
+  Shiki warmup before the initial render so syntax highlighting AND
+  magic-move keyed-token computation work on the first frame.
+- **main.js bundle** — 1.77 MB → 1.81 MB (added the bundled
+  `shiki-magic-move/renderer` + `core` runtime for the iframe; still
+  91% of the 2 MB soft cap).
+
 ## [0.3.0] — 2026-05-11
 
 ### Added

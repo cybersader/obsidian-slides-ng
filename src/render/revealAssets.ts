@@ -5,9 +5,15 @@
  * (also runs automatically as part of `dev` and `build`) to refresh it
  * from node_modules.
  */
-import { revealJs, revealCss, THEMES_BY_NAME } from "./revealAssets.generated";
+import {
+  revealJs,
+  revealCss,
+  THEMES_BY_NAME,
+  magicMoveJs,
+  magicMoveCss,
+} from "./revealAssets.generated";
 
-export { revealJs, revealCss };
+export { revealJs, revealCss, magicMoveJs, magicMoveCss };
 
 /** All theme names we ship. Always includes "black" as the default. */
 export function availableThemes(): string[] {

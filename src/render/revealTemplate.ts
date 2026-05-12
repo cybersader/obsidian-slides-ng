@@ -1,4 +1,4 @@
-import { revealCss, revealJs, getTheme } from "./revealAssets";
+import { revealCss, revealJs, getTheme, magicMoveJs, magicMoveCss } from "./revealAssets";
 
 export interface SlideHtml {
   /** Pre-rendered HTML for the slide body (markdown already converted). */
@@ -261,6 +261,77 @@ export function buildIframeHtml(
       letter-spacing: -0.02em;
       padding: 0 5%;
     }
+
+    /* image-left / image-right: side-by-side image + content */
+    .slides-ng-image-left,
+    .slides-ng-image-right {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      align-items: center;
+      height: 100%;
+    }
+    .slides-ng-image-side {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      overflow: hidden;
+    }
+    .slides-ng-image-side img,
+    .slides-ng-image-side .slides-ng-image {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .slides-ng-image-content {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* image (full-bleed): image fills the slide; content overlays it */
+    .slides-ng-image-full {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    .slides-ng-image-bg {
+      position: absolute;
+      inset: 0;
+    }
+    .slides-ng-image-bg img,
+    .slides-ng-image-bg .slides-ng-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .slides-ng-image-overlay {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      height: 100%;
+      color: white;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+      padding: 0 5%;
+    }
+  </style>
+  <style>
+    /* shiki-magic-move v0.4 — token-morph between paired code blocks */
+    ${magicMoveCss}
+    .slides-ng-magic-move {
+      width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -279,6 +350,71 @@ ${sectionsHtml}
       } catch (err) {
         document.body.innerHTML = '<pre style="color:#f99;padding:1em;font-family:monospace;white-space:pre-wrap">slides-ng: reveal.js failed to initialize\\n' + (err && err.stack ? String(err.stack) : String(err)) + '</pre>';
       }
+    })();
+  </script>
+  <script>
+    ${magicMoveJs}
+  </script>
+  <script>
+    /* Magic-Move bootstrap. Finds all .slides-ng-magic-move elements,
+       groups them by data-mm-key, and on reveal.js slidechanged events
+       morphs the current key's renderer to the new slide's keyed tokens. */
+    (function () {
+      if (!window.SlidesNgMagicMove) return;
+      var renderers = new Map(); // key → { renderer, lastKey }
+      var allMarkers = Array.from(document.querySelectorAll('.slides-ng-magic-move'));
+      allMarkers.forEach(function (el) {
+        var key = el.getAttribute('data-mm-key');
+        var tokensJson = el.getAttribute('data-mm-tokens');
+        if (!key || !tokensJson) return;
+        try {
+          var tokens = JSON.parse(tokensJson);
+          var existing = renderers.get(key);
+          if (!existing) {
+            // First marker for this key — install a renderer + render
+            // the initial state into the same DOM slot.
+            el.innerHTML = '';
+            var renderer = new window.SlidesNgMagicMove.MagicMoveRenderer(el);
+            renderer.render(tokens);
+            renderers.set(key, { renderer: renderer, tokens: tokens, elements: [el] });
+          } else {
+            // Subsequent marker for the same key — track it for later morph.
+            existing.elements.push(el);
+            // Pre-render the initial state for visual correctness when reveal
+            // is first viewing this slide.
+            el.innerHTML = '';
+            var laterRenderer = new window.SlidesNgMagicMove.MagicMoveRenderer(el);
+            laterRenderer.render(tokens);
+          }
+        } catch (e) {
+          console.warn('[slides-ng] magic-move bootstrap failed for key', key, e);
+        }
+      });
+
+      // When reveal advances to a slide containing a magic-move element,
+      // animate the renderer for THAT key to this slide's tokens.
+      Reveal.on('slidechanged', function () {
+        var current = Reveal.getCurrentSlide();
+        if (!current) return;
+        var markers = current.querySelectorAll('.slides-ng-magic-move');
+        markers.forEach(function (el) {
+          var key = el.getAttribute('data-mm-key');
+          var tokensJson = el.getAttribute('data-mm-tokens');
+          if (!key || !tokensJson) return;
+          try {
+            var tokens = JSON.parse(tokensJson);
+            var entry = renderers.get(key);
+            if (!entry) return;
+            // Run the morph on the original renderer (the one installed
+            // for the first marker with this key). This is the element
+            // that will animate — the later markers are non-interactive
+            // placeholders.
+            entry.renderer.render(tokens);
+          } catch (e) {
+            console.warn('[slides-ng] magic-move slidechanged failed', e);
+          }
+        });
+      });
     })();
   </script>
 </body>

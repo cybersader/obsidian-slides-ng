@@ -1,6 +1,7 @@
 import { ItemView, WorkspaceLeaf, TFile, TAbstractFile, Notice, ViewStateResult } from "obsidian";
 import { renderDeck } from "./render/renderDeck";
 import { exportAndOpen, exportAndOpenForPdf } from "./export/exportStandalone";
+import { warmHighlighter } from "./render/shiki";
 import type { SlidesNGSettings } from "./settings";
 
 export const VIEW_TYPE_SLIDES_NG = "slides-ng-preview";
@@ -103,6 +104,10 @@ export class SlidesNGView extends ItemView {
       })
     );
 
+    // Ensure Shiki is warm before the first render so syntax highlighting
+    // AND magic-move keyed-token computation work on the first frame.
+    // (Subsequent renders are unaffected — the highlighter caches itself.)
+    await warmHighlighter().catch(() => undefined);
     await this.refresh();
   }
 
@@ -145,6 +150,7 @@ export class SlidesNGView extends ItemView {
       const html = renderDeck(markdown, file.path, {
         defaultTheme: settings.defaultTheme,
         defaultTransition: settings.defaultTransition,
+        resolveImage: (raw) => this.resolveImageAttachment(raw, file.path),
       });
       this.iframeEl.srcdoc = html;
     } catch (err) {
@@ -212,6 +218,32 @@ export class SlidesNGView extends ItemView {
   private renderDefaults() {
     const s = this.getSettings();
     return { defaultTheme: s.defaultTheme, defaultTransition: s.defaultTransition };
+  }
+
+  /**
+   * Resolve a `image:` frontmatter value (relative path or absolute URL)
+   * to a URL the iframe-sandboxed reveal.js can load. Strategy:
+   *   - http(s):// → use as-is
+   *   - data: → use as-is
+   *   - vault-relative path → look up via Obsidian's metadata cache + adapter
+   *     and return getResourcePath() (which returns an `app://` URL the
+   *     iframe can load)
+   *   - not found → return null (renderer will fall back to the raw path)
+   */
+  private resolveImageAttachment(raw: string, deckPath: string): string | null {
+    if (/^(https?:|data:|file:)/.test(raw)) return raw;
+    const trimmed = raw.trim();
+    const linktext = trimmed.replace(/^!?\[\[|\]\]$/g, "");
+    const target = this.app.metadataCache.getFirstLinkpathDest(linktext, deckPath);
+    if (target) {
+      return this.app.vault.adapter.getResourcePath(target.path);
+    }
+    // Plain path (no wikilink syntax) — try direct adapter resolution.
+    const file = this.app.vault.getAbstractFileByPath(trimmed);
+    if (file && "path" in file) {
+      return this.app.vault.adapter.getResourcePath(file.path);
+    }
+    return null;
   }
 }
 

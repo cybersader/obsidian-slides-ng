@@ -34,6 +34,9 @@ Slides NG aims for the lightest possible authoring substrate:
 - **In-editor autocomplete** — typing `layout: ` in frontmatter, `::` at line start in the slide body, or `<v-` anywhere fires an autocomplete dropdown with the relevant suggestions. The slot-marker dropdown is context-aware and filters to slots actually used by the current slide's layout.
 - **Slide annotations** (Slides Extended convention) — `<!-- slide data-auto-animate -->` / `<!-- slide class="hero" -->` / `<!-- slide style="background:#000" -->` placed anywhere on a slide attach to that slide's `<section>` tag. Unlocks reveal.js auto-animate.
 - **Element annotations** — `<!-- element class="fragment" -->` immediately after an element folds those attributes into it. `class` and `style` concatenate; other attributes overwrite.
+- **Snippet/template expansion** — type `::name` at line start in the slide body; the autocomplete dropdown surfaces ready-made markdown templates (note, cover, two-cols, auto-animate, v-clicks, fragment, code-ts, …) — selecting one fully replaces the `::name` with multi-line markdown. Plain markdown out, no shortcode rendering at runtime.
+- **Image layouts** — `image-left`, `image-right`, `image` (full-bleed) — image URL from per-slide frontmatter `image:`. Vault-relative attachments are resolved via Obsidian's adapter; absolute URLs and data URIs pass through. Wikilink form `[[attachment.png]]` also works.
+- **Magic-Move** — paired code blocks across consecutive slides sharing `{key=NAME}` get smooth token-morph transitions courtesy of `shiki-magic-move`. Server-side keyed-token computation; bundled vanilla renderer runs inside the iframe.
 - **Open in browser** — writes `.slides-ng-export-<timestamp>.html` to the vault, opens via `electron.shell.openExternal` (no port, no spawned server)
 - **Export for PDF** — same export workflow, opens with `?print-pdf` so reveal.js flattens the deck for browser-side Print → Save as PDF
 
@@ -137,7 +140,7 @@ reveal.js + reveal CSS + all 15 themes are inlined at build time by `scripts/gen
 
 ## Status
 
-v0.3.0 — Slide + element annotations. v0.1.0 covered the brief's §7 acceptance list; v0.2.0 added 9 named layouts + `::name::` slots; v0.2.1 added the layout metadata registry + validation + in-editor autocomplete; v0.3.0 adds Slides-Extended-flavoured `<!-- slide attr -->` and `<!-- element attr -->` annotations (auto-animate, custom slide classes, per-element fragment attrs). See `CHANGELOG.md` for the full delta.
+v0.4.0 — Snippet expansion + image layouts + Magic-Move. v0.1.0 covered the brief's §7 acceptance list; v0.2.0 added 9 named layouts + `::name::` slots; v0.2.1 added the layout metadata registry + validation + in-editor autocomplete; v0.3.0 added Slides-Extended-flavoured `<!-- slide attr -->` / `<!-- element attr -->` annotations; v0.4.0 adds template-expansion snippets via the `::name` summon menu, three image layouts with Obsidian-attachment path resolution, and Magic-Move via bundled `shiki-magic-move`. See `CHANGELOG.md` for the full delta.
 
 | Phase | Description | State |
 |---|---|---|
@@ -154,6 +157,7 @@ v0.3.0 — Slide + element annotations. v0.1.0 covered the brief's §7 acceptanc
 | v0.2 | Slidev layouts (9 layouts + `::name::` slots) | ✅ |
 | v0.2.1 | Layout registry + render-time validation + in-editor autocomplete | ✅ |
 | v0.3.0 | Slide + element annotations (auto-animate, custom classes/IDs, fragment attrs) | ✅ |
+| v0.4.0 | Snippet expansion + image layouts + Magic-Move | ✅ |
 
 ## Features explicitly NOT in v0.1
 

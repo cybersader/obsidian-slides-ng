@@ -3,6 +3,7 @@ import {
   parseAllFrontmatterBlocks,
   isInFrontmatter,
   currentSlideLayout,
+  isInsideCodeFence,
   type EditorLike,
 } from "../src/suggestHelpers";
 
@@ -137,5 +138,37 @@ describe("currentSlideLayout", () => {
     // Cursor BEFORE the frontmatter (impossible in practice but the
     // helper should still return null rather than the upcoming layout).
     expect(currentSlideLayout(blocks, 0)).toBeNull();
+  });
+});
+
+describe("isInsideCodeFence", () => {
+  test("false outside any fence", () => {
+    const e = fakeEditor("Hello\n\n# World\n");
+    expect(isInsideCodeFence(e, 2)).toBe(false);
+  });
+
+  test("true inside ``` fence", () => {
+    const e = fakeEditor(
+      ["# Slide", "", "```ts", "const x = 1", "console.log(x)", "```", "", "After."].join("\n")
+    );
+    // Lines 3 and 4 are inside the fence.
+    expect(isInsideCodeFence(e, 3)).toBe(true);
+    expect(isInsideCodeFence(e, 4)).toBe(true);
+    // Line 5 is the closing ``` (toggle happens before counting); line 7 is after.
+    expect(isInsideCodeFence(e, 7)).toBe(false);
+  });
+
+  test("true inside ~~~ fence (tilde variant)", () => {
+    const e = fakeEditor(["~~~", "body", "~~~"].join("\n"));
+    expect(isInsideCodeFence(e, 1)).toBe(true);
+  });
+
+  test("nested fences: a `````` block ends the previous fence", () => {
+    // Real markdown allows nested fences only with different lengths.
+    // Our simple toggler treats every ``` as a state flip, which is
+    // good enough for autocomplete-suppression heuristics.
+    const e = fakeEditor(["```", "x", "```", "y"].join("\n"));
+    expect(isInsideCodeFence(e, 1)).toBe(true);
+    expect(isInsideCodeFence(e, 3)).toBe(false);
   });
 });

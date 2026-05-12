@@ -10,6 +10,8 @@ import { highlight } from "./shiki";
 import { applyClickReveals } from "./clickReveals";
 import { parseLineStep } from "../parser/lineStep";
 import { renderLineStep } from "./lineStepRenderer";
+import { parseMagicMoveKey } from "../parser/magicMoveKey";
+import { renderMagicMoveBlock } from "./magicMoveRenderer";
 import { splitSlots, hasSlots } from "./slots";
 import { applyLayout } from "./layouts";
 import {
@@ -27,15 +29,17 @@ md.use({
   renderer: {
     code(token: Tokens.Code): string {
       const info = token.lang ?? "";
-      // Try parsing the info string as a Slidev line-step spec first
-      // (e.g. `ts [1|2-3|all]`). If it matches, render a multi-step
-      // stacked block. Otherwise fall back to plain Shiki highlighting,
-      // taking only the first word as the lang (the info string can
-      // contain trailing non-step junk like `{monaco-diff}`).
+      // Priority 1: Magic-Move pairing via `{key=NAME}`.
+      const mm = parseMagicMoveKey(info);
+      if (mm) {
+        return renderMagicMoveBlock(token.text, mm);
+      }
+      // Priority 2: Slidev line-step spec (`ts [1|2-3|all]`).
       const stepped = parseLineStep(info);
       if (stepped) {
         return renderLineStep(token.text, stepped);
       }
+      // Plain Shiki highlight; strip non-lang info-string suffix.
       const langOnly = info.split(/\s+/)[0];
       return highlight(token.text, langOnly);
     },
@@ -51,6 +55,16 @@ export interface RenderDefaults {
   /** Plugin-setting defaults — overridden by per-deck frontmatter. */
   defaultTheme?: string;
   defaultTransition?: string;
+  /**
+   * Optional image-attachment resolver. Called with the raw `image:`
+   * frontmatter value; returns a fully-qualified URL (data: URI,
+   * file://, https://, etc.) or null if the resolver couldn't find
+   * the asset. The view supplies a real implementation via
+   * `app.vault.adapter.getResourcePath()`; unit tests can pass null
+   * or a mock. When omitted, the raw `image:` value is used as-is
+   * (works for absolute URLs).
+   */
+  resolveImage?: (path: string) => string | null;
 }
 
 export function renderDeck(
@@ -89,7 +103,7 @@ export function renderDeckFromAst(
   overrides: Partial<DeckRenderOptions> = {},
   defaults: RenderDefaults = {}
 ): string {
-  const slides = deck.slides.map(slideToHtml);
+  const slides = deck.slides.map((s) => slideToHtml(s, defaults));
   const defaultLayer: Partial<DeckRenderOptions> = {};
   if (defaults.defaultTheme) defaultLayer.theme = defaults.defaultTheme;
   if (defaults.defaultTransition) defaultLayer.transition = defaults.defaultTransition;
@@ -102,7 +116,7 @@ export function renderDeckFromAst(
   return buildIframeHtml(slides, opts);
 }
 
-function slideToHtml(slide: Slide): SlideHtml {
+function slideToHtml(slide: Slide, defaults: RenderDefaults = {}): SlideHtml {
   // 1. Extract Slides-Extended-style slide annotations from the raw
   //    markdown before anything else touches it. The cleaned content
   //    is what flows into the slot splitter / markdown→HTML pass.
@@ -134,6 +148,17 @@ function slideToHtml(slide: Slide): SlideHtml {
     html = applyElementAnnotations(html);
     slotHtml[name] = applyClickReveals(html);
   }
+
+  // 4. Image-layout support: when `image:` is in the frontmatter, inject
+  //    a synthesized `image` slot containing the resolved <img> tag. The
+  //    image-* layouts read this slot; non-image layouts ignore it.
+  if (typeof slide.frontmatter.image === "string" && slide.frontmatter.image.length > 0) {
+    const raw = slide.frontmatter.image;
+    const resolved = defaults.resolveImage ? defaults.resolveImage(raw) : null;
+    const src = resolved ?? raw;
+    slotHtml.image = `<img class="slides-ng-image" src="${escapeAttrValue(src)}" alt="">`;
+  }
+
   const body = applyLayout(layoutName, slotHtml);
 
   const noteHtml = slide.note ? markdownToHtml(slide.note) : undefined;
@@ -147,6 +172,10 @@ function slideToHtml(slide: Slide): SlideHtml {
 
 function markdownToHtml(text: string): string {
   return md.parse(text, { async: false }) as string;
+}
+
+function escapeAttrValue(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
 function headmatterToOptions(

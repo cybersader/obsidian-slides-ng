@@ -71,6 +71,21 @@ export const LAYOUT_SCHEMAS = {
     required: ["default"],
     description: "Closing slide",
   },
+  "image-left": {
+    slots: ["default"],
+    required: [],
+    description: "Image on the left, content on the right (image from frontmatter `image:`)",
+  },
+  "image-right": {
+    slots: ["default"],
+    required: [],
+    description: "Image on the right, content on the left (image from frontmatter `image:`)",
+  },
+  image: {
+    slots: ["default"],
+    required: [],
+    description: "Full-bleed image background (image from frontmatter `image:`)",
+  },
 } as const satisfies Record<string, LayoutSchema>;
 
 export type LayoutName = keyof typeof LAYOUT_SCHEMAS;
