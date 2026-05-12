@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.4] — 2026-05-12
+
+### Fixed
+
+- **Ribbon "Open slides preview" button opened an empty/black preview**
+  when a deck was loaded in the editor. The ribbon click was stealing
+  focus from the markdown view BEFORE the callback ran, so
+  `getActiveViewOfType(MarkdownView)` returned null and the preview
+  loaded with no file. The command-palette path didn't show the bug
+  because Obsidian preserves leaf context for command execution.
+
+  Fix: track `lastMarkdownFile` via `active-leaf-change` events on
+  plugin load (seeded from any currently active markdown view).
+  `resolveActiveDeckFile()` falls back to the tracked file when the
+  current active-view check returns null. Ribbon clicks now always
+  open the user's most-recently-focused deck.
+
+### Tests
+
+- New `test/e2e/ribbon-focus.spec.ts` (1 test) — opens deck, defocuses
+  via settings tab to force `getActiveViewOfType(MarkdownView)` →
+  null, clicks ribbon DOM element, asserts preview opens on the right
+  file AND iframe renders ≥ 2 slides.
+- Totals: 259 unit / 18 E2E spec files.
+
 ## [0.5.3] — 2026-05-12
 
 ### Fixed

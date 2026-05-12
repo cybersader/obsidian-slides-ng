@@ -16,6 +16,13 @@ import {
 
 export default class SlidesNGPlugin extends Plugin {
   settings: SlidesNGSettings = { ...DEFAULT_SETTINGS };
+  /**
+   * Most-recently-focused markdown file. Tracked via active-leaf-change
+   * so the ribbon-button callback can still find the user's intended
+   * deck even when the ribbon click has stolen focus away from the
+   * markdown view between user intent and callback execution.
+   */
+  private lastMarkdownFile: TFile | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -24,6 +31,20 @@ export default class SlidesNGPlugin extends Plugin {
     this.registerView(
       VIEW_TYPE_SLIDES_NG,
       (leaf) => new SlidesNGView(leaf, () => this.settings)
+    );
+
+    // Track the user's most recently focused markdown file so the ribbon
+    // button can still recover it after focus-steal. Seed with the
+    // currently active view (if any) so the tracker works even before
+    // the first leaf-change event fires after enable.
+    const initialMd = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (initialMd?.file) this.lastMarkdownFile = initialMd.file;
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        if (leaf?.view instanceof MarkdownView && leaf.view.file) {
+          this.lastMarkdownFile = leaf.view.file;
+        }
+      })
     );
 
     this.registerView(
@@ -209,8 +230,15 @@ export default class SlidesNGPlugin extends Plugin {
   }
 
   private resolveActiveDeckFile(): TFile | null {
+    // Primary: currently active markdown view.
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    return view?.file ?? null;
+    if (view?.file) return view.file;
+    // Fallback: ribbon-button clicks (and other UI that steals focus
+    // before our callback fires) can leave the active-view check
+    // returning null even though the user clearly intended a markdown
+    // file. We track that file via active-leaf-change events for this
+    // exact recovery path.
+    return this.lastMarkdownFile;
   }
 
   /**
