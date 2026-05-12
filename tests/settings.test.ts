@@ -1,7 +1,13 @@
 import { test, expect, describe } from "bun:test";
 import { renderDeck, renderDeckStandalone } from "../src/render/renderDeck";
 import { availableThemes, getTheme } from "../src/render/revealAssets";
-import { DEFAULT_SETTINGS, REVEAL_TRANSITIONS } from "../src/settings";
+import {
+  DEFAULT_SETTINGS,
+  REVEAL_TRANSITIONS,
+  IMAGE_LAYOUT_SPLITS,
+  PICKER_MODES,
+  BUNDLED_CODE_THEMES,
+} from "../src/settings";
 
 describe("settings defaults", () => {
   test("default theme is 'black'", () => {
@@ -77,5 +83,117 @@ describe("REVEAL_TRANSITIONS constant", () => {
     expect(REVEAL_TRANSITIONS).toContain("convex");
     expect(REVEAL_TRANSITIONS).toContain("concave");
     expect(REVEAL_TRANSITIONS).toContain("zoom");
+  });
+});
+
+describe("0.5.2 settings defaults", () => {
+  test("defaultLayout is 'default'", () => {
+    expect(DEFAULT_SETTINGS.defaultLayout).toBe("default");
+  });
+  test("codeTheme is 'github-dark'", () => {
+    expect(DEFAULT_SETTINGS.codeTheme).toBe("github-dark");
+  });
+  test("imageLayoutSplit is '50/50'", () => {
+    expect(DEFAULT_SETTINGS.imageLayoutSplit).toBe("50/50");
+  });
+  test("speakerTimerTickMs is 1000", () => {
+    expect(DEFAULT_SETTINGS.speakerTimerTickMs).toBe(1000);
+  });
+  test("speakerPickerDefaultMode is 'compact'", () => {
+    expect(DEFAULT_SETTINGS.speakerPickerDefaultMode).toBe("compact");
+  });
+  test("lineStepDimOpacity is 0.32", () => {
+    expect(DEFAULT_SETTINGS.lineStepDimOpacity).toBe(0.32);
+  });
+  test("showRevealControlsEmbedded defaults off", () => {
+    expect(DEFAULT_SETTINGS.showRevealControlsEmbedded).toBe(false);
+  });
+  test("showRevealMenuEmbedded defaults on (discoverable nav)", () => {
+    expect(DEFAULT_SETTINGS.showRevealMenuEmbedded).toBe(true);
+  });
+});
+
+describe("0.5.2 settings enums", () => {
+  test("IMAGE_LAYOUT_SPLITS covers 50/50, 60/40, 40/60", () => {
+    expect(IMAGE_LAYOUT_SPLITS).toEqual(["50/50", "60/40", "40/60"]);
+  });
+  test("PICKER_MODES covers compact and list", () => {
+    expect(PICKER_MODES).toEqual(["compact", "list"]);
+  });
+  test("BUNDLED_CODE_THEMES has 4 themes including github-dark", () => {
+    expect(BUNDLED_CODE_THEMES.length).toBe(4);
+    expect(BUNDLED_CODE_THEMES).toContain("github-dark");
+    expect(BUNDLED_CODE_THEMES).toContain("github-light");
+    expect(BUNDLED_CODE_THEMES).toContain("dracula");
+    expect(BUNDLED_CODE_THEMES).toContain("nord");
+  });
+});
+
+describe("renderDeck threads settings into iframe HTML", () => {
+  test("showRevealControlsEmbedded=true → controls:true in embedded mode", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { showRevealControlsEmbedded: true });
+    expect(html).toContain('"controls":true');
+    expect(html).toContain('"progress":true');
+  });
+
+  test("showRevealControlsEmbedded=false (default) → controls hidden", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", {});
+    expect(html).toContain('"controls":false');
+  });
+
+  test("showRevealMenuEmbedded=true bundles the menu plugin script", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { showRevealMenuEmbedded: true });
+    // The menu UMD bundle defines RevealMenu globally — check the source
+    // marker is present.
+    expect(html).toContain("RevealMenu");
+  });
+
+  test("showRevealMenuEmbedded=false omits the menu plugin", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { showRevealMenuEmbedded: false });
+    // Bridge code references RevealMenu only inside the `if (showMenu)`
+    // block — without the plugin, that block isn't emitted, so the only
+    // "RevealMenu" mentions in output should be zero.
+    const matches = html.match(/RevealMenu/g) ?? [];
+    expect(matches.length).toBe(0);
+  });
+
+  test("imageLayoutSplit 60/40 maps to 3fr 2fr in CSS", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { imageLayoutSplit: "60/40" });
+    expect(html).toContain("grid-template-columns: 3fr 2fr");
+  });
+
+  test("lineStepDimOpacity 0.5 lands in iframe CSS", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { lineStepDimOpacity: 0.5 });
+    expect(html).toContain("opacity: 0.5");
+  });
+
+  test("defaultLayout falls back from settings when slide has no layout:", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", { defaultLayout: "center" });
+    expect(html).toContain('data-layout="center"');
+  });
+});
+
+describe("renderDeck slide-number click suppressor", () => {
+  test("iframe HTML contains the slide-number click-suppress handler", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", {});
+    expect(html).toContain(".slide-number");
+    expect(html).toContain("preventDefault");
+  });
+});
+
+describe("renderDeck toggleOverview bridge command", () => {
+  test("iframe bridge handles toggleOverview command", () => {
+    const md = "---\n---\n\n# Slide\n";
+    const html = renderDeck(md, "deck.md", {});
+    expect(html).toContain("toggleOverview");
+    expect(html).toContain("Reveal.toggleOverview");
   });
 });

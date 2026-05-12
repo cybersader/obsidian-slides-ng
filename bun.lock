@@ -25,6 +25,7 @@
         "eslint": "^9.17.0",
         "eslint-plugin-obsidianmd": "latest",
         "obsidian": "latest",
+        "reveal.js-menu": "2.1.0",
         "typescript": "^5.6.0",
         "typescript-eslint": "^8.32.0",
         "wdio-obsidian-reporter": "^2.0.0",
@@ -1754,6 +1755,8 @@
     "ret": ["ret@0.5.0", "", {}, "sha512-I1XxrZSQ+oErkRR4jYbAyEEu2I0avBvvMM5JN+6EBprOGRCs63ENqZ3vjavq8fBw2+62G5LF5XelKwuJpcvcxw=="],
 
     "reveal.js": ["reveal.js@5.2.1", "", {}, "sha512-r7//6mIM5p34hFiDMvYfXgyjXqGRta+/psd9YtytsgRlrpRzFv4RbH76TXd2qD+7ZPZEbpBDhdRhJaFgfQ7zNQ=="],
+
+    "reveal.js-menu": ["reveal.js-menu@2.1.0", "", {}, "sha512-35zp4fHSMyWd15+3CvQ8LrpS+4Gj2qvlkxX3lo5LpITDe6ZkA4A9y1E5fE63YlQl5fp7W1mNgNJr4kCU0s14lA=="],
 
     "rgb2hex": ["rgb2hex@0.2.5", "", {}, "sha512-22MOP1Rh7sAo1BZpDG6R5RFYzR2lYEgwq7HEmyW2qcsOqR2lQKmn+O//xV3YG/0rrhMC6KVX2hU+ZXuaw9a5bw=="],
 

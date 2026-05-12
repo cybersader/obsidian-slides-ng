@@ -11,9 +11,18 @@ import {
   THEMES_BY_NAME,
   magicMoveJs,
   magicMoveCss,
+  revealMenuJs,
+  revealMenuCss,
 } from "./revealAssets.generated";
 
-export { revealJs, revealCss, magicMoveJs, magicMoveCss };
+export {
+  revealJs,
+  revealCss,
+  magicMoveJs,
+  magicMoveCss,
+  revealMenuJs,
+  revealMenuCss,
+};
 
 /** All theme names we ship. Always includes "black" as the default. */
 export function availableThemes(): string[] {

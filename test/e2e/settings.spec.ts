@@ -91,11 +91,13 @@ describe("slides-ng settings tab", function () {
     await browser.pause(500);
 
     // Now inspect the rendered iframe srcdoc to confirm the right
-    // transition ended up in the config.
+    // transition ended up in the config. v0.5.2 wraps the Reveal init
+    // in `var initOpts = {...}; ... Reveal.initialize(initOpts);` so we
+    // search for the JSON literal assigned to initOpts, not the call site.
     const config = await browser.execute(() => {
       const iframe = document.querySelector("iframe.slides-ng-frame") as HTMLIFrameElement | null;
       const sd = iframe?.getAttribute("srcdoc") ?? "";
-      const m = /Reveal\.initialize\((\{[^)]+\})/.exec(sd);
+      const m = /var\s+initOpts\s*=\s*(\{.+?\});/.exec(sd);
       return m ? m[1] : null;
     });
 

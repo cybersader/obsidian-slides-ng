@@ -142,7 +142,7 @@ reveal.js + reveal CSS + all 15 themes are inlined at build time by `scripts/gen
 
 ## Status
 
-v0.5.0 — In-Obsidian Speaker Console + cursor-follow + toolbar polish. v0.1.0 covered the brief's §7 acceptance list; v0.2.0 added 9 named layouts + `::name::` slots; v0.2.1 added the layout metadata registry + validation + in-editor autocomplete; v0.3.0 added Slides-Extended-flavoured `<!-- slide attr -->` / `<!-- element attr -->` annotations; v0.4.0 added template-expansion snippets, three image layouts with Obsidian-attachment path resolution, and Magic-Move via bundled `shiki-magic-move`; v0.5.0 adds the speaker console (drag-to-popout, notes + timer + blackout + picker, driven via iframe postMessage) and editor cursor-follow. See `CHANGELOG.md` for the full delta.
+v0.5.2 — In-window reveal.js controls + reveal.js-menu plugin + "Grid" overview mode + 6 new settings (default layout, code theme, image-split, line-step dim, speaker timer cadence, speaker picker default). v0.1.0 covered the brief's §7 acceptance list; v0.2.0 added 9 named layouts + `::name::` slots; v0.2.1 added the layout metadata registry + validation + in-editor autocomplete; v0.3.0 added Slides-Extended-flavoured `<!-- slide attr -->` / `<!-- element attr -->` annotations; v0.4.0 added template-expansion snippets, three image layouts with Obsidian-attachment path resolution, and Magic-Move via bundled `shiki-magic-move`; v0.5.0 added the speaker console; v0.5.1 added the "Use current" toolbar button. See `CHANGELOG.md` for the full delta and `ROADMAP.md` for what's coming next.
 
 | Phase | Description | State |
 |---|---|---|
@@ -161,6 +161,7 @@ v0.5.0 — In-Obsidian Speaker Console + cursor-follow + toolbar polish. v0.1.0 
 | v0.3.0 | Slide + element annotations (auto-animate, custom classes/IDs, fragment attrs) | ✅ |
 | v0.4.0 | Snippet expansion + image layouts + Magic-Move | ✅ |
 | v0.5.0 | Speaker console + cursor-follow + toolbar polish | ✅ |
+| v0.5.2 | In-window controls + reveal.js-menu + Grid overview + 6 new settings | ✅ |
 
 ## Features explicitly NOT in v0.1
 

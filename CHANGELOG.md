@@ -6,6 +6,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-05-12
+
+### Added
+
+- **In-window reveal.js controls** — new setting
+  `Show reveal controls in preview` (default off). When on, reveal's
+  arrow + dot navigation UI and progress bar render inside the
+  embedded preview iframe. Standalone "Open in browser" always shows
+  them regardless.
+- **reveal.js-menu plugin bundled** (~45 KB JS + ~8 KB CSS) — adds a
+  hamburger button in the corner of the slide window. Click → outline
+  by heading + jumpable slide list (closes the Extended-Slides parity
+  gap on in-window discoverability). Setting:
+  `Show menu plugin in preview` (default on).
+- **"Grid" button in the speaker view** — posts a new
+  `toggleOverview` bridge command to the iframe, triggering
+  `Reveal.toggleOverview()`. Free thumbnail-style nav: reveal lays
+  out every slide as a mini-grid; click one to jump.
+- **6 new settings**, grouped in the settings tab under Rendering /
+  Code / Layouts / Editor / Speaker sections:
+  - `defaultLayout` — fallback layout when a slide has no `layout:` set
+  - `codeTheme` — Shiki theme dropdown (github-dark, github-light, dracula, nord)
+  - `imageLayoutSplit` — column ratio for image-left / image-right (50/50, 60/40, 40/60)
+  - `lineStepDimOpacity` — opacity of non-active lines in code line-stepping (slider 0–1)
+  - `speakerPickerDefaultMode` — initial picker mode for the speaker view (compact / list)
+  - `speakerTimerTickMs` — timer refresh cadence (default 1000ms)
+- **Bundled Shiki themes** — github-light, dracula, nord added
+  alongside github-dark.
+
+### Fixed
+
+- **Slide-number click → black overlay**: with `hash:false` in
+  embedded mode, the slide-number `<a>` click fell through into
+  reveal's pause-mode toggle, blacking out the window. Now intercepted
+  with a capture-phase click handler that `preventDefault`s the
+  slide-number anchor.
+- **Speaker Start/Pause button visual state**: label flips between
+  "Start" and "Pause" with an accent (mod-cta) color when running.
+  Previously the button worked but the timer's slow tick made it
+  look unresponsive.
+- **Speaker timer tick predictability**: ticks at the configured
+  cadence (default 1Hz) instead of a hardcoded 500ms.
+
+### Changed
+
+- **Speaker picker default mode** persists from settings instead of
+  resetting to "compact" on every reopen.
+- **Code highlighting threading**: `renderDeck`, line-step renderer,
+  and magic-move renderer now accept a `codeTheme` parameter and
+  thread it through to Shiki + shiki-magic-move. Theme switch takes
+  effect on next render.
+- **main.js bundle**: 1.83 MB → 1.86 MB (added reveal.js-menu plugin
+  + 3 extra Shiki themes; still under the 2 MB soft cap).
+
+### Tests
+
+- 17 new unit tests for settings (0.5.2 defaults, enums, renderDeck
+  setting threading, slide-number suppressor, toggleOverview bridge
+  command)
+- New `test/e2e/in-window-controls.spec.ts` (4 tests) — toggles
+  controls + menu settings and asserts iframe srcdoc reflects the
+  change; visual confirmation that controls appear after re-render
+- `test/e2e/speaker-view.spec.ts` extended (+2 tests) — Start/Pause
+  visual state, Grid button → overview mode
+- Totals: 256 unit tests / 16 E2E spec files
+
 ## [0.5.1] — 2026-05-12
 
 ### Added

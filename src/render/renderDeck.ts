@@ -20,31 +20,35 @@ import {
   renderAttrs,
 } from "../parser/annotations";
 
-// Local Marked instance with Shiki + Slidev line-step wired into the
-// `code` renderer. Using `Marked` (a fresh instance) rather than the
-// global `marked` keeps our renderer override isolated from any other
-// consumer of marked elsewhere in the bundle.
-const md = new Marked();
-md.use({
-  renderer: {
-    code(token: Tokens.Code): string {
-      const info = token.lang ?? "";
-      // Priority 1: Magic-Move pairing via `{key=NAME}`.
-      const mm = parseMagicMoveKey(info);
-      if (mm) {
-        return renderMagicMoveBlock(token.text, mm);
-      }
-      // Priority 2: Slidev line-step spec (`ts [1|2-3|all]`).
-      const stepped = parseLineStep(info);
-      if (stepped) {
-        return renderLineStep(token.text, stepped);
-      }
-      // Plain Shiki highlight; strip non-lang info-string suffix.
-      const langOnly = info.split(/\s+/)[0];
-      return highlight(token.text, langOnly);
+// Build a marked instance whose code renderer threads the user's
+// `codeTheme` setting into Shiki + Slidev line-step + Magic-Move. We
+// rebuild per-render so the theme can change at runtime without needing
+// to invalidate Shiki itself (Shiki caches grammars; switching theme is
+// just a different render config).
+function buildMarked(codeTheme: string | undefined): Marked {
+  const inst = new Marked();
+  inst.use({
+    renderer: {
+      code(token: Tokens.Code): string {
+        const info = token.lang ?? "";
+        // Priority 1: Magic-Move pairing via `{key=NAME}`.
+        const mm = parseMagicMoveKey(info);
+        if (mm) {
+          return renderMagicMoveBlock(token.text, mm, codeTheme);
+        }
+        // Priority 2: Slidev line-step spec (`ts [1|2-3|all]`).
+        const stepped = parseLineStep(info);
+        if (stepped) {
+          return renderLineStep(token.text, stepped, codeTheme);
+        }
+        // Plain Shiki highlight; strip non-lang info-string suffix.
+        const langOnly = info.split(/\s+/)[0];
+        return highlight(token.text, langOnly, codeTheme);
+      },
     },
-  },
-});
+  });
+  return inst;
+}
 
 /**
  * High-level renderer: takes raw markdown source and returns a complete
@@ -55,6 +59,21 @@ export interface RenderDefaults {
   /** Plugin-setting defaults — overridden by per-deck frontmatter. */
   defaultTheme?: string;
   defaultTransition?: string;
+  /**
+   * Layout used for slides that don't set `layout:` in their frontmatter.
+   * Defaults to `"default"` (single-column) when undefined.
+   */
+  defaultLayout?: string;
+  /** Shiki theme for code blocks. Defaults to the renderer's built-in. */
+  codeTheme?: string;
+  /** Column split ratio for image-left / image-right layouts. */
+  imageLayoutSplit?: "50/50" | "60/40" | "40/60";
+  /** Line-step dimming opacity (0–1). */
+  lineStepDimOpacity?: number;
+  /** Show reveal's controls + progress bar even in embedded mode. */
+  showRevealControlsEmbedded?: boolean;
+  /** Show reveal.js-menu hamburger plugin in embedded mode. */
+  showRevealMenuEmbedded?: boolean;
   /**
    * Optional image-attachment resolver. Called with the raw `image:`
    * frontmatter value; returns a fully-qualified URL (data: URI,
@@ -103,10 +122,21 @@ export function renderDeckFromAst(
   overrides: Partial<DeckRenderOptions> = {},
   defaults: RenderDefaults = {}
 ): string {
-  const slides = deck.slides.map((s) => slideToHtml(s, defaults));
+  const md = buildMarked(defaults.codeTheme);
+  const slides = deck.slides.map((s) => slideToHtml(s, md, defaults));
   const defaultLayer: Partial<DeckRenderOptions> = {};
   if (defaults.defaultTheme) defaultLayer.theme = defaults.defaultTheme;
   if (defaults.defaultTransition) defaultLayer.transition = defaults.defaultTransition;
+  if (defaults.imageLayoutSplit) defaultLayer.imageLayoutSplit = defaults.imageLayoutSplit;
+  if (typeof defaults.lineStepDimOpacity === "number") {
+    defaultLayer.lineStepDimOpacity = defaults.lineStepDimOpacity;
+  }
+  if (defaults.showRevealControlsEmbedded !== undefined) {
+    defaultLayer.showRevealControlsEmbedded = defaults.showRevealControlsEmbedded;
+  }
+  if (defaults.showRevealMenuEmbedded !== undefined) {
+    defaultLayer.showRevealMenuEmbedded = defaults.showRevealMenuEmbedded;
+  }
 
   const opts: DeckRenderOptions = {
     ...defaultLayer,
@@ -116,7 +146,11 @@ export function renderDeckFromAst(
   return buildIframeHtml(slides, opts);
 }
 
-function slideToHtml(slide: Slide, defaults: RenderDefaults = {}): SlideHtml {
+function slideToHtml(
+  slide: Slide,
+  md: Marked,
+  defaults: RenderDefaults = {}
+): SlideHtml {
   // 1. Extract Slides-Extended-style slide annotations from the raw
   //    markdown before anything else touches it. The cleaned content
   //    is what flows into the slot splitter / markdown→HTML pass.
@@ -127,7 +161,7 @@ function slideToHtml(slide: Slide, defaults: RenderDefaults = {}): SlideHtml {
   const layoutName =
     typeof slide.frontmatter.layout === "string" && slide.frontmatter.layout.length > 0
       ? slide.frontmatter.layout
-      : "default";
+      : (defaults.defaultLayout ?? "default");
 
   // 2. Every slide flows through a layout, even `default`, so the iframe
   //    CSS can target `.slides-ng-layout` uniformly. Slot splitting only
@@ -138,10 +172,10 @@ function slideToHtml(slide: Slide, defaults: RenderDefaults = {}): SlideHtml {
     : { default: cleanedContent };
 
   const slotHtml: Record<string, string> = {};
-  for (const [name, md] of Object.entries(slotMarkdown)) {
+  for (const [name, src] of Object.entries(slotMarkdown)) {
     // Per-slot v-click translation so fragments in `::left::` don't
     // leak into `::right::` and vice versa.
-    let html = markdownToHtml(md);
+    let html = md.parse(src, { async: false }) as string;
     // 3. Element-level `<!-- element attr=val -->` annotations are
     //    applied after marked has emitted HTML — they fold into the
     //    previous sibling element.
@@ -161,17 +195,13 @@ function slideToHtml(slide: Slide, defaults: RenderDefaults = {}): SlideHtml {
 
   const body = applyLayout(layoutName, slotHtml);
 
-  const noteHtml = slide.note ? markdownToHtml(slide.note) : undefined;
+  const noteHtml = slide.note ? (md.parse(slide.note, { async: false }) as string) : undefined;
 
   // 4. Slide-level annotations land on the `<section>` tag itself.
   const sectionAttrs =
     Object.keys(slideAttrs).length > 0 ? renderAttrs(slideAttrs) : undefined;
 
   return { body, noteHtml, sectionAttrs };
-}
-
-function markdownToHtml(text: string): string {
-  return md.parse(text, { async: false }) as string;
 }
 
 function escapeAttrValue(s: string): string {

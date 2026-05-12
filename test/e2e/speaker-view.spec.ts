@@ -249,6 +249,99 @@ describe("slides-ng speaker view drives the preview", function () {
     expect(listCount).toBeGreaterThanOrEqual(2);
   });
 
+  it("Start button label flips to 'Pause' and accent class added when running", async () => {
+    // Find the timer toggle button (the one starting with "Start").
+    const initial = await browser.execute(() => {
+      const btns = Array.from(
+        document.querySelectorAll(".slides-ng-speaker-timer-ctrls .slides-ng-speaker-btn")
+      ) as HTMLButtonElement[];
+      const btn = btns.find((b) => (b.textContent ?? "").trim() === "Start");
+      return {
+        found: !!btn,
+        text: btn?.textContent?.trim() ?? "",
+        hasMod: btn?.classList.contains("mod-cta") ?? false,
+      };
+    });
+    expect(initial.found).toBe(true);
+    expect(initial.text).toBe("Start");
+    expect(initial.hasMod).toBe(false);
+
+    // Click Start.
+    await browser.execute(() => {
+      const btns = Array.from(
+        document.querySelectorAll(".slides-ng-speaker-timer-ctrls .slides-ng-speaker-btn")
+      ) as HTMLButtonElement[];
+      btns.find((b) => (b.textContent ?? "").trim() === "Start")?.click();
+    });
+
+    await browser.waitUntil(
+      async () => {
+        const txt = await browser.execute(() => {
+          const btns = Array.from(
+            document.querySelectorAll(".slides-ng-speaker-timer-ctrls .slides-ng-speaker-btn")
+          ) as HTMLButtonElement[];
+          // After click the label flips to "Pause" — find by that text.
+          return btns.find((b) => (b.textContent ?? "").trim() === "Pause") ? "Pause" : "";
+        });
+        return txt === "Pause";
+      },
+      { timeout: 3000, timeoutMsg: "timer button never flipped to Pause" }
+    );
+
+    const running = await browser.execute(() => {
+      const btns = Array.from(
+        document.querySelectorAll(".slides-ng-speaker-timer-ctrls .slides-ng-speaker-btn")
+      ) as HTMLButtonElement[];
+      const btn = btns.find((b) => (b.textContent ?? "").trim() === "Pause");
+      return {
+        text: btn?.textContent?.trim() ?? "",
+        hasMod: btn?.classList.contains("mod-cta") ?? false,
+      };
+    });
+    expect(running.text).toBe("Pause");
+    expect(running.hasMod).toBe(true);
+
+    // Click Pause to stop the timer (don't leak running interval into
+    // subsequent specs).
+    await browser.execute(() => {
+      const btns = Array.from(
+        document.querySelectorAll(".slides-ng-speaker-timer-ctrls .slides-ng-speaker-btn")
+      ) as HTMLButtonElement[];
+      btns.find((b) => (b.textContent ?? "").trim() === "Pause")?.click();
+    });
+  });
+
+  it("Grid button toggles reveal.js overview mode in the iframe", async () => {
+    // Click Grid in the speaker view.
+    await clickSpeakerButtonByText("Grid");
+
+    // Wait for reveal to enter overview mode — adds .overview class to
+    // .reveal root.
+    await switchToSlideFrame();
+    try {
+      await browser.waitUntil(
+        async () => {
+          const isOverview = await browser.execute(() => {
+            const r = document.querySelector(".reveal");
+            return r?.classList.contains("overview") ?? false;
+          });
+          return isOverview;
+        },
+        { timeout: 5000, timeoutMsg: "iframe never entered reveal overview mode" }
+      );
+      const isOverview = await browser.execute(() => {
+        const r = document.querySelector(".reveal");
+        return r?.classList.contains("overview") ?? false;
+      });
+      expect(isOverview).toBe(true);
+    } finally {
+      await switchToTop();
+    }
+
+    // Toggle off so subsequent tests aren't affected.
+    await clickSpeakerButtonByText("Grid");
+  });
+
   it("captures speaker + preview screenshot", async () => {
     await browser.saveScreenshot(`${SCREENSHOT_DIR}/speaker-view-side-by-side.png`);
   });

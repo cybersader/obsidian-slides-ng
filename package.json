@@ -1,6 +1,6 @@
 {
   "name": "obsidian-slides-ng",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Markdown slide decks for Obsidian — zero localhost ports, no spawned dev server, reveal.js + Shiki bundled.",
   "main": "main.js",
   "private": true,
@@ -41,6 +41,7 @@
     "eslint": "^9.17.0",
     "eslint-plugin-obsidianmd": "latest",
     "obsidian": "latest",
+    "reveal.js-menu": "2.1.0",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.32.0",
     "wdio-obsidian-reporter": "^2.0.0",

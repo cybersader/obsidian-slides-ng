@@ -28,11 +28,12 @@ export interface ParsedMagicMoveKey {
  */
 export function renderMagicMoveBlock(
   code: string,
-  parsed: ParsedMagicMoveKey
+  parsed: ParsedMagicMoveKey,
+  theme?: string
 ): string {
   const { lang, key } = parsed;
-  const initialHtml = highlight(code, lang);
-  const tokens = getKeyedTokensSync(code, lang);
+  const initialHtml = highlight(code, lang, theme);
+  const tokens = getKeyedTokensSync(code, lang, theme);
   if (!tokens) {
     // Couldn't get keyed tokens; render as a normal code block. No
     // marker so the iframe-side bootstrap doesn't pick it up.

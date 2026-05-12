@@ -19,11 +19,15 @@ import { highlight, highlightWithTransformers } from "./shiki";
  * reveal.js marks them `.visible.current-fragment`. The CSS hides step 0
  * once any later step is current.
  */
-export function renderLineStep(code: string, parsed: ParsedLineStep): string {
+export function renderLineStep(
+  code: string,
+  parsed: ParsedLineStep,
+  theme?: string
+): string {
   const { lang, steps } = parsed;
 
   const stepHtml = steps.map((step, idx) => {
-    const inner = renderSingleStep(code, lang, step);
+    const inner = renderSingleStep(code, lang, step, theme);
     const cls =
       idx === 0
         ? "line-step-step"
@@ -43,10 +47,15 @@ export function renderLineStep(code: string, parsed: ParsedLineStep): string {
   );
 }
 
-function renderSingleStep(code: string, lang: string, step: Step): string {
+function renderSingleStep(
+  code: string,
+  lang: string,
+  step: Step,
+  theme?: string
+): string {
   if (step.lines === null) {
     // 'all' / '*' — full highlight, no dimming.
-    return highlight(code, lang);
+    return highlight(code, lang, theme);
   }
   const keep = step.lines;
   const transformer: ShikiTransformer = {
@@ -59,7 +68,7 @@ function renderSingleStep(code: string, lang: string, step: Step): string {
       return node;
     },
   };
-  return highlightWithTransformers(code, lang, [transformer]);
+  return highlightWithTransformers(code, lang, [transformer], theme);
 }
 
 function escapeAttr(s: string): string {

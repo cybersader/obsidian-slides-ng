@@ -15,6 +15,9 @@ import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import { codeToKeyedTokens as smmCodeToKeyedTokens } from "shiki-magic-move/core";
 
 import githubDark from "shiki/themes/github-dark.mjs";
+import githubLight from "shiki/themes/github-light.mjs";
+import dracula from "shiki/themes/dracula.mjs";
+import nord from "shiki/themes/nord.mjs";
 
 import typescript from "shiki/langs/typescript.mjs";
 import javascript from "shiki/langs/javascript.mjs";
@@ -29,6 +32,20 @@ import go from "shiki/langs/go.mjs";
 import rust from "shiki/langs/rust.mjs";
 
 export const DEFAULT_THEME = "github-dark";
+
+const BUNDLED_THEMES = [githubDark, githubLight, dracula, nord];
+
+/**
+ * Resolve a theme name to one the highlighter has loaded. Falls back to
+ * DEFAULT_THEME on unknown names. Tests + callers thread the user's
+ * `codeTheme` setting through here.
+ */
+function resolveTheme(name: string | undefined): string {
+  if (!name) return DEFAULT_THEME;
+  // shiki theme files export a `.name` field; we just check string match.
+  const known = BUNDLED_THEMES.map((t) => (t as { name: string }).name);
+  return known.includes(name) ? name : DEFAULT_THEME;
+}
 
 const DEFAULT_LANGS = [
   typescript,
@@ -52,7 +69,7 @@ export async function warmHighlighter(): Promise<HighlighterCore> {
   if (cached) return cached;
   if (pending) return pending;
   pending = createHighlighterCore({
-    themes: [githubDark],
+    themes: BUNDLED_THEMES,
     langs: DEFAULT_LANGS,
     engine: createJavaScriptRegexEngine(),
   }).then((h) => {
@@ -72,19 +89,17 @@ export async function warmHighlighter(): Promise<HighlighterCore> {
  * loaded. We pass `lang` through unchanged and let Shiki resolve it;
  * on failure (unknown grammar) we fall back to plaintext.
  */
-export function highlight(code: string, lang?: string): string {
+export function highlight(code: string, lang?: string, theme?: string): string {
   if (!cached) {
     return `<pre><code class="language-${lang ?? "text"}">${escapeHtml(code)}</code></pre>`;
   }
   const requested = lang && lang.length > 0 ? lang : "text";
+  const t = resolveTheme(theme);
   try {
-    return cached.codeToHtml(code, {
-      lang: requested,
-      theme: DEFAULT_THEME,
-    });
+    return cached.codeToHtml(code, { lang: requested, theme: t });
   } catch {
     try {
-      return cached.codeToHtml(code, { lang: "text", theme: DEFAULT_THEME });
+      return cached.codeToHtml(code, { lang: "text", theme: t });
     } catch {
       return `<pre><code class="language-text">${escapeHtml(code)}</code></pre>`;
     }
@@ -108,12 +123,13 @@ export function isWarm(): boolean {
  */
 export async function getKeyedTokens(
   code: string,
-  lang: string
+  lang: string,
+  theme?: string
 ): Promise<unknown | null> {
   if (!cached) return null;
   try {
     const { codeToKeyedTokens } = await import("shiki-magic-move/core");
-    return codeToKeyedTokens(cached, code, { lang, theme: DEFAULT_THEME });
+    return codeToKeyedTokens(cached, code, { lang, theme: resolveTheme(theme) });
   } catch {
     return null;
   }
@@ -124,10 +140,14 @@ export async function getKeyedTokens(
  * the highlighter to be warm; `shiki-magic-move/core` is statically
  * imported so it's always available.
  */
-export function getKeyedTokensSync(code: string, lang: string): unknown | null {
+export function getKeyedTokensSync(
+  code: string,
+  lang: string,
+  theme?: string
+): unknown | null {
   if (!cached) return null;
   try {
-    return smmCodeToKeyedTokens(cached, code, { lang, theme: DEFAULT_THEME });
+    return smmCodeToKeyedTokens(cached, code, { lang, theme: resolveTheme(theme) });
   } catch {
     return null;
   }
@@ -142,18 +162,16 @@ export function getKeyedTokensSync(code: string, lang: string): unknown | null {
 export function highlightWithTransformers(
   code: string,
   lang: string | undefined,
-  transformers: ShikiTransformer[]
+  transformers: ShikiTransformer[],
+  theme?: string
 ): string {
-  if (!cached) return highlight(code, lang);
+  if (!cached) return highlight(code, lang, theme);
   const requested = lang && lang.length > 0 ? lang : "text";
+  const t = resolveTheme(theme);
   try {
-    return cached.codeToHtml(code, {
-      lang: requested,
-      theme: DEFAULT_THEME,
-      transformers,
-    });
+    return cached.codeToHtml(code, { lang: requested, theme: t, transformers });
   } catch {
-    return highlight(code, lang);
+    return highlight(code, lang, theme);
   }
 }
 

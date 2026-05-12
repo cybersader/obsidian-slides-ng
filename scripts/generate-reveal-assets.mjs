@@ -96,6 +96,17 @@ const magicMoveCss = readFileSync(
 exports.push(`export const magicMoveJs = ${JSON.stringify(magicMoveJs)};`);
 exports.push(`export const magicMoveCss = ${JSON.stringify(magicMoveCss)};`);
 
+// ---------------------------------------------------------------------------
+// reveal.js-menu plugin (MIT, denehyg/reveal.js-menu). UMD-style JS — defines
+// window.RevealMenu globally — plus CSS. Font-awesome icons are intentionally
+// NOT bundled (would add ~100 KB for cosmetic glyphs); the menu still works
+// without them. ~45 KB JS + ~8 KB CSS combined.
+// ---------------------------------------------------------------------------
+const revealMenuJs = readFileSync("node_modules/reveal.js-menu/menu.js", "utf-8");
+const revealMenuCss = readFileSync("node_modules/reveal.js-menu/menu.css", "utf-8");
+exports.push(`export const revealMenuJs = ${JSON.stringify(revealMenuJs)};`);
+exports.push(`export const revealMenuCss = ${JSON.stringify(revealMenuCss)};`);
+
 if (!existsSync(dirname(OUT))) {
   mkdirSync(dirname(OUT), { recursive: true });
 }

@@ -1,4 +1,12 @@
-import { revealCss, revealJs, getTheme, magicMoveJs, magicMoveCss } from "./revealAssets";
+import {
+  revealCss,
+  revealJs,
+  getTheme,
+  magicMoveJs,
+  magicMoveCss,
+  revealMenuJs,
+  revealMenuCss,
+} from "./revealAssets";
 
 export interface SlideHtml {
   /** Pre-rendered HTML for the slide body (markdown already converted). */
@@ -24,6 +32,14 @@ export interface DeckRenderOptions {
    * default browser opens a fullscreen-capable deck via the F key).
    */
   embedded?: boolean;
+  /** Show reveal's controls + progress bar even in embedded mode. */
+  showRevealControlsEmbedded?: boolean;
+  /** Show reveal.js-menu hamburger plugin in embedded mode. */
+  showRevealMenuEmbedded?: boolean;
+  /** Column split ratio for image-left / image-right layouts. */
+  imageLayoutSplit?: "50/50" | "60/40" | "40/60";
+  /** Line-step dimming opacity (0–1). */
+  lineStepDimOpacity?: number;
   // Pass-through reveal.js Reveal.initialize() options if the caller
   // wants to override anything specific.
   revealOptions?: Record<string, unknown>;
@@ -43,6 +59,20 @@ export function buildIframeHtml(
   const slideNumber = options.slideNumber ?? false;
   const embedded = options.embedded ?? true;
   const userOptions = options.revealOptions ?? {};
+  const showControlsEmbedded = options.showRevealControlsEmbedded ?? false;
+  const showMenuEmbedded = options.showRevealMenuEmbedded ?? false;
+  const imageSplit = options.imageLayoutSplit ?? "50/50";
+  const lineStepDim = options.lineStepDimOpacity ?? 0.32;
+  // Reveal's controls + progress bar visibility. Standalone mode always
+  // shows them (helps presenters drive in a browser); embedded mode hides
+  // by default but the user can opt in via setting.
+  const showControls = !embedded || showControlsEmbedded;
+  const showProgress = !embedded || showControlsEmbedded;
+  // Reveal-menu plugin: shown in standalone always (no reason to hide it
+  // when the user already opened a full browser tab) + in embedded mode
+  // when the user opts in. The plugin attaches itself to window.RevealMenu
+  // via UMD; init invokes it from the iframe-side inline script.
+  const showMenu = !embedded || showMenuEmbedded;
 
   const sectionsHtml = slides
     .map((s) => {
@@ -55,7 +85,8 @@ export function buildIframeHtml(
     .join("\n");
 
   // Reveal.initialize() config. We stringify safely so user-supplied
-  // overrides can't break out of the JSON literal.
+  // overrides can't break out of the JSON literal. menu options live
+  // here too — the plugin reads its config from Reveal.initialize().
   const initConfig = JSON.stringify({
     hash: false,
     history: false,
@@ -70,9 +101,32 @@ export function buildIframeHtml(
     view: "presentation",
     scrollActivationWidth: 0,
     // In standalone mode show reveal's built-in controls and progress
-    // bar; in embedded mode they're hidden by default.
-    controls: !embedded,
-    progress: !embedded,
+    // bar; in embedded mode hidden by default unless the user opts in.
+    controls: showControls,
+    progress: showProgress,
+    menu: {
+      side: "left",
+      width: "normal",
+      numbers: false,
+      titleSelector: "h1, h2, h3, h4",
+      useTextContentForMissingTitles: true,
+      hideMissingTitles: false,
+      markers: false,
+      // We don't bundle font-awesome — disable icon mode so the menu
+      // renders titles as plain text without missing-glyph squares.
+      custom: false,
+      themes: false,
+      themesPath: "",
+      transitions: false,
+      openButton: true,
+      openSlideNumber: false,
+      keyboard: true,
+      sticky: false,
+      autoOpen: true,
+      delayInit: false,
+      openOnInit: false,
+      loadIcons: false,
+    },
     ...userOptions,
   });
 
@@ -127,7 +181,7 @@ export function buildIframeHtml(
     }
     /* Dimmed lines within a step (Shiki transformer marks them). */
     .line-step-step .shiki .line.line-dim {
-      opacity: 0.32;
+      opacity: ${lineStepDim};
       transition: opacity 0.2s ease;
     }
 
@@ -268,11 +322,19 @@ export function buildIframeHtml(
       padding: 0 5%;
     }
 
-    /* image-left / image-right: side-by-side image + content */
-    .slides-ng-image-left,
+    /* image-left / image-right: side-by-side image + content. Column
+     * ratio is settings-driven: image-left puts the image on the left
+     * (so 60/40 = wider image), image-right reverses it. */
+    .slides-ng-image-left {
+      display: grid;
+      grid-template-columns: ${imageGridLeft(imageSplit)};
+      gap: 2rem;
+      align-items: center;
+      height: 100%;
+    }
     .slides-ng-image-right {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: ${imageGridRight(imageSplit)};
       gap: 2rem;
       align-items: center;
       height: 100%;
@@ -339,6 +401,22 @@ export function buildIframeHtml(
       width: 100%;
     }
   </style>
+  ${showMenu ? `<style>
+    /* reveal.js-menu plugin. font-awesome is intentionally NOT bundled
+     * (would add ~100 KB for cosmetic icons); the icon-mode CSS rules
+     * still reference fa- classes but those just no-op visually. The
+     * menu still functions as a heading outline + slide list. */
+    ${revealMenuCss}
+    /* Override the menu toggle button to use a plain Unicode hamburger
+     * instead of a font-awesome glyph (since we don't ship font-awesome). */
+    .reveal .slide-menu-button > * { display: none; }
+    .reveal .slide-menu-button::before {
+      content: "\\2630";
+      font-size: 22px;
+      line-height: 1;
+      color: white;
+    }
+  </style>` : ""}
 </head>
 <body>
   <div class="reveal">
@@ -349,13 +427,33 @@ ${sectionsHtml}
   <script>
     ${revealJs}
   </script>
+  ${showMenu ? `<script>
+    /* reveal.js-menu plugin (UMD). Defines window.RevealMenu. */
+    ${revealMenuJs}
+  </script>` : ""}
   <script>
     (function () {
       try {
-        Reveal.initialize(${initConfig});
+        var initOpts = ${initConfig};
+        ${showMenu ? `if (typeof RevealMenu !== 'undefined') {
+          initOpts.plugins = (initOpts.plugins || []).concat([RevealMenu]);
+        }` : ""}
+        Reveal.initialize(initOpts);
       } catch (err) {
         document.body.innerHTML = '<pre style="color:#f99;padding:1em;font-family:monospace;white-space:pre-wrap">slides-ng: reveal.js failed to initialize\\n' + (err && err.stack ? String(err.stack) : String(err)) + '</pre>';
       }
+      /* Suppress click on the slide-number anchor. With hash:false the
+         href="#/h/v" fragment navigation no-ops but the click can bubble
+         into reveal's pause-mode toggle, blacking out the slide window
+         unexpectedly. Use capture-phase so we intercept before reveal's
+         own handler. */
+      document.addEventListener('click', function (e) {
+        var t = e.target;
+        if (t && t.closest && t.closest('.slide-number')) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, true);
     })();
   </script>
   <script>
@@ -493,6 +591,9 @@ ${sectionsHtml}
             case 'first':  Reveal.slide(0); break;
             case 'last':   Reveal.slide(Reveal.getTotalSlides() - 1); break;
             case 'goto':   if (typeof data.idx === 'number') Reveal.slide(data.idx); break;
+            case 'toggleOverview':
+              if (typeof Reveal.toggleOverview === 'function') Reveal.toggleOverview();
+              break;
             case 'toggleBlackout': {
               var el = ensureBlackoutEl();
               if (el.classList.contains('on')) {
@@ -528,4 +629,34 @@ ${sectionsHtml}
   </script>
 </body>
 </html>`;
+}
+
+/**
+ * Resolve the imageLayoutSplit setting → grid-template-columns for the
+ * image-left layout (image on left, content on right). e.g. "60/40" =
+ * 60% image, 40% content.
+ */
+function imageGridLeft(split: "50/50" | "60/40" | "40/60"): string {
+  switch (split) {
+    case "60/40":
+      return "3fr 2fr";
+    case "40/60":
+      return "2fr 3fr";
+    case "50/50":
+    default:
+      return "1fr 1fr";
+  }
+}
+
+/** Mirrored split for image-right (content first, image second). */
+function imageGridRight(split: "50/50" | "60/40" | "40/60"): string {
+  switch (split) {
+    case "60/40":
+      return "2fr 3fr";
+    case "40/60":
+      return "3fr 2fr";
+    case "50/50":
+    default:
+      return "1fr 1fr";
+  }
 }

@@ -16,6 +16,7 @@
 
 import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
 import { VIEW_TYPE_SLIDES_NG, SlidesNGView } from "./SlidesNGView";
+import type { SlidesNGSettings } from "./settings";
 
 export const VIEW_TYPE_SLIDES_NG_SPEAKER = "slides-ng-speaker";
 
@@ -36,7 +37,10 @@ type SpeakerCommand =
   | "last"
   | "goto"
   | "toggleBlackout"
+  | "toggleOverview"
   | "requestState";
+
+export type SpeakerSettingsAccessor = () => SlidesNGSettings;
 
 export class SlidesNGSpeakerView extends ItemView {
   private state: PreviewState | null = null;
@@ -44,14 +48,17 @@ export class SlidesNGSpeakerView extends ItemView {
   private timerPausedMs = 0;
   private timerTickHandle: number | null = null;
   private pickerMode: "compact" | "list" = "compact";
+  private getSettings?: SpeakerSettingsAccessor;
 
   // DOM refs populated in onOpen.
   private statusEl?: HTMLElement;
   private timerEl?: HTMLElement;
+  private timerToggleBtn?: HTMLButtonElement;
   private nextLineEl?: HTMLElement;
   private notesEl?: HTMLElement;
   private pickerEl?: HTMLElement;
   private blackoutBtn?: HTMLButtonElement;
+  private modeToggleBtn?: HTMLButtonElement;
 
   private messageHandler = (event: MessageEvent) => {
     const data = event.data as Partial<PreviewState> & { type?: string };
@@ -60,8 +67,9 @@ export class SlidesNGSpeakerView extends ItemView {
     this.applyState();
   };
 
-  constructor(leaf: WorkspaceLeaf) {
+  constructor(leaf: WorkspaceLeaf, getSettings?: SpeakerSettingsAccessor) {
     super(leaf);
+    this.getSettings = getSettings;
   }
 
   getViewType(): string {
@@ -77,6 +85,12 @@ export class SlidesNGSpeakerView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    // Resolve initial picker mode from settings (if available).
+    const settings = this.getSettings?.();
+    if (settings?.speakerPickerDefaultMode) {
+      this.pickerMode = settings.speakerPickerDefaultMode;
+    }
+
     const container = this.contentEl;
     container.empty();
     container.addClass("slides-ng-speaker");
@@ -96,6 +110,8 @@ export class SlidesNGSpeakerView extends ItemView {
       .addEventListener("click", () => this.send("next"));
     controls.createEl("button", { text: "Last", cls: "slides-ng-speaker-btn" })
       .addEventListener("click", () => this.send("last"));
+    controls.createEl("button", { text: "Grid", cls: "slides-ng-speaker-btn" })
+      .addEventListener("click", () => this.send("toggleOverview"));
     this.blackoutBtn = controls.createEl("button", {
       text: "Blackout",
       cls: "slides-ng-speaker-btn slides-ng-speaker-blackout",
@@ -104,8 +120,11 @@ export class SlidesNGSpeakerView extends ItemView {
 
     // Timer controls
     const timerCtrls = container.createDiv({ cls: "slides-ng-speaker-timer-ctrls" });
-    timerCtrls.createEl("button", { text: "Start/pause", cls: "slides-ng-speaker-btn" })
-      .addEventListener("click", () => this.toggleTimer());
+    this.timerToggleBtn = timerCtrls.createEl("button", {
+      text: "Start",
+      cls: "slides-ng-speaker-btn",
+    });
+    this.timerToggleBtn.addEventListener("click", () => this.toggleTimer());
     timerCtrls.createEl("button", { text: "Reset", cls: "slides-ng-speaker-btn" })
       .addEventListener("click", () => this.resetTimer());
 
@@ -123,13 +142,13 @@ export class SlidesNGSpeakerView extends ItemView {
     // Picker mode toggle
     const pickerHeader = container.createDiv({ cls: "slides-ng-speaker-picker-header" });
     pickerHeader.createEl("div", { cls: "slides-ng-speaker-section-title", text: "Slides" });
-    const modeToggle = pickerHeader.createEl("button", {
+    this.modeToggleBtn = pickerHeader.createEl("button", {
       cls: "slides-ng-speaker-btn slides-ng-speaker-mode-toggle",
-      text: "Mode: compact",
+      text: `Mode: ${this.pickerMode}`,
     });
-    modeToggle.addEventListener("click", () => {
+    this.modeToggleBtn.addEventListener("click", () => {
       this.pickerMode = this.pickerMode === "compact" ? "list" : "compact";
-      modeToggle.setText(`Mode: ${this.pickerMode}`);
+      this.modeToggleBtn!.setText(`Mode: ${this.pickerMode}`);
       this.renderPicker();
     });
 
@@ -245,6 +264,7 @@ export class SlidesNGSpeakerView extends ItemView {
       this.stopTimerTick();
       this.applyTimerLabel();
     }
+    this.applyTimerBtnState();
   }
 
   private resetTimer(): void {
@@ -252,11 +272,20 @@ export class SlidesNGSpeakerView extends ItemView {
     this.timerPausedMs = 0;
     this.stopTimerTick();
     if (this.timerEl) this.timerEl.setText("00:00:00");
+    this.applyTimerBtnState();
+  }
+
+  private applyTimerBtnState(): void {
+    if (!this.timerToggleBtn) return;
+    const running = this.timerStartMs !== null;
+    this.timerToggleBtn.setText(running ? "Pause" : "Start");
+    this.timerToggleBtn.toggleClass("mod-cta", running);
   }
 
   private startTimerTick(): void {
     this.stopTimerTick();
-    this.timerTickHandle = window.setInterval(() => this.applyTimerLabel(), 500);
+    const tickMs = this.getSettings?.()?.speakerTimerTickMs ?? 1000;
+    this.timerTickHandle = window.setInterval(() => this.applyTimerLabel(), tickMs);
     this.applyTimerLabel();
   }
 

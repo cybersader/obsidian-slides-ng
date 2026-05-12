@@ -291,6 +291,12 @@ export class SlidesNGView extends ItemView {
       const html = renderDeck(markdown, file.path, {
         defaultTheme: settings.defaultTheme,
         defaultTransition: settings.defaultTransition,
+        defaultLayout: settings.defaultLayout,
+        codeTheme: settings.codeTheme,
+        imageLayoutSplit: settings.imageLayoutSplit,
+        lineStepDimOpacity: settings.lineStepDimOpacity,
+        showRevealControlsEmbedded: settings.showRevealControlsEmbedded,
+        showRevealMenuEmbedded: settings.showRevealMenuEmbedded,
         resolveImage: (raw) => this.resolveImageAttachment(raw, file.path),
       });
       this.iframeEl.srcdoc = html;
@@ -358,7 +364,17 @@ export class SlidesNGView extends ItemView {
 
   private renderDefaults() {
     const s = this.getSettings();
-    return { defaultTheme: s.defaultTheme, defaultTransition: s.defaultTransition };
+    return {
+      defaultTheme: s.defaultTheme,
+      defaultTransition: s.defaultTransition,
+      defaultLayout: s.defaultLayout,
+      codeTheme: s.codeTheme,
+      imageLayoutSplit: s.imageLayoutSplit,
+      lineStepDimOpacity: s.lineStepDimOpacity,
+      // showRevealControlsEmbedded + showRevealMenuEmbedded intentionally
+      // not threaded into standalone exports — standalone mode shows
+      // controls + menu regardless.
+    };
   }
 
   /**
