@@ -152,14 +152,14 @@ describe("renderDeck threads settings into iframe HTML", () => {
     expect(html).toContain("RevealMenu");
   });
 
-  test("showRevealMenuEmbedded=false omits the menu plugin", () => {
+  test("showRevealMenuEmbedded=false omits the menu plugin bundle", () => {
     const md = "---\n---\n\n# Slide\n";
     const html = renderDeck(md, "deck.md", { showRevealMenuEmbedded: false });
-    // Bridge code references RevealMenu only inside the `if (showMenu)`
-    // block — without the plugin, that block isn't emitted, so the only
-    // "RevealMenu" mentions in output should be zero.
-    const matches = html.match(/RevealMenu/g) ?? [];
-    expect(matches.length).toBe(0);
+    // The menu plugin's UMD bundle is large + has a unique signature.
+    // Check the wrapper comment we emit when the bundle IS included.
+    expect(html).not.toContain("reveal.js-menu plugin");
+    // And the plugin's CSS block (which we identify via our wrapper).
+    expect(html).not.toContain("font-awesome is intentionally NOT bundled");
   });
 
   test("imageLayoutSplit 60/40 maps to 3fr 2fr in CSS", () => {

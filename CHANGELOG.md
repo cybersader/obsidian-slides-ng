@@ -6,6 +6,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-05-12
+
+### Added
+
+- **Visual next-slide preview** in the speaker view — a second
+  iframe pinned to slide N+1 of the same deck, theme + layouts +
+  code highlighting + magic-move all rendered exactly as the main
+  preview shows them. Sandbox stays `allow-scripts` only; synced via
+  postMessage. Re-renders automatically when the deck file is saved.
+- **Placeholder/scene slides** ("OBS-style scenes") — a library of
+  overlay slides the presenter can flash up mid-presentation. Ships
+  with 4 defaults (Blackout / Be right back / Q & A / Stand by); user
+  adds + edits via the new Scenes section in settings. Speaker view
+  shows a row of scene buttons; clicking activates an overlay on top
+  of the current slide. Click again to clear. State protocol carries
+  `activeSceneId` so the button + overlay stay synchronized.
+- **Menu toolbar button** in the preview pane — toggles the
+  reveal.js-menu hamburger so users don't have to hunt for it in the
+  iframe corner. Hidden when `showRevealMenuEmbedded` is off.
+
+### Fixed
+
+- **"Grid" button rendered a single row, not a grid**: reveal.js's
+  stock overview CSS collapsed in the embedded viewport, and there
+  were no slide numbers. v0.7.0 adds dedicated `.reveal.overview
+  .slides` CSS — proper auto-fill grid (180px minmax columns), scroll
+  when content overflows, and a CSS-counter-driven slide-number badge
+  on every tile so users can identify each one.
+- **Speaker view buttons "kind of terrible"** — UI overhaul: every
+  control now has an Obsidian icon via `setIcon`; nav buttons sit in
+  a connected pill row; the Next button is a primary `mod-cta`
+  accent; bigger tap targets; proper focus rings; labels collapse on
+  narrow speaker leaves.
+- **Mini-iframe state race**: speaker view's message handler now
+  filters by `event.source` so state events from the visual next-
+  slide preview iframe don't clobber the main preview's state.
+
+### Changed
+
+- **Bridge protocol** — new commands `setScene`, `clearScene`,
+  `toggleMenu`. The existing `toggleBlackout` command remains as a
+  backwards-compat alias for `setScene({id:'blackout', html:''})`.
+- **Overlay element renamed**: `#slides-ng-blackout` → `#slides-ng-scene`
+  (generic, holds any scene content). Style updated to flex-center +
+  themed font.
+- **`isBlackout` state field** derived from `activeSceneId ===
+  'blackout'`; existing speaker views unaware of scenes still work.
+
+### Tests
+
+- New `tests/scenes.test.ts` (9 tests) — DEFAULT_SCENES shape +
+  bridge command wiring + overview-mode CSS markers.
+- New `test/e2e/speaker-070.spec.ts` (6 tests) — speaker button
+  icons present; Next is `mod-cta`; Menu toolbar button exists; Grid
+  triggers reveal overview AND `.slides` has grid display; scene
+  toggle round-trip; mini-iframe has non-empty srcdoc.
+- Totals: 295 unit / 20 E2E spec files.
+
+### Notes
+
+- DnD modular speaker panels + per-panel show/hide were in the
+  original 0.7.0 plan; bumped to 0.8.0 to focus this release on the
+  fixes the user surfaced this session.
+- Hyperlinked slide-web navigation via Obsidian block IDs added to
+  the idea jar (user-flagged but acknowledged as over-engineering;
+  defer until requested).
+
 ## [0.6.0] — 2026-05-12
 
 ### Added

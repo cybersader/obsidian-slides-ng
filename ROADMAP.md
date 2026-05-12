@@ -6,13 +6,12 @@ move between sections as work happens. Released versions live in
 
 ## In flight
 
-### 0.7.0 — visual speaker UX + modular panels
+### 0.8.0 — modular speaker panels
 
-- **True visual next-slide preview** — second mini-iframe in the speaker view rendering the next slide at scale (theme, fonts, code highlighting, layouts intact)
-- **Light drag-and-drop modular panels** — each speaker panel (status / controls / timer / next / notes / picker) gets a drag handle, vertical reorder, order persists per-user
+- **Light drag-and-drop modular panels** — each speaker panel (status / controls / timer / next / notes / picker / scenes / visual-next-preview) gets a drag handle, vertical reorder, order persists per-user
 - **Per-panel show/hide** — settings toggles to hide panels you don't use during presentation
 
-### 0.8.0 (tentative) — reverse-follow + presenter overlays
+### 0.9.0 (tentative) — reverse-follow + presenter overlays
 
 - **Reverse follow** — preview → editor cursor. Fires only on horizontal `slidechanged`, never on fragment events (where Slides-Extended jittered)
 - **Presenter overlay tools** — drawing layer, laser pointer, color swatches (Slides-Extended parity)
@@ -22,6 +21,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.7.0** — speaker UX overhaul: visual next-slide preview iframe, OBS-style scene overlays, Grid button real-grid fix with slide numbers, icon-based speaker buttons, Menu toolbar button
 - **0.6.0** — authoring polish bundle: per-slide backgrounds with vault-path resolution, code-block max-height + scroll, `customCSS:` frontmatter injection, `transitionSpeed` setting, `magicMoveDurationMs` setting
 - **0.5.4** — ribbon-button focus-steal recovery
 - **0.5.3** — toolbar wrap on narrow leaves
@@ -38,10 +38,13 @@ ballpark.
 
 | Idea | Priority | Effort |
 |---|---|---|
-| Reverse follow: preview → editor cursor (only on horizontal `slidechanged`, never on fragment events — that's where Slides-Extended jittered) | Medium | 1-2 hr |
-| Pre-rendered slide thumbnails in speaker picker (html2canvas or tiny per-slide iframe — reveal-overview "Grid" button covers 80% for free) | Medium | 3-4 hr |
-| Per-slide visual overlay tools — drawing layer, laser pointer, color swatches (Extended Slides parity) | Medium | Large |
-| Full panel-system speaker view (resizable + free positioning, beyond the 0.6.0 light DnD) — needs a grid lib | Future | 6-8 hr |
+| Reverse follow: preview → editor cursor (only on horizontal `slidechanged`, never on fragment events — that's where Slides-Extended jittered) | High | 1-2 hr |
+| Pre-rendered slide thumbnails in speaker picker | Medium | 3-4 hr — Grid overview (fixed in 0.7) covers most of this for free |
+| Per-slide visual overlay tools — drawing layer, laser pointer, color swatches (Extended Slides parity) | Medium-High | Large — 0.9.0 candidate |
+| Hyperlinked slide-web navigation via block IDs | Medium | User-flagged but acknowledged as over-engineering — defer until requested |
+| Slide-web navigation graph view (visual editor for the slide-web) | Future research | Strong over-engineering; only if hyperlinked nav proves valuable |
+| Custom scene shortcuts (keyboard bindings) | Low | Add once scenes ship and the user has favourites |
+| Full panel-system speaker view (resizable + free positioning) | Future | 6-8 hr — only if 0.8.0's light DnD insufficient |
 | Per-panel save/load layouts | Future | 1-2 hr |
 
 ### Rendering / fidelity

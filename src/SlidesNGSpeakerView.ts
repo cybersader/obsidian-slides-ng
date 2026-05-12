@@ -14,9 +14,24 @@
  * Obsidian's "Move to new window" to make it a true second monitor.
  */
 
-import { ItemView, WorkspaceLeaf, Notice } from "obsidian";
+import {
+  ItemView,
+  WorkspaceLeaf,
+  Notice,
+  setIcon,
+  setTooltip,
+  TFile,
+  TAbstractFile,
+} from "obsidian";
+import { Marked } from "marked";
 import { VIEW_TYPE_SLIDES_NG, SlidesNGView } from "./SlidesNGView";
-import type { SlidesNGSettings } from "./settings";
+import { renderDeck } from "./render/renderDeck";
+import type { SlidesNGSettings, SceneDefinition } from "./settings";
+
+// Lightweight markdown → HTML for scene content. Synchronous + fast +
+// no Obsidian-render-cycle hang risk. Scenes are presentational
+// overlays; we don't need wikilinks/embeds/Obsidian-specific bits.
+const sceneMd = new Marked();
 
 export const VIEW_TYPE_SLIDES_NG_SPEAKER = "slides-ng-speaker";
 
@@ -25,6 +40,8 @@ interface PreviewState {
   fragmentIdx: number;
   totalSlides: number;
   isBlackout: boolean;
+  /** Currently-active scene id, or null if none. Added in v0.7.0. */
+  activeSceneId: string | null;
   notesHtml: string;
   nextTitle: string;
   slides: { idx: number; title: string }[];
@@ -38,6 +55,9 @@ type SpeakerCommand =
   | "goto"
   | "toggleBlackout"
   | "toggleOverview"
+  | "toggleMenu"
+  | "setScene"
+  | "clearScene"
   | "requestState";
 
 export type SpeakerSettingsAccessor = () => SlidesNGSettings;
@@ -59,10 +79,27 @@ export class SlidesNGSpeakerView extends ItemView {
   private pickerEl?: HTMLElement;
   private blackoutBtn?: HTMLButtonElement;
   private modeToggleBtn?: HTMLButtonElement;
+  private sceneButtons = new Map<string, HTMLButtonElement>();
+  /** Visual next-slide preview mini-iframe (v0.7.0). */
+  private nextSlideIframe?: HTMLIFrameElement;
+  /** Cached deck path the mini-iframe is currently rendering. */
+  private lastMiniRenderedPath?: string;
+  /** Cached deck mtime so save-driven re-renders stay in sync. */
+  private lastMiniRenderedMtime?: number;
 
   private messageHandler = (event: MessageEvent) => {
     const data = event.data as Partial<PreviewState> & { type?: string };
     if (!data || data.type !== "slides-ng-state") return;
+    // Only accept state from the MAIN preview iframe. The visual next-
+    // slide mini-iframe (introduced in v0.7) also runs the bridge and
+    // posts state events — those represent a different slide position
+    // and would race the main preview's state, clobbering activeSceneId
+    // and other fields. event.source identifies which iframe sent the
+    // message.
+    const mainIframe = this.findPreviewIframe();
+    if (mainIframe && event.source && event.source !== mainIframe.contentWindow) {
+      return;
+    }
     this.state = data as PreviewState;
     this.applyState();
   };
@@ -100,39 +137,105 @@ export class SlidesNGSpeakerView extends ItemView {
     this.statusEl = status.createSpan({ cls: "slides-ng-speaker-position", text: "Slide — of —" });
     this.timerEl = status.createSpan({ cls: "slides-ng-speaker-timer", text: "00:00:00" });
 
-    // Control bar
+    // Control bar — connected nav pill + utility buttons
     const controls = container.createDiv({ cls: "slides-ng-speaker-controls" });
-    controls.createEl("button", { text: "First", cls: "slides-ng-speaker-btn" })
-      .addEventListener("click", () => this.send("first"));
-    controls.createEl("button", { text: "‹ prev", cls: "slides-ng-speaker-btn" })
-      .addEventListener("click", () => this.send("prev"));
-    controls.createEl("button", { text: "Next ›", cls: "slides-ng-speaker-btn" })
-      .addEventListener("click", () => this.send("next"));
-    controls.createEl("button", { text: "Last", cls: "slides-ng-speaker-btn" })
-      .addEventListener("click", () => this.send("last"));
-    controls.createEl("button", { text: "Grid", cls: "slides-ng-speaker-btn" })
-      .addEventListener("click", () => this.send("toggleOverview"));
-    this.blackoutBtn = controls.createEl("button", {
-      text: "Blackout",
-      cls: "slides-ng-speaker-btn slides-ng-speaker-blackout",
+    const navGroup = controls.createDiv({ cls: "slides-ng-speaker-nav-group" });
+    this.addControlButton(navGroup, {
+      icon: "chevrons-left",
+      label: "First",
+      tooltip: "Jump to first slide",
+      onClick: () => this.send("first"),
     });
-    this.blackoutBtn.addEventListener("click", () => this.send("toggleBlackout"));
+    this.addControlButton(navGroup, {
+      icon: "chevron-left",
+      label: "Prev",
+      tooltip: "Previous slide",
+      onClick: () => this.send("prev"),
+    });
+    this.addControlButton(navGroup, {
+      icon: "chevron-right",
+      label: "Next",
+      tooltip: "Next slide",
+      variant: "primary",
+      onClick: () => this.send("next"),
+    });
+    this.addControlButton(navGroup, {
+      icon: "chevrons-right",
+      label: "Last",
+      tooltip: "Jump to last slide",
+      onClick: () => this.send("last"),
+    });
+
+    const utilGroup = controls.createDiv({ cls: "slides-ng-speaker-util-group" });
+    this.addControlButton(utilGroup, {
+      icon: "grid-3x3",
+      label: "Grid",
+      tooltip: "Toggle the slide-grid overview",
+      onClick: () => this.send("toggleOverview"),
+    });
+    this.blackoutBtn = this.addControlButton(utilGroup, {
+      icon: "monitor-off",
+      label: "Blackout",
+      tooltip: "Blackout the slide window",
+      onClick: () => this.send("toggleBlackout"),
+      extraClass: "slides-ng-speaker-blackout",
+    });
 
     // Timer controls
     const timerCtrls = container.createDiv({ cls: "slides-ng-speaker-timer-ctrls" });
-    this.timerToggleBtn = timerCtrls.createEl("button", {
-      text: "Start",
-      cls: "slides-ng-speaker-btn",
+    this.timerToggleBtn = this.addControlButton(timerCtrls, {
+      icon: "play",
+      label: "Start",
+      tooltip: "Start the elapsed timer",
+      onClick: () => this.toggleTimer(),
     });
-    this.timerToggleBtn.addEventListener("click", () => this.toggleTimer());
-    timerCtrls.createEl("button", { text: "Reset", cls: "slides-ng-speaker-btn" })
-      .addEventListener("click", () => this.resetTimer());
+    this.addControlButton(timerCtrls, {
+      icon: "rotate-ccw",
+      label: "Reset",
+      tooltip: "Reset the elapsed timer to zero",
+      onClick: () => this.resetTimer(),
+    });
 
-    // Next-slide preview line
+    // Next-slide preview line (text)
     this.nextLineEl = container.createDiv({
       cls: "slides-ng-speaker-next",
       text: "Next: —",
     });
+
+    // Visual next-slide preview — a second iframe rendering the same
+    // deck pinned to currentIdx + 1. Synced via postMessage on every
+    // slidechanged event from the main preview.
+    const visualWrap = container.createDiv({
+      cls: "slides-ng-speaker-visual-next-wrap",
+    });
+    visualWrap.createEl("div", {
+      cls: "slides-ng-speaker-section-title",
+      text: "Up next (visual)",
+    });
+    const frameWrap = visualWrap.createDiv({
+      cls: "slides-ng-speaker-visual-next-frame-wrap",
+    });
+    this.nextSlideIframe = frameWrap.createEl("iframe", {
+      cls: "slides-ng-speaker-visual-next-frame",
+      attr: { sandbox: "allow-scripts" },
+    });
+
+    // Re-render the mini-iframe whenever the deck file is modified.
+    this.registerEvent(
+      this.app.vault.on("modify", (file: TAbstractFile) => {
+        if (this.lastMiniRenderedPath && file.path === this.lastMiniRenderedPath) {
+          // Force re-render by clearing cache markers.
+          this.lastMiniRenderedPath = undefined;
+          this.lastMiniRenderedMtime = undefined;
+          void this.ensureVisualNextSlideRendered();
+        }
+      })
+    );
+
+    // Scenes panel — placeholder overlays the presenter can flash up
+    // mid-presentation (blackout, BRB, Q&A, custom). One button per
+    // configured scene; active scene gets the accent treatment.
+    this.renderScenesPanel(container);
 
     // Notes panel
     const notesWrap = container.createDiv({ cls: "slides-ng-speaker-notes-wrap" });
@@ -166,7 +269,219 @@ export class SlidesNGSpeakerView extends ItemView {
   async onClose(): Promise<void> {
     window.removeEventListener("message", this.messageHandler);
     this.stopTimerTick();
+    this.sceneButtons.clear();
     this.contentEl.empty();
+  }
+
+  /**
+   * Build a speaker-view button with an icon + label. Mirrors the
+   * preview toolbar's pattern (`addToolbarButton` in SlidesNGView) so
+   * the two surfaces feel consistent.
+   */
+  private addControlButton(
+    parent: HTMLElement,
+    opts: {
+      icon: string;
+      label: string;
+      tooltip?: string;
+      variant?: "primary";
+      extraClass?: string;
+      onClick: () => void;
+    }
+  ): HTMLButtonElement {
+    const cls = [
+      "slides-ng-speaker-btn",
+      opts.variant === "primary" ? "mod-cta" : "",
+      opts.extraClass ?? "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const btn = parent.createEl("button", { cls });
+    const iconEl = btn.createSpan({ cls: "slides-ng-speaker-btn-icon" });
+    setIcon(iconEl, opts.icon);
+    btn.createSpan({ cls: "slides-ng-speaker-btn-label", text: opts.label });
+    if (opts.tooltip) setTooltip(btn, opts.tooltip);
+    btn.addEventListener("click", opts.onClick);
+    return btn;
+  }
+
+  /** Replace the icon inside a control button created by addControlButton. */
+  private swapButtonIcon(btn: HTMLElement | undefined, icon: string): void {
+    if (!btn) return;
+    const iconEl = btn.querySelector(".slides-ng-speaker-btn-icon") as HTMLElement | null;
+    if (iconEl) setIcon(iconEl, icon);
+  }
+
+  /** Replace the label inside a control button created by addControlButton. */
+  private swapButtonLabel(btn: HTMLElement | undefined, label: string): void {
+    if (!btn) return;
+    const labelEl = btn.querySelector(".slides-ng-speaker-btn-label") as HTMLElement | null;
+    if (labelEl) labelEl.setText(label);
+  }
+
+  /**
+   * Render the Scenes panel — one button per configured scene. Clicking
+   * a scene postMessages `setScene` (or `clearScene` if already active)
+   * to the preview iframe, which overlays the scene content on top of
+   * the current slide. State events echo back the active scene id so
+   * the buttons stay in sync.
+   */
+  private renderScenesPanel(container: HTMLElement): void {
+    const scenes: SceneDefinition[] = this.getSettings?.()?.scenes ?? [];
+    if (scenes.length === 0) return;
+
+    const wrap = container.createDiv({ cls: "slides-ng-speaker-scenes-wrap" });
+    wrap.createEl("div", {
+      cls: "slides-ng-speaker-section-title",
+      text: "Scenes",
+    });
+    const sceneRow = wrap.createDiv({ cls: "slides-ng-speaker-scenes" });
+    this.sceneButtons.clear();
+    for (const scene of scenes) {
+      // Icon lookup: a few well-known scene ids get a dedicated icon;
+      // anything else gets a generic "layers" icon.
+      const icon = scene.id === "blackout"
+        ? "monitor-off"
+        : scene.id === "brb"
+          ? "coffee"
+          : scene.id === "qa"
+            ? "message-circle-question"
+            : scene.id === "standby"
+              ? "pause-circle"
+              : "layers";
+      const btn = this.addControlButton(sceneRow, {
+        icon,
+        label: scene.label,
+        tooltip: `Show scene: ${scene.label}`,
+        onClick: () => this.activateScene(scene),
+      });
+      this.sceneButtons.set(scene.id, btn);
+    }
+  }
+
+  /**
+   * Toggle a scene on or off. If this scene is already active, clear
+   * it; otherwise render the scene's markdown content to HTML and
+   * send it to the iframe via the `setScene` bridge command.
+   */
+  private activateScene(scene: SceneDefinition): void {
+    const isActive = this.state?.activeSceneId === scene.id;
+    if (isActive) {
+      this.send("clearScene");
+      return;
+    }
+    const html = this.renderSceneMarkdown(scene.content);
+    this.sendPayload({
+      type: "slides-ng-cmd",
+      cmd: "setScene",
+      id: scene.id,
+      html,
+    });
+  }
+
+  /**
+   * Render scene markdown to HTML via the same sync `marked` we use
+   * for deck content. Scenes are presentational overlays — we don't
+   * need wikilink/embed resolution. Empty content (blackout case)
+   * returns empty string; the overlay's default black background IS
+   * the blackout effect.
+   */
+  private renderSceneMarkdown(content: string): string {
+    if (!content || content.trim().length === 0) return "";
+    return sceneMd.parse(content, { async: false }) as string;
+  }
+
+  /**
+   * Find the file path the main preview is showing, by reading its
+   * leaf state. Used by the visual next-slide preview to know which
+   * deck to render in its mini-iframe.
+   */
+  private findPreviewDeckPath(): string | undefined {
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_SLIDES_NG);
+    for (const leaf of leaves) {
+      if (leaf.view instanceof SlidesNGView) {
+        const path = leaf.view.getState()?.filePath;
+        if (typeof path === "string") return path;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Ensure the mini-iframe is rendering the current deck. Re-renders
+   * when the deck path changes OR when the file's mtime changes
+   * (post-save). No-op when already up-to-date.
+   */
+  private async ensureVisualNextSlideRendered(): Promise<void> {
+    if (!this.nextSlideIframe) return;
+    const deckPath = this.findPreviewDeckPath();
+    if (!deckPath) return;
+    const file = this.app.vault.getAbstractFileByPath(deckPath);
+    if (!(file instanceof TFile)) return;
+    const mtime = file.stat.mtime;
+    if (
+      deckPath === this.lastMiniRenderedPath &&
+      mtime === this.lastMiniRenderedMtime
+    ) {
+      return;
+    }
+    try {
+      const markdown = await this.app.vault.read(file);
+      const settings = this.getSettings?.();
+      const html = renderDeck(markdown, file.path, {
+        defaultTheme: settings?.defaultTheme,
+        defaultTransition: settings?.defaultTransition,
+        defaultLayout: settings?.defaultLayout,
+        codeTheme: settings?.codeTheme,
+        imageLayoutSplit: settings?.imageLayoutSplit,
+        lineStepDimOpacity: settings?.lineStepDimOpacity,
+        codeBlockMaxHeight: settings?.codeBlockMaxHeight,
+        codeBlockOverflowScroll: settings?.codeBlockOverflowScroll,
+        transitionSpeed: settings?.transitionSpeed,
+        magicMoveDurationMs: settings?.magicMoveDurationMs,
+        // The mini-iframe is a preview, not interactive — controls + menu off.
+        showRevealControlsEmbedded: false,
+        showRevealMenuEmbedded: false,
+        resolveImage: (raw) => this.resolveDeckImage(raw, file.path),
+      });
+      this.nextSlideIframe.srcdoc = html;
+      this.lastMiniRenderedPath = deckPath;
+      this.lastMiniRenderedMtime = mtime;
+    } catch (err) {
+      console.warn("[slides-ng] visual next-slide preview render failed", err);
+    }
+  }
+
+  /** Drive the mini-iframe to a specific slide index (clamped to total). */
+  private driveVisualNextSlideTo(idx: number): void {
+    if (!this.nextSlideIframe?.contentWindow) return;
+    const safeIdx = Math.max(0, idx);
+    this.nextSlideIframe.contentWindow.postMessage(
+      { type: "slides-ng-cmd", cmd: "goto", idx: safeIdx },
+      "*"
+    );
+  }
+
+  /** Image-attachment resolver — mirrors SlidesNGView.resolveImageAttachment. */
+  private resolveDeckImage(raw: string, deckPath: string): string | null {
+    if (/^(https?:|data:|file:)/.test(raw)) return raw;
+    const trimmed = raw.trim();
+    const linktext = trimmed.replace(/^!?\[\[|\]\]$/g, "");
+    const target = this.app.metadataCache.getFirstLinkpathDest(linktext, deckPath);
+    if (target) return this.app.vault.adapter.getResourcePath(target.path);
+    const file = this.app.vault.getAbstractFileByPath(trimmed);
+    if (file && "path" in file) return this.app.vault.adapter.getResourcePath(file.path);
+    return null;
+  }
+
+  /** Lower-level postMessage helper for commands with payloads beyond {cmd, idx?}. */
+  private sendPayload(payload: Record<string, unknown>): void {
+    const iframe = this.findPreviewIframe();
+    if (!iframe || !iframe.contentWindow) {
+      new Notice("Open a slides-ng preview first.");
+      return;
+    }
+    iframe.contentWindow.postMessage(payload, "*");
   }
 
   // --- Preview-iframe communication ---
@@ -213,8 +528,21 @@ export class SlidesNGSpeakerView extends ItemView {
     }
     if (this.blackoutBtn) {
       this.blackoutBtn.toggleClass("on", this.state.isBlackout);
-      this.blackoutBtn.setText(this.state.isBlackout ? "Blackout on" : "Blackout");
+      this.swapButtonLabel(
+        this.blackoutBtn,
+        this.state.isBlackout ? "Blackout on" : "Blackout"
+      );
     }
+    // Highlight whichever scene is currently active; clear the others.
+    const activeId = this.state.activeSceneId;
+    for (const [id, btn] of this.sceneButtons) {
+      btn.toggleClass("on", id === activeId);
+    }
+
+    // Drive the visual next-slide preview to currentIdx + 1.
+    void this.ensureVisualNextSlideRendered().then(() => {
+      this.driveVisualNextSlideTo(this.state!.currentIdx + 1);
+    });
     this.renderPicker();
   }
 
@@ -278,7 +606,8 @@ export class SlidesNGSpeakerView extends ItemView {
   private applyTimerBtnState(): void {
     if (!this.timerToggleBtn) return;
     const running = this.timerStartMs !== null;
-    this.timerToggleBtn.setText(running ? "Pause" : "Start");
+    this.swapButtonIcon(this.timerToggleBtn, running ? "pause" : "play");
+    this.swapButtonLabel(this.timerToggleBtn, running ? "Pause" : "Start");
     this.timerToggleBtn.toggleClass("mod-cta", running);
   }
 

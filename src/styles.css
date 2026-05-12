@@ -144,27 +144,179 @@
   font-family: var(--font-monospace);
   font-size: 1.05em;
 }
-.slides-ng-speaker-controls,
+.slides-ng-speaker-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.slides-ng-speaker-nav-group,
+.slides-ng-speaker-util-group,
 .slides-ng-speaker-timer-ctrls {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.3rem;
+  align-items: center;
   flex-wrap: wrap;
 }
+.slides-ng-speaker-nav-group {
+  /* Connected pill for the four navigation buttons (First / Prev /
+   * Next / Last). Buttons sit adjacent; outer corners are rounded
+   * but the inner edges meet — feels like one control. */
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 0;
+}
+.slides-ng-speaker-nav-group .slides-ng-speaker-btn {
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+}
+.slides-ng-speaker-nav-group .slides-ng-speaker-btn.mod-cta {
+  /* Primary action (Next) — accent-colour fill */
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
 .slides-ng-speaker-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 0.85em;
-  padding: 0.3rem 0.7rem;
-  border-radius: 4px;
+  line-height: 1;
+  min-height: 32px;
+  padding: 0.4rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  cursor: pointer;
+  transition: background-color 80ms ease, border-color 80ms ease, color 80ms ease;
+}
+.slides-ng-speaker-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+.slides-ng-speaker-nav-group .slides-ng-speaker-btn:hover {
+  background: var(--background-modifier-hover);
+  border-color: transparent;
+}
+.slides-ng-speaker-btn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+.slides-ng-speaker-btn.on,
+.slides-ng-speaker-btn.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+.slides-ng-speaker-btn.on:hover,
+.slides-ng-speaker-btn.mod-cta:hover {
+  background: var(--interactive-accent-hover);
+  border-color: var(--interactive-accent-hover);
+}
+.slides-ng-speaker-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+.slides-ng-speaker-btn-icon .svg-icon {
+  width: 16px;
+  height: 16px;
+}
+.slides-ng-speaker-btn-label {
+  white-space: nowrap;
+}
+/* Narrow speaker panes: collapse labels (keep icons) so buttons fit. */
+@container (max-width: 480px) {
+  .slides-ng-speaker-btn-label {
+    display: none;
+  }
+  .slides-ng-speaker-btn {
+    padding: 0.4rem;
+  }
+}
+.slides-ng-speaker {
+  container-type: inline-size;
+}
+
+.slides-ng-speaker-visual-next-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.slides-ng-speaker-visual-next-frame-wrap {
+  /* Aspect-ratio box: reveal renders into 960x700 by default; we scale
+   * proportionally. Outer wrapper is responsive width; height tracks. */
+  position: relative;
+  width: 100%;
+  /* 9:16-ish proportion to match reveal's default 960x700 ≈ 0.73 */
+  padding-top: 56%;
+  background: #000;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+}
+.slides-ng-speaker-visual-next-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  /* Disable pointer events — this is a preview, not interactive.
+   * Clicking should not jump the deck. */
+  pointer-events: none;
+}
+
+.slides-ng-speaker-scenes-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.slides-ng-speaker-scenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* Settings tab — Scenes editor: per-scene row with label + content
+ * textarea + delete button, plus an "Add scene" button at the bottom. */
+.slides-ng-scene-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.slides-ng-scene-editor-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.5rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+}
+.slides-ng-scene-editor-row input,
+.slides-ng-scene-editor-row textarea {
+  font-family: var(--font-monospace);
+  font-size: 0.85em;
+}
+.slides-ng-scene-editor-row textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+.slides-ng-scene-editor-add {
+  align-self: flex-start;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
   border: 1px solid var(--background-modifier-border);
   background: var(--interactive-normal);
   color: var(--text-normal);
   cursor: pointer;
-}
-.slides-ng-speaker-btn:hover {
-  background: var(--interactive-hover);
-}
-.slides-ng-speaker-btn.on {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
 }
 .slides-ng-speaker-next {
   padding: 0.3rem 0.6rem;

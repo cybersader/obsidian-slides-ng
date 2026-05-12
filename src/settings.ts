@@ -95,6 +95,26 @@ export interface SlidesNGSettings {
    * default is 500.
    */
   magicMoveDurationMs: number;
+
+  /**
+   * OBS-style placeholder/scene slides. Each is a markdown content
+   * block the presenter can flash over the current slide during a
+   * live presentation. Ships with 4 defaults; users add/edit via the
+   * settings tab.
+   */
+  scenes: SceneDefinition[];
+}
+
+export interface SceneDefinition {
+  /** Stable identifier — used in postMessage payloads + active-scene tracking. */
+  id: string;
+  /** Button label shown in the speaker view. */
+  label: string;
+  /**
+   * Markdown content rendered into the overlay. Empty string = an
+   * all-black blackout (no content rendered, just the dark overlay).
+   */
+  content: string;
 }
 
 export const REVEAL_TRANSITIONS = [
@@ -122,6 +142,29 @@ export const BUNDLED_CODE_THEMES = [
   "nord",
 ] as const;
 
+export const DEFAULT_SCENES: SceneDefinition[] = [
+  {
+    id: "blackout",
+    label: "Blackout",
+    content: "",
+  },
+  {
+    id: "brb",
+    label: "Be right back",
+    content: "# Be right back\n\nBack in a few minutes.",
+  },
+  {
+    id: "qa",
+    label: "Q & A",
+    content: "# Q & A\n\nQuestions?",
+  },
+  {
+    id: "standby",
+    label: "Stand by",
+    content: "# Stand by",
+  },
+];
+
 export const DEFAULT_SETTINGS: SlidesNGSettings = {
   defaultTheme: "black",
   defaultTransition: "slide",
@@ -138,4 +181,5 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   codeBlockOverflowScroll: true,
   transitionSpeed: "default",
   magicMoveDurationMs: 500,
+  scenes: DEFAULT_SCENES.map((s) => ({ ...s })),
 };

@@ -125,9 +125,8 @@ describe("In-window reveal.js controls + menu plugin (srcdoc-level)", function (
   it("showRevealMenuEmbedded=true → menu plugin script bundled in iframe srcdoc", async () => {
     await setSettingAndReload("showRevealMenuEmbedded", true);
     const html = await getIframeSrcdoc();
-    // The reveal-menu UMD wrapper defines window.RevealMenu globally — the
-    // bundle string contains the global name as a marker.
-    expect(html).toContain("RevealMenu");
+    // The plugin's bundled CSS block carries a unique signature.
+    expect(html).toContain("reveal.js-menu plugin");
     // And the menu CSS gets a hamburger character via ::before.
     expect(html).toContain("slide-menu-button");
   });
@@ -135,7 +134,12 @@ describe("In-window reveal.js controls + menu plugin (srcdoc-level)", function (
   it("showRevealMenuEmbedded=false → menu plugin NOT bundled in srcdoc", async () => {
     await setSettingAndReload("showRevealMenuEmbedded", false);
     const html = await getIframeSrcdoc();
-    expect(html).not.toContain("RevealMenu");
+    // 0.7+ note: the bridge ALWAYS references RevealMenu (for the
+    // toggleMenu command), even when the plugin isn't bundled. We
+    // check the plugin's bundled CSS/JS markers, not the bare
+    // RevealMenu identifier.
+    expect(html).not.toContain("reveal.js-menu plugin");
+    expect(html).not.toContain("font-awesome is intentionally NOT bundled");
     // Restore default.
     await setSettingAndReload("showRevealMenuEmbedded", true);
   });

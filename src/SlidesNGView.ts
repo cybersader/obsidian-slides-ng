@@ -94,6 +94,13 @@ export class SlidesNGView extends ItemView {
       onClick: () => void this.useCurrentFile(),
     });
 
+    this.addToolbarButton(leftGroup, {
+      icon: "list",
+      label: "Menu",
+      tooltip: "Toggle the in-iframe menu (heading outline + slide list)",
+      onClick: () => this.postIframeCommand("toggleMenu"),
+    });
+
     this.addToolbarButton(rightGroup, {
       icon: "monitor-play",
       label: "Speaker",

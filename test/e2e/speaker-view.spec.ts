@@ -7,7 +7,7 @@
  *      (slide-count, notes, picker)
  *   3. Click Next/Prev in the speaker view; assert the iframe's
  *      `.section.present` advances
- *   4. Toggle blackout; assert `#slides-ng-blackout` overlay is added in
+ *   4. Toggle blackout; assert `#slides-ng-scene` overlay is added in
  *      the iframe
  *   5. Toggle picker mode (compact ↔ list); assert UI updates
  *   6. Screenshots: speaker + preview side-by-side, blackout state.
@@ -162,19 +162,21 @@ describe("slides-ng speaker view drives the preview", function () {
       async () => {
         const txt = await browser.execute(() => {
           const b = document.querySelector(".slides-ng-speaker-blackout") as HTMLElement | null;
-          return b?.innerText?.trim() ?? "";
+          return b?.textContent?.trim() ?? "";
         });
         return txt.toLowerCase().includes("on");
       },
       { timeout: 5000, timeoutMsg: "blackout button label never updated to 'on'" }
     );
 
-    // And the iframe should have a #slides-ng-blackout overlay element.
+    // And the iframe should have a #slides-ng-scene overlay element
+    // with the .on class (v0.7+ — was #slides-ng-blackout in v0.5/0.6).
     await switchToSlideFrame();
     try {
-      const hasOverlay = await browser.execute(
-        () => !!document.getElementById("slides-ng-blackout")
-      );
+      const hasOverlay = await browser.execute(() => {
+        const el = document.getElementById("slides-ng-scene");
+        return !!el && el.classList.contains("on");
+      });
       expect(hasOverlay).toBe(true);
     } finally {
       await switchToTop();
@@ -189,7 +191,7 @@ describe("slides-ng speaker view drives the preview", function () {
       async () => {
         const txt = await browser.execute(() => {
           const b = document.querySelector(".slides-ng-speaker-blackout") as HTMLElement | null;
-          return b?.innerText?.trim() ?? "";
+          return b?.textContent?.trim() ?? "";
         });
         return !txt.toLowerCase().includes("on");
       },
@@ -201,7 +203,7 @@ describe("slides-ng speaker view drives the preview", function () {
     // Initial mode label is "compact".
     const initialLabel = await browser.execute(() => {
       const b = document.querySelector(".slides-ng-speaker-mode-toggle") as HTMLElement | null;
-      return b?.innerText?.trim() ?? "";
+      return b?.textContent?.trim() ?? "";
     });
     expect(initialLabel).toBe("Mode: compact");
 
@@ -222,7 +224,7 @@ describe("slides-ng speaker view drives the preview", function () {
       async () => {
         const label = await browser.execute(() => {
           const b = document.querySelector(".slides-ng-speaker-mode-toggle") as HTMLElement | null;
-          return b?.innerText?.trim() ?? "";
+          return b?.textContent?.trim() ?? "";
         });
         return label === "Mode: list";
       },

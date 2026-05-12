@@ -409,6 +409,66 @@ export function buildIframeHtml(
       text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
       padding: 0 5%;
     }
+
+    /* ----------------------------------------------------------------
+     * Overview mode (the "Grid" button in the speaker view triggers
+     * Reveal.toggleOverview()). Reveal's stock overview CSS collapses
+     * to a single row in narrow embedded viewports and produces no
+     * scroll. These overrides force a real grid layout + force-show
+     * a slide-number badge on every tile so the user can identify
+     * each slide.
+     * ---------------------------------------------------------------- */
+    .reveal.overview .slides {
+      display: grid !important;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      grid-auto-rows: minmax(120px, auto);
+      gap: 1rem;
+      padding: 1rem;
+      overflow-y: auto !important;
+      box-sizing: border-box;
+      max-height: 100%;
+      width: 100% !important;
+      height: 100% !important;
+      top: 0 !important;
+      left: 0 !important;
+      transform: none !important;
+    }
+    .reveal.overview .slides > section {
+      position: relative !important;
+      transform: none !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      cursor: pointer;
+      overflow: hidden;
+      border-radius: 4px;
+      outline: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .reveal.overview .slides > section.present {
+      outline: 2px solid var(--r-link-color, #42affa);
+    }
+    /* Synthetic slide-number badge — visible in overview regardless of
+     * the deck's slideNumber setting. Counter increments per top-level
+     * <section> in document order. */
+    .reveal.overview .slides {
+      counter-reset: slides-ng-tile;
+    }
+    .reveal.overview .slides > section::after {
+      counter-increment: slides-ng-tile;
+      content: counter(slides-ng-tile);
+      position: absolute;
+      bottom: 6px;
+      right: 8px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: var(--r-main-font, sans-serif);
+      pointer-events: none;
+      z-index: 2;
+    }
   </style>
   <style>
     /* shiki-magic-move v0.4 — token-morph between paired code blocks */
@@ -588,13 +648,20 @@ ${sectionsHtml}
         var nextSlide = null;
         try { nextSlide = Reveal.getSlide(indices.h + 1, 0); } catch (e) { nextSlide = null; }
         var nextTitleEl = nextSlide ? nextSlide.querySelector('h1, h2, h3') : null;
-        var blackoutEl = document.getElementById('slides-ng-blackout');
+        var sceneEl = document.getElementById('slides-ng-scene');
+        var activeSceneId = (sceneEl && sceneEl.classList.contains('on'))
+          ? (sceneEl.getAttribute('data-scene-id') || null)
+          : null;
         return {
           type: 'slides-ng-state',
           currentIdx: indices.h,
           fragmentIdx: indices.f != null ? indices.f : -1,
           totalSlides: totalSlides,
-          isBlackout: !!(blackoutEl && blackoutEl.classList.contains('on')),
+          // isBlackout retained for backwards compatibility with the
+          // pre-0.7 speaker view bridge consumers — derived from the
+          // active scene id now.
+          isBlackout: activeSceneId === 'blackout',
+          activeSceneId: activeSceneId,
           notesHtml: notesEl ? notesEl.innerHTML : '',
           nextTitle: nextTitleEl ? nextTitleEl.innerText.trim().slice(0, 80) : '',
           slides: harvestSlideMeta()
@@ -606,14 +673,38 @@ ${sectionsHtml}
           window.parent.postMessage(state, '*');
         }
       }
-      function ensureBlackoutEl() {
-        var el = document.getElementById('slides-ng-blackout');
+      function ensureSceneEl() {
+        var el = document.getElementById('slides-ng-scene');
         if (el) return el;
         el = document.createElement('div');
-        el.id = 'slides-ng-blackout';
-        el.style.cssText = 'position:fixed;inset:0;background:#000;z-index:9999;display:none;';
+        el.id = 'slides-ng-scene';
+        // Full-viewport overlay; flex-center for arbitrary content.
+        // Background is solid black by default — for "blackout" the
+        // empty content + dark background is the blackout effect.
+        el.style.cssText =
+          'position:fixed;inset:0;background:#000;color:#fff;z-index:9999;' +
+          'display:none;align-items:center;justify-content:center;' +
+          'text-align:center;padding:5%;overflow:auto;' +
+          'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);';
         document.body.appendChild(el);
         return el;
+      }
+      function setScene(id, html) {
+        var el = ensureSceneEl();
+        el.setAttribute('data-scene-id', id || '');
+        el.innerHTML = html || '';
+        el.style.display = 'flex';
+        el.classList.add('on');
+        postState();
+      }
+      function clearScene() {
+        var el = document.getElementById('slides-ng-scene');
+        if (!el) return;
+        el.classList.remove('on');
+        el.style.display = 'none';
+        el.setAttribute('data-scene-id', '');
+        el.innerHTML = '';
+        postState();
       }
       window.addEventListener('message', function (event) {
         var data = event.data;
@@ -628,18 +719,33 @@ ${sectionsHtml}
             case 'toggleOverview':
               if (typeof Reveal.toggleOverview === 'function') Reveal.toggleOverview();
               break;
+            case 'toggleMenu':
+              // reveal.js-menu exposes both Reveal.toggleMenu and the
+              // plugin's own API. Use whichever is available.
+              if (typeof Reveal.toggleMenu === 'function') Reveal.toggleMenu();
+              else if (window.RevealMenu && typeof window.RevealMenu.toggle === 'function')
+                window.RevealMenu.toggle();
+              break;
             case 'toggleBlackout': {
-              var el = ensureBlackoutEl();
-              if (el.classList.contains('on')) {
-                el.classList.remove('on');
-                el.style.display = 'none';
-              } else {
-                el.classList.add('on');
-                el.style.display = 'block';
-              }
-              postState();
+              // Backwards-compat alias: blackout is now scene id
+              // "blackout" with empty content. If blackout is already
+              // active, clear; otherwise activate.
+              var existing = document.getElementById('slides-ng-scene');
+              var activeNow = existing && existing.classList.contains('on')
+                ? existing.getAttribute('data-scene-id')
+                : null;
+              if (activeNow === 'blackout') clearScene();
+              else setScene('blackout', '');
               break;
             }
+            case 'setScene':
+              if (typeof data.id === 'string') {
+                setScene(data.id, typeof data.html === 'string' ? data.html : '');
+              }
+              break;
+            case 'clearScene':
+              clearScene();
+              break;
             case 'requestState': postState(); break;
           }
         } catch (e) {

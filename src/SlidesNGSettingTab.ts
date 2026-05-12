@@ -6,7 +6,9 @@ import {
   PICKER_MODES,
   BUNDLED_CODE_THEMES,
   TRANSITION_SPEEDS,
+  DEFAULT_SCENES,
 } from "./settings";
+import type { SceneDefinition } from "./settings";
 import { availableThemes } from "./render/revealAssets";
 import { KNOWN_LAYOUTS } from "./render/layouts";
 
@@ -244,5 +246,77 @@ export class SlidesNGSettingTab extends PluginSettingTab {
           }
         );
       });
+
+    // ---------- Scenes ----------
+    new Setting(containerEl).setName("Scenes").setHeading();
+
+    new Setting(containerEl)
+      .setName("Placeholder scenes")
+      .setDesc(
+        "Overlay slides the presenter can flash up mid-presentation (blackout, be right back, q & a, etc.). Each scene's content is rendered as Markdown when activated. Reopen the speaker view to pick up edits."
+      );
+
+    this.renderSceneEditor(containerEl);
+  }
+
+  private renderSceneEditor(containerEl: HTMLElement): void {
+    const editor = containerEl.createDiv({ cls: "slides-ng-scene-editor" });
+    const refresh = (): void => {
+      editor.empty();
+      const scenes = this.plugin.settings.scenes;
+      for (let i = 0; i < scenes.length; i++) {
+        const scene = scenes[i];
+        const row = editor.createDiv({ cls: "slides-ng-scene-editor-row" });
+
+        const labelInput = row.createEl("input", {
+          attr: { type: "text", placeholder: "Label", value: scene.label },
+        });
+        labelInput.addEventListener("change", async () => {
+          scenes[i] = { ...scene, label: labelInput.value };
+          await this.plugin.saveSettings();
+        });
+
+        const contentInput = row.createEl("textarea", {
+          attr: { placeholder: "Markdown content (empty = blackout)" },
+        });
+        contentInput.value = scene.content;
+        contentInput.addEventListener("change", async () => {
+          scenes[i] = { ...scene, content: contentInput.value };
+          await this.plugin.saveSettings();
+        });
+
+        const removeBtn = row.createEl("button", { text: "Remove" });
+        removeBtn.addEventListener("click", async () => {
+          this.plugin.settings.scenes.splice(i, 1);
+          await this.plugin.saveSettings();
+          refresh();
+        });
+      }
+
+      const actions = editor.createDiv();
+      const addBtn = actions.createEl("button", {
+        cls: "slides-ng-scene-editor-add",
+        text: "Add scene",
+      });
+      addBtn.addEventListener("click", async () => {
+        const newId = `scene-${Date.now().toString(36)}`;
+        const newScene: SceneDefinition = { id: newId, label: "New scene", content: "" };
+        this.plugin.settings.scenes.push(newScene);
+        await this.plugin.saveSettings();
+        refresh();
+      });
+
+      const resetBtn = actions.createEl("button", {
+        cls: "slides-ng-scene-editor-add",
+        text: "Reset to defaults",
+        attr: { style: "margin-left: 0.5rem;" },
+      });
+      resetBtn.addEventListener("click", async () => {
+        this.plugin.settings.scenes = DEFAULT_SCENES.map((s) => ({ ...s }));
+        await this.plugin.saveSettings();
+        refresh();
+      });
+    };
+    refresh();
   }
 }
