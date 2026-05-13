@@ -5,9 +5,14 @@ import {
   VIEW_TYPE_SLIDES_NG_SPEAKER,
 } from "./SlidesNGSpeakerView";
 import { warmHighlighter } from "./render/shiki";
-import { exportAndOpen, exportAndOpenForPdf } from "./export/exportStandalone";
+import {
+  exportAndOpen,
+  exportAndOpenForPdf,
+  type PdfExportOptions,
+} from "./export/exportStandalone";
 import { SlidesNGSettingTab } from "./SlidesNGSettingTab";
 import { DEFAULT_SETTINGS, type SlidesNGSettings } from "./settings";
+import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
 import {
   LayoutNameSuggest,
   SlotMarkerSuggest,
@@ -139,11 +144,33 @@ export default class SlidesNGPlugin extends Plugin {
       new Notice("Open a Markdown deck before running this command.");
       return;
     }
+    // Show options modal first; user picks notes/aspect/theme; null = cancel.
+    new ExportPdfOptionsModal(
+      this.app,
+      this.settings.defaultTheme,
+      (pdfOptions) => {
+        if (!pdfOptions) return;
+        void this.runPdfExport(file, pdfOptions);
+      }
+    ).open();
+  }
+
+  /** Actually run the export once the user has picked their options. */
+  private async runPdfExport(
+    file: TFile,
+    pdfOptions: PdfExportOptions
+  ): Promise<void> {
     try {
-      const result = await exportAndOpenForPdf(this.app, file, undefined, {
-        defaultTheme: this.settings.defaultTheme,
-        defaultTransition: this.settings.defaultTransition,
-      });
+      const result = await exportAndOpenForPdf(
+        this.app,
+        file,
+        undefined,
+        {
+          defaultTheme: this.settings.defaultTheme,
+          defaultTransition: this.settings.defaultTransition,
+        },
+        pdfOptions
+      );
       if (result.opened) {
         new Notice(
           "Opened in print mode. Use your browser's print → save as PDF."

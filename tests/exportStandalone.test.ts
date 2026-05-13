@@ -1,6 +1,7 @@
 import { test, expect, describe } from "bun:test";
 import {
   buildExportFilename,
+  buildPdfUrlSuffix,
   exportDeckToFile,
 } from "../src/export/exportStandalone";
 import { renderDeckStandalone, renderDeck } from "../src/render/renderDeck";
@@ -73,6 +74,48 @@ class MockApp {
   };
 }
 
+describe("buildPdfUrlSuffix", () => {
+  test("defaults to ?print-pdf only", () => {
+    expect(buildPdfUrlSuffix()).toBe("?print-pdf");
+    expect(buildPdfUrlSuffix({})).toBe("?print-pdf");
+  });
+
+  test("includes showNotes=true when requested", () => {
+    expect(buildPdfUrlSuffix({ showNotes: true })).toBe(
+      "?print-pdf&showNotes=true"
+    );
+  });
+
+  test("omits showNotes when false / undefined", () => {
+    expect(buildPdfUrlSuffix({ showNotes: false })).toBe("?print-pdf");
+  });
+
+  test("includes pdfMaxPagesPerSlide when >1", () => {
+    expect(buildPdfUrlSuffix({ maxPagesPerSlide: 3 })).toBe(
+      "?print-pdf&pdfMaxPagesPerSlide=3"
+    );
+  });
+
+  test("omits pdfMaxPagesPerSlide when 1 or undefined", () => {
+    expect(buildPdfUrlSuffix({ maxPagesPerSlide: 1 })).toBe("?print-pdf");
+    expect(buildPdfUrlSuffix({})).toBe("?print-pdf");
+  });
+
+  test("combines all flags", () => {
+    expect(
+      buildPdfUrlSuffix({ showNotes: true, maxPagesPerSlide: 4 })
+    ).toBe("?print-pdf&showNotes=true&pdfMaxPagesPerSlide=4");
+  });
+
+  test("aspectRatio + themeOverride are NOT in the URL (they go through renderDefaults)", () => {
+    const url = buildPdfUrlSuffix({
+      aspectRatio: "16:9",
+      themeOverride: "white",
+    });
+    expect(url).toBe("?print-pdf");
+  });
+});
+
 describe("exportDeckToFile", () => {
   test("writes a .slides-ng-export-<timestamp>.html to the vault", async () => {
     const app = new MockApp() as unknown as Parameters<typeof exportDeckToFile>[0];
@@ -88,6 +131,15 @@ describe("exportDeckToFile", () => {
     const written = (app as unknown as { vault: { adapter: MockAdapter } }).vault
       .adapter.written.get(".slides-ng-export-999.html");
     expect(written).toBe(result.html);
+  });
+
+  test("renders pdfAspectWidth/pdfAspectHeight when caller sets them in defaults", () => {
+    const html = renderDeckStandalone("---\n---\n\n# A\n", undefined, {
+      pdfAspectWidth: 1280,
+      pdfAspectHeight: 720,
+    });
+    expect(html).toContain('"width":1280');
+    expect(html).toContain('"height":720');
   });
 
   test("each export with a different timestamp creates a fresh file", async () => {

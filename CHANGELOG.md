@@ -6,6 +6,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-05-13
+
+### Added
+
+- **Export-for-PDF options modal** — Export PDF (toolbar + command)
+  now opens a small modal first so the user picks how the printed
+  pages should look before the deck is rendered for print.
+  Available knobs:
+  - **Include speaker notes** — embeds notes alongside each slide
+    via reveal's `?showNotes=true`. Useful for handouts.
+  - **Aspect ratio** — `Current` (deck default), `16:9` (1280×720),
+    or `4:3` (1024×768). Overrides flow through `RenderDefaults`
+    into `Reveal.initialize()` so the rendered HTML has the right
+    page dimensions for whichever paper the user is printing on.
+  - **Theme override** — pick any of the 15 bundled reveal themes
+    just for the PDF run without touching the deck or settings.
+    Lets users author in `black` and print in `white` for ink.
+  - **Max pages per slide on overflow** — sets reveal's
+    `pdfMaxPagesPerSlide` URL param. Default 1 (clip overflow);
+    raise it to let long slides break across pages.
+
+### Why
+
+Sole 0.8.x PDF flow was "click → goes straight to print mode with
+zero choice." Two real friction points: dark-themed decks wasted
+ink, and content that overflowed in `print-pdf` mode was silently
+clipped. The modal collects intent up front so the same path
+handles both cases without per-deck frontmatter gymnastics.
+
+### Technical
+
+- `src/export/exportStandalone.ts` — new `PdfExportOptions`
+  interface and `buildPdfUrlSuffix()` pure helper.
+  `exportAndOpenForPdf()` now accepts an optional `pdfOptions`
+  parameter and merges the theme + aspect-ratio overrides into
+  `RenderDefaults` before rendering; URL-only flags (`showNotes`,
+  `pdfMaxPagesPerSlide`) go into the file:// query string.
+- `src/render/renderDeck.ts` — new `pdfAspectWidth` / `pdfAspectHeight`
+  on `RenderDefaults`, threaded into the deck's default options
+  layer so they survive the standalone-render path.
+- `src/render/revealTemplate.ts` — same fields plumbed through
+  `DeckRenderOptions` and spread into the `Reveal.initialize()`
+  config block. Override only kicks in when the caller explicitly
+  passes a number — `current` aspect stays at reveal's default
+  960×700 (or whatever the deck's own settings produce).
+- `src/ExportPdfOptionsModal.ts` (new, ~115 LOC) — small Obsidian
+  `Modal` subclass with three `new Setting()` rows + Cancel/Export
+  buttons. Pure UI; export logic stays in
+  `exportStandalone.ts`.
+- `src/main.ts` + `src/SlidesNGView.ts` — both entry points now
+  open the modal first and only run the export when the user
+  clicks Export.
+- `tests/exportStandalone.test.ts` — `buildPdfUrlSuffix` covered:
+  defaults to `?print-pdf`; `showNotes`, `maxPagesPerSlide`
+  encoded as query params; aspect + theme are NOT in the URL
+  (they go through `renderDefaults`); standalone render with
+  `pdfAspectWidth: 1280` produces `"width":1280` in the bundle.
+
 ## [0.8.4] — 2026-05-12
 
 ### Changed

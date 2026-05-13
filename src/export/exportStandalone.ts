@@ -2,6 +2,35 @@ import { App, TFile } from "obsidian";
 import { renderDeckStandalone, type RenderDefaults } from "../render/renderDeck";
 
 /**
+ * Options the user picks before exporting to PDF. v0.9.0+. Each
+ * field is optional so older callers (without a modal) still work.
+ */
+export interface PdfExportOptions {
+  /**
+   * Embed the speaker notes in the printed pages (reveal's
+   * `?showNotes` URL param). Default false.
+   */
+  showNotes?: boolean;
+  /**
+   * Override the deck aspect ratio for printing. `"16:9"` and
+   * `"4:3"` change the reveal-initialize width/height; `"current"`
+   * uses whatever the deck's settings produce. Default `"current"`.
+   */
+  aspectRatio?: "16:9" | "4:3" | "current";
+  /**
+   * Override the deck theme. Useful for printing a dark-theme deck
+   * in a light-theme layout that uses less ink. `null` = use the
+   * deck's own theme. Default `null`.
+   */
+  themeOverride?: string | null;
+  /**
+   * Max pages per slide when content overflows (reveal's
+   * `pdfMaxPagesPerSlide` URL param). Default 1.
+   */
+  maxPagesPerSlide?: number;
+}
+
+/**
  * Result of a single export run.
  */
 export interface ExportResult {
@@ -100,18 +129,47 @@ export async function exportAndOpen(
 }
 
 /**
- * PDF-print variant — same export + open flow, but appends `?print-pdf`
- * to the file:// URL. Reveal.js detects this query string and renders
- * the deck flattened for printing (one slide per page). The user then
- * uses their browser's "Print → Save as PDF" to produce the PDF.
+ * Build the URL suffix for PDF print mode given the user's options.
+ * Combines reveal's print-pdf flag with any optional query params
+ * the user selected in the export dialog.
+ */
+export function buildPdfUrlSuffix(opts: PdfExportOptions = {}): string {
+  const params: string[] = ["print-pdf"];
+  if (opts.showNotes) params.push("showNotes=true");
+  if (opts.maxPagesPerSlide && opts.maxPagesPerSlide > 1) {
+    params.push(`pdfMaxPagesPerSlide=${opts.maxPagesPerSlide}`);
+  }
+  return "?" + params.join("&");
+}
+
+/**
+ * PDF-print variant — same export + open flow, but appends print-mode
+ * URL params built from the user's PdfExportOptions. Theme + aspect-
+ * ratio overrides flow through `defaults` so the rendered HTML's
+ * Reveal.initialize() gets the right config; URL-only flags (notes,
+ * pdfMaxPagesPerSlide) are encoded in the suffix.
  */
 export async function exportAndOpenForPdf(
   app: App,
   file: TFile,
   timestamp: number = Date.now(),
-  defaults: RenderDefaults = {}
+  defaults: RenderDefaults = {},
+  pdfOptions: PdfExportOptions = {}
 ): Promise<ExportResult & { opened: boolean }> {
-  const result = await exportDeckToFile(app, file, timestamp, defaults);
-  const opened = await openExternalInBrowser(result.absolutePath, "?print-pdf");
+  // Apply theme / aspect ratio overrides into the render defaults.
+  const merged: RenderDefaults = { ...defaults };
+  if (pdfOptions.themeOverride) {
+    merged.defaultTheme = pdfOptions.themeOverride;
+  }
+  if (pdfOptions.aspectRatio === "16:9") {
+    merged.pdfAspectWidth = 1280;
+    merged.pdfAspectHeight = 720;
+  } else if (pdfOptions.aspectRatio === "4:3") {
+    merged.pdfAspectWidth = 1024;
+    merged.pdfAspectHeight = 768;
+  }
+  const result = await exportDeckToFile(app, file, timestamp, merged);
+  const suffix = buildPdfUrlSuffix(pdfOptions);
+  const opened = await openExternalInBrowser(result.absolutePath, suffix);
   return { ...result, opened };
 }

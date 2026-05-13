@@ -48,6 +48,10 @@ export interface DeckRenderOptions {
   transitionSpeed?: "default" | "fast" | "slow";
   /** Magic-Move animation duration in ms. */
   magicMoveDurationMs?: number;
+  /** PDF-export width override (px). Passed to Reveal.initialize. */
+  pdfAspectWidth?: number;
+  /** PDF-export height override (px). Passed to Reveal.initialize. */
+  pdfAspectHeight?: number;
   /** Custom CSS rules to inject as the last <style> block. */
   customCSS?: string;
   // Pass-through reveal.js Reveal.initialize() options if the caller
@@ -77,6 +81,8 @@ export function buildIframeHtml(
   const codeBlockOverflow = options.codeBlockOverflowScroll ?? true;
   const transitionSpeed = options.transitionSpeed ?? "default";
   const magicMoveDuration = options.magicMoveDurationMs ?? 500;
+  const pdfAspectWidth = options.pdfAspectWidth;
+  const pdfAspectHeight = options.pdfAspectHeight;
   const customCss = options.customCSS ?? "";
   // Reveal's controls + progress bar visibility. Standalone mode always
   // shows them (helps presenters drive in a browser); embedded mode hides
@@ -110,6 +116,12 @@ export function buildIframeHtml(
     transitionSpeed,
     slideNumber,
     embedded,
+    // Aspect-ratio overrides for PDF export. Reveal uses width/height
+    // as the design canvas — the slide content is scaled to fit any
+    // viewport while preserving this aspect ratio. Only set when the
+    // export pipeline asked for a non-default aspect.
+    ...(typeof pdfAspectWidth === "number" ? { width: pdfAspectWidth } : {}),
+    ...(typeof pdfAspectHeight === "number" ? { height: pdfAspectHeight } : {}),
     // Force presentation mode. reveal.js 5 auto-activates scroll mode in
     // small embedded viewports, which rearranges section DOM and breaks
     // discrete slide navigation (Reveal.slide() scrolls instead of

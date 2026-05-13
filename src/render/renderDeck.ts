@@ -83,6 +83,14 @@ export interface RenderDefaults {
   /** Magic-Move animation duration (ms). */
   magicMoveDurationMs?: number;
   /**
+   * PDF-export aspect-ratio overrides. When set, Reveal.initialize()
+   * receives explicit width + height (reveal scales the slide to fit
+   * any container while preserving the configured aspect). Default
+   * undefined = use reveal's stock 960×700. v0.9.0+.
+   */
+  pdfAspectWidth?: number;
+  pdfAspectHeight?: number;
+  /**
    * Optional image-attachment resolver. Called with the raw `image:`
    * frontmatter value; returns a fully-qualified URL (data: URI,
    * file://, https://, etc.) or null if the resolver couldn't find
@@ -156,6 +164,12 @@ export function renderDeckFromAst(
   }
   if (typeof defaults.magicMoveDurationMs === "number") {
     defaultLayer.magicMoveDurationMs = defaults.magicMoveDurationMs;
+  }
+  if (typeof defaults.pdfAspectWidth === "number") {
+    defaultLayer.pdfAspectWidth = defaults.pdfAspectWidth;
+  }
+  if (typeof defaults.pdfAspectHeight === "number") {
+    defaultLayer.pdfAspectHeight = defaults.pdfAspectHeight;
   }
 
   const opts: DeckRenderOptions = {

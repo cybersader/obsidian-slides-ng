@@ -6,21 +6,20 @@ move between sections as work happens. Released versions live in
 
 ## In flight
 
-
-### 0.8.x — PDF export options
-
-- **Export-to-PDF dialog** — currently `?print-pdf` opens a fixed reveal print mode with no controls. Replace with a small dialog: notes on/off, aspect ratio override, theme override, slide-range, page layout. ~3-4 hr.
-
-### 0.9.0 (tentative) — reverse-follow + presenter overlays
+### 1.0.0 (tentative) — reverse-follow + presenter overlays + slide-range PDF
 
 - **Reverse follow** — preview → editor cursor. Fires only on horizontal `slidechanged`, never on fragment events (where Slides-Extended jittered)
 - **Presenter overlay tools** — drawing layer, laser pointer, color swatches (Slides-Extended parity)
+- **PDF slide-range** — extend the 0.9.0 modal with a slide-range field so users can print a subset (e.g. `1-5,8` for handouts of the intro + the final summary)
 
 ## Shipped
 
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.9.0** — export-for-PDF options modal: notes on/off, aspect ratio (current/16:9/4:3), theme override, max-pages-per-slide. Aspect/theme flow through RenderDefaults; notes/pages flow through reveal URL params. Modal opens for both the toolbar button and the `export-for-pdf` command.
+- **0.8.4** — drag handles moved inline next to panel section titles (no longer floating on the left edge)
+- **0.8.3** — DnD floating drop-line indicator at exact insert position; handle restyled
 - **0.8.2** — editable speaker notes (click Edit → textarea → Save writes back to deck file; pure-function helpers in editSlideNotes.ts)
 - **0.8.1** — drag-and-drop modular speaker panels (grip handles, vertical reorder, persists via speakerPanelOrder)
 - **0.8.0** — per-panel show/hide, resizable visual-next-slide preview, clickable Slide N of M opens Grid, compact picker redesign with clickable rows + view-all footer

@@ -628,6 +628,26 @@
   white-space: nowrap;
 }
 
+/* ===== Export-for-PDF options modal ===== */
+.slides-ng-export-pdf-modal h2 {
+  margin-top: 0;
+  margin-bottom: 0.4rem;
+}
+.slides-ng-export-pdf-modal-hint {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+.slides-ng-export-pdf-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
 /* The line-step CSS below is injected INTO THE IFRAME (via revealTemplate.ts).
  * Keeping it in src/styles.css means it gets bundled, but it's only effective
  * inside the iframe-srcdoc — at the plugin level it's harmless dead CSS. */

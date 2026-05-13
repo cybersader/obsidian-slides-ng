@@ -11,7 +11,12 @@ import {
 } from "obsidian";
 import { VIEW_TYPE_SLIDES_NG_SPEAKER } from "./SlidesNGSpeakerView";
 import { renderDeck } from "./render/renderDeck";
-import { exportAndOpen, exportAndOpenForPdf } from "./export/exportStandalone";
+import {
+  exportAndOpen,
+  exportAndOpenForPdf,
+  type PdfExportOptions,
+} from "./export/exportStandalone";
+import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
 import { warmHighlighter } from "./render/shiki";
 import { slideIndexFromCursor } from "./parser/slideIndexFromCursor";
 import type { SlidesNGSettings } from "./settings";
@@ -367,8 +372,30 @@ export class SlidesNGView extends ItemView {
   async openInBrowserForPdf(): Promise<void> {
     const file = await this.resolveCurrentFile();
     if (!file) return;
+    const settings = this.getSettings();
+    new ExportPdfOptionsModal(
+      this.app,
+      settings.defaultTheme,
+      (pdfOptions) => {
+        if (!pdfOptions) return;
+        void this.runPdfExport(file, pdfOptions);
+      }
+    ).open();
+  }
+
+  /** Actually run the export once the user has picked their options. */
+  private async runPdfExport(
+    file: TFile,
+    pdfOptions: PdfExportOptions
+  ): Promise<void> {
     try {
-      const result = await exportAndOpenForPdf(this.app, file, undefined, this.renderDefaults());
+      const result = await exportAndOpenForPdf(
+        this.app,
+        file,
+        undefined,
+        this.renderDefaults(),
+        pdfOptions
+      );
       if (result.opened) {
         new Notice("Opened in print mode. Use your browser's print → save as PDF.");
       } else {
