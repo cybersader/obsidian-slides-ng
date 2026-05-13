@@ -7,8 +7,10 @@ import {
   BUNDLED_CODE_THEMES,
   TRANSITION_SPEEDS,
   DEFAULT_SCENES,
+  SPEAKER_PANEL_LABELS,
+  DEFAULT_SPEAKER_PANEL_VISIBILITY,
 } from "./settings";
-import type { SceneDefinition } from "./settings";
+import type { SceneDefinition, SpeakerPanelId } from "./settings";
 import { availableThemes } from "./render/revealAssets";
 import { KNOWN_LAYOUTS } from "./render/layouts";
 
@@ -246,6 +248,37 @@ export class SlidesNGSettingTab extends PluginSettingTab {
           }
         );
       });
+
+    // ---------- Speaker panels ----------
+    new Setting(containerEl).setName("Speaker panels").setHeading();
+    new Setting(containerEl)
+      .setName("Visible panels")
+      .setDesc(
+        "Toggle individual panels in the speaker view. Hidden panels can be re-enabled here at any time. Reopen the speaker view to apply changes."
+      );
+    const panelIds: SpeakerPanelId[] = [
+      "status",
+      "controls",
+      "timer",
+      "nextLine",
+      "visualNext",
+      "scenes",
+      "notes",
+      "picker",
+    ];
+    for (const id of panelIds) {
+      new Setting(containerEl)
+        .setName(SPEAKER_PANEL_LABELS[id])
+        .addToggle((t) => {
+          const current =
+            this.plugin.settings.speakerPanelVisibility[id] ??
+            DEFAULT_SPEAKER_PANEL_VISIBILITY[id];
+          t.setValue(current).onChange(async (v) => {
+            this.plugin.settings.speakerPanelVisibility[id] = v;
+            await this.plugin.saveSettings();
+          });
+        });
+    }
 
     // ---------- Scenes ----------
     new Setting(containerEl).setName("Scenes").setHeading();

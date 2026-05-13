@@ -215,9 +215,10 @@ describe("slides-ng speaker view drives the preview", function () {
     });
     expect(initialLabel).toBe("Mode: compact");
 
-    // In compact mode, picker should contain a compact-current row.
+    // In compact mode, picker should contain a row marked "current"
+    // (v0.8.0+ redesign — was .slides-ng-speaker-compact-current).
     const compactHasCurrent = await browser.execute(
-      () => !!document.querySelector(".slides-ng-speaker-compact-current")
+      () => !!document.querySelector(".slides-ng-speaker-compact-row.current")
     );
     expect(compactHasCurrent).toBe(true);
 

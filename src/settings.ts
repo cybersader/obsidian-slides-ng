@@ -103,7 +103,56 @@ export interface SlidesNGSettings {
    * settings tab.
    */
   scenes: SceneDefinition[];
+
+  /**
+   * Per-panel visibility in the speaker view. Keys match the
+   * `SpeakerPanelId` enum below; values are `true` (show) / `false`
+   * (hide). Hidden panels are still mounted in the DOM but
+   * `display:none`-d, so toggling at runtime is instant.
+   */
+  speakerPanelVisibility: Record<SpeakerPanelId, boolean>;
+
+  /**
+   * User-set height of the visual-next-slide preview iframe (px).
+   * `null` = use the default aspect-ratio sizing. Persisted via
+   * settings rather than localStorage so the user's preference
+   * follows the plugin across vault sync.
+   */
+  speakerVisualNextHeightPx: number | null;
 }
+
+/** All draggable/toggleable speaker-view panels. */
+export type SpeakerPanelId =
+  | "status"
+  | "controls"
+  | "timer"
+  | "nextLine"
+  | "visualNext"
+  | "scenes"
+  | "notes"
+  | "picker";
+
+export const SPEAKER_PANEL_LABELS: Record<SpeakerPanelId, string> = {
+  status: "Status bar (slide N of M + timer)",
+  controls: "Navigation controls (First / Prev / Next / Last / Grid)",
+  timer: "Timer controls (Start, Reset)",
+  nextLine: "Next-slide title line",
+  visualNext: "Visual next-slide preview",
+  scenes: "Scenes (overlay slides)",
+  notes: "Speaker notes",
+  picker: "Slide picker",
+};
+
+export const DEFAULT_SPEAKER_PANEL_VISIBILITY: Record<SpeakerPanelId, boolean> = {
+  status: true,
+  controls: true,
+  timer: true,
+  nextLine: true,
+  visualNext: true,
+  scenes: true,
+  notes: true,
+  picker: true,
+};
 
 export interface SceneDefinition {
   /** Stable identifier — used in postMessage payloads + active-scene tracking. */
@@ -182,4 +231,6 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   transitionSpeed: "default",
   magicMoveDurationMs: 500,
   scenes: DEFAULT_SCENES.map((s) => ({ ...s })),
+  speakerPanelVisibility: { ...DEFAULT_SPEAKER_PANEL_VISIBILITY },
+  speakerVisualNextHeightPx: null,
 };

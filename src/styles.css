@@ -137,6 +137,22 @@
   background: var(--background-secondary);
   font-variant-numeric: tabular-nums;
 }
+/* The position label is wrapped in a button so users can click it to
+ * open the Grid. The button is styled to look like a normal label. */
+.slides-ng-speaker-status-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  transition: background 80ms ease;
+}
+.slides-ng-speaker-status-btn:hover {
+  background: var(--background-modifier-hover);
+}
 .slides-ng-speaker-position {
   font-weight: 600;
 }
@@ -249,16 +265,22 @@
   gap: 0.3rem;
 }
 .slides-ng-speaker-visual-next-frame-wrap {
-  /* Aspect-ratio box: reveal renders into 960x700 by default; we scale
-   * proportionally. Outer wrapper is responsive width; height tracks. */
+  /* Aspect-ratio box (default) — padding-top creates a responsive
+   * 16:9-ish frame proportional to width. When the user drag-resizes
+   * the bottom edge, JS swaps `padding-top` to `0` + sets an explicit
+   * `height` and persists it via settings. */
   position: relative;
   width: 100%;
-  /* 9:16-ish proportion to match reveal's default 960x700 ≈ 0.73 */
   padding-top: 56%;
   background: #000;
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
+  /* Native vertical resize handle (CSS-only). Browser shows the
+   * drag-handle in the bottom-right corner. Min/max keeps it sane. */
+  resize: vertical;
+  min-height: 80px;
+  max-height: 80vh;
 }
 .slides-ng-speaker-visual-next-frame {
   position: absolute;
@@ -354,18 +376,96 @@
   border-radius: 6px;
   overflow-y: auto;
 }
-.slides-ng-speaker-compact-current {
+/* Compact picker: previous (faded) + current (accent) + next 3
+ * (normal). Each row is a clickable button. */
+.slides-ng-speaker-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.slides-ng-speaker-compact-row {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 80ms ease;
+}
+.slides-ng-speaker-compact-row:hover {
+  background: var(--background-modifier-hover);
+}
+.slides-ng-speaker-compact-row.past {
+  opacity: 0.5;
+}
+.slides-ng-speaker-compact-row.current {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
   font-weight: 600;
-  color: var(--text-accent);
-  margin-bottom: 0.2rem;
 }
-.slides-ng-speaker-compact-upcoming {
-  color: var(--text-muted);
-  white-space: pre;
+.slides-ng-speaker-compact-row.current:hover {
+  background: var(--interactive-accent-hover);
 }
-.slides-ng-speaker-list-item {
-  padding: 0.25rem 0.4rem;
+.slides-ng-speaker-compact-num {
+  flex: 0 0 auto;
+  min-width: 1.5em;
+  padding: 0.1rem 0.4rem;
   border-radius: 3px;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 0.85em;
+  font-weight: 600;
+  text-align: center;
+}
+.slides-ng-speaker-compact-row.current .slides-ng-speaker-compact-num {
+  background: rgba(255, 255, 255, 0.25);
+}
+.slides-ng-speaker-compact-title {
+  flex: 1 1 auto;
+  font-size: 0.9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slides-ng-speaker-compact-all {
+  appearance: none;
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px dashed var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.82em;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 80ms ease, color 80ms ease;
+}
+.slides-ng-speaker-compact-all:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* Full-list picker rows */
+.slides-ng-speaker-list-item {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-normal);
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 .slides-ng-speaker-list-item:hover {
@@ -375,6 +475,25 @@
   background: var(--interactive-accent);
   color: var(--text-on-accent);
   font-weight: 600;
+}
+.slides-ng-speaker-list-num {
+  flex: 0 0 auto;
+  min-width: 1.5em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 0.85em;
+  font-weight: 600;
+  text-align: center;
+}
+.slides-ng-speaker-list-item.current .slides-ng-speaker-list-num {
+  background: rgba(255, 255, 255, 0.25);
+}
+.slides-ng-speaker-list-title {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The line-step CSS below is injected INTO THE IFRAME (via revealTemplate.ts).

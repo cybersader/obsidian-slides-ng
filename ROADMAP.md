@@ -6,13 +6,9 @@ move between sections as work happens. Released versions live in
 
 ## In flight
 
-### 0.8.0 — modular speaker panels + UX polish
+### 0.8.1 — DnD modular panels + editable notes
 
-- **Light drag-and-drop modular panels** — each speaker panel (status / controls / timer / next / notes / picker / scenes / visual-next-preview) gets a drag handle, vertical reorder, order persists per-user
-- **Per-panel show/hide** — settings toggles to hide panels you don't use during presentation
-- **Per-panel resize** — each panel gets a draggable bottom-edge handle to resize its height. Most useful for the visual-next-slide preview which the user wants larger by default
-- **Compact picker redesign** — current compact mode is sparse; rethink with the modular layout
-- **Clickable slide-N-of-M status label** — opens a slide picker overlay
+- **Light drag-and-drop modular panels** — each speaker panel gets a drag handle, vertical reorder, order persists per-user
 - **Editable speaker notes from the speaker view** — click notes panel, edit inline, write back to deck file on debounce
 
 ### 0.8.x — PDF export options
@@ -29,6 +25,11 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.8.0** — per-panel show/hide, resizable visual-next-slide preview, clickable Slide N of M opens Grid, compact picker redesign with clickable rows + view-all footer
+- **0.7.5** — speaker view opens as new tab instead of horizontal split; menu-plugin autoOpen disabled
+- **0.7.4** — Grid tiles show real slide thumbnails via DOM clone + idle-time prewarm
+- **0.7.3** — custom slides-picker overlay replaces reveal's stock overview for the Grid button
+- **0.7.2** — scene overlay flex-direction column so multi-block content stacks vertically
 - **0.7.1** — patch release: frontmatter keys namespaced `slides-ng-*` (back-compat for legacy keys), Grid CSS rework with aspect-ratio tiles + no horizontal scroll, scene newlines fixed, Menu toolbar button actually toggles, duplicate Blackout removed, "Use current" focus-steal fix
 - **0.7.0** — speaker UX overhaul: visual next-slide preview iframe, OBS-style scene overlays, Grid button real-grid fix with slide numbers, icon-based speaker buttons, Menu toolbar button
 - **0.6.0** — authoring polish bundle: per-slide backgrounds with vault-path resolution, code-block max-height + scroll, `customCSS:` frontmatter injection, `transitionSpeed` setting, `magicMoveDurationMs` setting

@@ -6,6 +6,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-05-12
+
+### Added
+
+- **Per-panel show/hide for the speaker view** — every panel (status,
+  controls, timer, next-line, visual-next-preview, scenes, notes,
+  picker) can be toggled on/off via Settings → Slides NG → Speaker
+  panels. Hidden panels are still mounted; toggle is instant on
+  next reopen.
+- **Resizable visual-next-slide preview** — the mini-iframe panel
+  now has a native CSS resize handle on its bottom edge. Drag to
+  resize; height persists via the new `speakerVisualNextHeightPx`
+  setting (ResizeObserver + debounced save). Default keeps the
+  16:9 aspect-ratio sizing.
+- **Clickable "Slide N of M" status label** — wraps the status text
+  in a button that opens the Grid overlay. Closes the "how do I
+  jump anywhere" UX gap without needing to know the Grid button
+  exists.
+- **Compact picker redesign** — was a sparse text list. Now:
+  previous slide (faded) + current slide (accent fill with number
+  badge) + next 3 upcoming slides, all rendered as clickable rows
+  with prominent number badges. Footer button "View all N slides …"
+  opens the Grid for jumping outside the compact window. No need
+  to switch to list mode just to find a specific slide.
+
+### Changed
+
+- **List-mode picker rows** got number badges too (parity with
+  compact), and they're now `<button>` elements with proper focus
+  + hover affordance instead of plain divs.
+
+### Notes
+
+DnD modular panels, editable speaker notes, and PDF export
+options remain queued — 0.8.1+ work (see ROADMAP.md).
+
 ## [0.7.5] — 2026-05-12
 
 ### Changed

@@ -53,7 +53,11 @@ export default class SlidesNGPlugin extends Plugin {
 
     this.registerView(
       VIEW_TYPE_SLIDES_NG_SPEAKER,
-      (leaf) => new SlidesNGSpeakerView(leaf, () => this.settings)
+      (leaf) => new SlidesNGSpeakerView(
+        leaf,
+        () => this.settings,
+        () => this.saveSettings()
+      )
     );
 
     // In-editor autocomplete for deck authoring.

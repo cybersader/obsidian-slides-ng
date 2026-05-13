@@ -26,7 +26,12 @@ import {
 import { Marked } from "marked";
 import { VIEW_TYPE_SLIDES_NG, SlidesNGView } from "./SlidesNGView";
 import { renderDeck } from "./render/renderDeck";
-import type { SlidesNGSettings, SceneDefinition } from "./settings";
+import type {
+  SlidesNGSettings,
+  SceneDefinition,
+  SpeakerPanelId,
+} from "./settings";
+import { DEFAULT_SPEAKER_PANEL_VISIBILITY } from "./settings";
 
 // Lightweight markdown → HTML for scene content. Synchronous + fast +
 // no Obsidian-render-cycle hang risk. Scenes are presentational
@@ -64,6 +69,7 @@ type SpeakerCommand =
   | "requestState";
 
 export type SpeakerSettingsAccessor = () => SlidesNGSettings;
+export type SpeakerSettingsPersist = () => Promise<void>;
 
 export class SlidesNGSpeakerView extends ItemView {
   private state: PreviewState | null = null;
@@ -106,9 +112,17 @@ export class SlidesNGSpeakerView extends ItemView {
     this.applyState();
   };
 
-  constructor(leaf: WorkspaceLeaf, getSettings?: SpeakerSettingsAccessor) {
+  private saveSettings?: SpeakerSettingsPersist;
+  private resizeObserver?: ResizeObserver;
+
+  constructor(
+    leaf: WorkspaceLeaf,
+    getSettings?: SpeakerSettingsAccessor,
+    saveSettings?: SpeakerSettingsPersist
+  ) {
     super(leaf);
     this.getSettings = getSettings;
+    this.saveSettings = saveSettings;
   }
 
   getViewType(): string {
@@ -134,13 +148,34 @@ export class SlidesNGSpeakerView extends ItemView {
     container.empty();
     container.addClass("slides-ng-speaker");
 
-    // Status bar
+    // Panel visibility: each panel is shown only if its visibility flag
+    // is true. Hidden panels are still mounted (display:none) so
+    // toggling is instant.
+    const visibility: Record<SpeakerPanelId, boolean> = {
+      ...DEFAULT_SPEAKER_PANEL_VISIBILITY,
+      ...(settings?.speakerPanelVisibility ?? {}),
+    };
+    const setPanelVisible = (el: HTMLElement, id: SpeakerPanelId): void => {
+      el.dataset.speakerPanel = id;
+      el.style.display = visibility[id] ? "" : "none";
+    };
+
+    // Status bar — clickable as a whole to open the Grid (slide N of M
+    // acts like a "jump to any slide" affordance).
     const status = container.createDiv({ cls: "slides-ng-speaker-status" });
-    this.statusEl = status.createSpan({ cls: "slides-ng-speaker-position", text: "Slide — of —" });
+    setPanelVisible(status, "status");
+    const statusBtn = status.createEl("button", {
+      cls: "slides-ng-speaker-status-btn",
+      attr: { type: "button" },
+    });
+    setTooltip(statusBtn, "Open the slide grid");
+    this.statusEl = statusBtn.createSpan({ cls: "slides-ng-speaker-position", text: "Slide — of —" });
+    statusBtn.addEventListener("click", () => this.send("toggleOverview"));
     this.timerEl = status.createSpan({ cls: "slides-ng-speaker-timer", text: "00:00:00" });
 
     // Control bar — connected nav pill + utility buttons
     const controls = container.createDiv({ cls: "slides-ng-speaker-controls" });
+    setPanelVisible(controls, "controls");
     const navGroup = controls.createDiv({ cls: "slides-ng-speaker-nav-group" });
     this.addControlButton(navGroup, {
       icon: "chevrons-left",
@@ -181,6 +216,7 @@ export class SlidesNGSpeakerView extends ItemView {
 
     // Timer controls
     const timerCtrls = container.createDiv({ cls: "slides-ng-speaker-timer-ctrls" });
+    setPanelVisible(timerCtrls, "timer");
     this.timerToggleBtn = this.addControlButton(timerCtrls, {
       icon: "play",
       label: "Start",
@@ -199,6 +235,7 @@ export class SlidesNGSpeakerView extends ItemView {
       cls: "slides-ng-speaker-next",
       text: "Next: —",
     });
+    setPanelVisible(this.nextLineEl, "nextLine");
 
     // Visual next-slide preview — a second iframe rendering the same
     // deck pinned to currentIdx + 1. Synced via postMessage on every
@@ -206,6 +243,7 @@ export class SlidesNGSpeakerView extends ItemView {
     const visualWrap = container.createDiv({
       cls: "slides-ng-speaker-visual-next-wrap",
     });
+    setPanelVisible(visualWrap, "visualNext");
     visualWrap.createEl("div", {
       cls: "slides-ng-speaker-section-title",
       text: "Up next (visual)",
@@ -233,15 +271,18 @@ export class SlidesNGSpeakerView extends ItemView {
     // Scenes panel — placeholder overlays the presenter can flash up
     // mid-presentation (blackout, BRB, Q&A, custom). One button per
     // configured scene; active scene gets the accent treatment.
-    this.renderScenesPanel(container);
+    this.renderScenesPanel(container, setPanelVisible);
 
     // Notes panel
     const notesWrap = container.createDiv({ cls: "slides-ng-speaker-notes-wrap" });
+    setPanelVisible(notesWrap, "notes");
     notesWrap.createEl("div", { cls: "slides-ng-speaker-section-title", text: "Speaker notes" });
     this.notesEl = notesWrap.createDiv({ cls: "slides-ng-speaker-notes" });
 
-    // Picker mode toggle
-    const pickerHeader = container.createDiv({ cls: "slides-ng-speaker-picker-header" });
+    // Picker — header + content. setPanelVisible wraps both so they hide together.
+    const pickerWrap = container.createDiv({ cls: "slides-ng-speaker-picker-wrap" });
+    setPanelVisible(pickerWrap, "picker");
+    const pickerHeader = pickerWrap.createDiv({ cls: "slides-ng-speaker-picker-header" });
     pickerHeader.createEl("div", { cls: "slides-ng-speaker-section-title", text: "Slides" });
     this.modeToggleBtn = pickerHeader.createEl("button", {
       cls: "slides-ng-speaker-btn slides-ng-speaker-mode-toggle",
@@ -254,7 +295,37 @@ export class SlidesNGSpeakerView extends ItemView {
     });
 
     // Slide picker
-    this.pickerEl = container.createDiv({ cls: "slides-ng-speaker-picker" });
+    this.pickerEl = pickerWrap.createDiv({ cls: "slides-ng-speaker-picker" });
+
+    // Visual-next-preview height: apply the user's persisted height
+    // if any, and wire a ResizeObserver to persist subsequent drag-
+    // resizes. The frame-wrap is `resize: vertical` in styles.css.
+    if (frameWrap) {
+      if (settings?.speakerVisualNextHeightPx) {
+        frameWrap.style.paddingTop = "0";
+        frameWrap.style.height = `${settings.speakerVisualNextHeightPx}px`;
+      }
+      // Debounced persist on user-drag.
+      let saveTimer: number | null = null;
+      this.resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        const height = Math.round(entry.contentRect.height);
+        // Ignore the initial measurement (no user interaction yet).
+        const liveSettings = this.getSettings?.();
+        if (!liveSettings) return;
+        if (liveSettings.speakerVisualNextHeightPx === height) return;
+        // Switch off aspect-ratio padding once user touches the handle.
+        frameWrap.style.paddingTop = "0";
+        if (saveTimer !== null) window.clearTimeout(saveTimer);
+        saveTimer = window.setTimeout(() => {
+          saveTimer = null;
+          liveSettings.speakerVisualNextHeightPx = height;
+          void this.saveSettings?.();
+        }, 250);
+      });
+      this.resizeObserver.observe(frameWrap);
+    }
 
     // Wire postMessage listener for state from the preview iframe.
     window.addEventListener("message", this.messageHandler);
@@ -268,6 +339,10 @@ export class SlidesNGSpeakerView extends ItemView {
     window.removeEventListener("message", this.messageHandler);
     this.stopTimerTick();
     this.sceneButtons.clear();
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = undefined;
+    }
     this.contentEl.empty();
   }
 
@@ -324,11 +399,15 @@ export class SlidesNGSpeakerView extends ItemView {
    * the current slide. State events echo back the active scene id so
    * the buttons stay in sync.
    */
-  private renderScenesPanel(container: HTMLElement): void {
+  private renderScenesPanel(
+    container: HTMLElement,
+    setPanelVisible: (el: HTMLElement, id: SpeakerPanelId) => void
+  ): void {
     const scenes: SceneDefinition[] = this.getSettings?.()?.scenes ?? [];
     if (scenes.length === 0) return;
 
     const wrap = container.createDiv({ cls: "slides-ng-speaker-scenes-wrap" });
+    setPanelVisible(wrap, "scenes");
     wrap.createEl("div", {
       cls: "slides-ng-speaker-section-title",
       text: "Scenes",
@@ -542,26 +621,61 @@ export class SlidesNGSpeakerView extends ItemView {
     this.pickerEl.empty();
     const { slides, currentIdx } = this.state;
     if (this.pickerMode === "compact") {
+      // Compact: previous (faded) + current (accent) + next 3
+      // (upcoming). Each row is clickable to jump to that slide.
+      // Number-badge on the left, title on the right, all rows fixed-
+      // height for at-a-glance readability during a live presentation.
       const summary = this.pickerEl.createDiv({ cls: "slides-ng-speaker-compact" });
-      const cur = slides[currentIdx];
-      summary.createEl("div", {
-        text: cur ? `▶ ${cur.idx + 1}. ${cur.title || "(untitled)"}` : "—",
-        cls: "slides-ng-speaker-compact-current",
-      });
-      const after = slides.slice(currentIdx + 1, currentIdx + 4);
-      for (const s of after) {
-        summary.createEl("div", {
-          text: `  ${s.idx + 1}. ${s.title || "(untitled)"}`,
-          cls: "slides-ng-speaker-compact-upcoming",
+      const start = Math.max(0, currentIdx - 1);
+      const end = Math.min(slides.length, currentIdx + 4);
+      for (let i = start; i < end; i++) {
+        const s = slides[i];
+        const isCurrent = i === currentIdx;
+        const isPast = i < currentIdx;
+        const row = summary.createEl("button", {
+          cls: [
+            "slides-ng-speaker-compact-row",
+            isCurrent ? "current" : "",
+            isPast ? "past" : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+          attr: { type: "button" },
         });
+        row.createSpan({
+          cls: "slides-ng-speaker-compact-num",
+          text: String(s.idx + 1),
+        });
+        row.createSpan({
+          cls: "slides-ng-speaker-compact-title",
+          text: s.title || "(untitled)",
+        });
+        row.addEventListener("click", () => this.send("goto", s.idx));
       }
+      // Footer: "View all" button to open the Grid for jumping outside
+      // the compact window. Saves users from switching to list mode
+      // just to find a specific slide.
+      const footer = summary.createEl("button", {
+        cls: "slides-ng-speaker-compact-all",
+        text: `View all ${slides.length} slides …`,
+        attr: { type: "button" },
+      });
+      footer.addEventListener("click", () => this.send("toggleOverview"));
     } else {
       for (const s of slides) {
-        const item = this.pickerEl.createDiv({
+        const item = this.pickerEl.createEl("button", {
           cls:
             "slides-ng-speaker-list-item" +
             (s.idx === currentIdx ? " current" : ""),
-          text: `${s.idx + 1}. ${s.title || "(untitled)"}`,
+          attr: { type: "button" },
+        });
+        item.createSpan({
+          cls: "slides-ng-speaker-list-num",
+          text: String(s.idx + 1),
+        });
+        item.createSpan({
+          cls: "slides-ng-speaker-list-title",
+          text: s.title || "(untitled)",
         });
         item.addEventListener("click", () => this.send("goto", s.idx));
       }
