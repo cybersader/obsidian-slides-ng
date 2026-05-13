@@ -107,8 +107,11 @@ describe("v0.7.0 — speaker UX overhaul + scenes", function () {
     expect(labels).toContain("Menu");
   });
 
-  it("Grid button triggers reveal overview AND the .slides has a grid display", async () => {
-    // Click the Grid button.
+  it("Grid button opens the custom slides-picker overlay with one tile per slide", async () => {
+    // v0.7.3+ — Grid no longer triggers reveal's stock overview (which
+    // had irreconcilable CSS-transform/clipping issues). Instead it
+    // opens a custom overlay div (#slides-ng-grid) with one text tile
+    // per slide.
     await browser.execute(() => {
       const btns = Array.from(
         document.querySelectorAll(".slides-ng-speaker-util-group .slides-ng-speaker-btn")
@@ -120,23 +123,21 @@ describe("v0.7.0 — speaker UX overhaul + scenes", function () {
     try {
       await browser.waitUntil(
         async () => {
-          const isOverview = await browser.execute(() => {
-            return document.querySelector(".reveal")?.classList.contains("overview") ?? false;
-          });
-          return isOverview;
+          const present = await browser.execute(
+            () => !!document.getElementById("slides-ng-grid")
+          );
+          return present;
         },
-        { timeout: 5000, timeoutMsg: "reveal never entered overview mode" }
+        { timeout: 5000, timeoutMsg: "custom Grid overlay never appeared" }
       );
 
-      // Assert .slides has grid display (the v0.7.0 fix).
-      const isGrid = await browser.execute(() => {
-        const slides = document.querySelector(".reveal.overview .slides") as HTMLElement | null;
-        if (!slides) return false;
-        return window.getComputedStyle(slides).display === "grid";
-      });
-      expect(isGrid).toBe(true);
+      // Assert tile count matches slide count (Decks/example.md has 7).
+      const tileCount = await browser.execute(
+        () => document.querySelectorAll("#slides-ng-grid button").length
+      );
+      expect(tileCount).toBeGreaterThanOrEqual(2);
 
-      await browser.saveScreenshot(`${SCREENSHOT_DIR}/v070-grid-mode.png`);
+      await browser.saveScreenshot(`${SCREENSHOT_DIR}/v073-grid-mode.png`);
     } finally {
       await switchToTop();
     }

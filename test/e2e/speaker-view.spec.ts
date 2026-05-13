@@ -321,29 +321,17 @@ describe("slides-ng speaker view drives the preview", function () {
     });
   });
 
-  it("Grid button toggles reveal.js overview mode in the iframe", async () => {
-    // Click Grid in the speaker view.
+  it("Grid button opens the custom slides-picker overlay", async () => {
+    // v0.7.3+ — Grid uses a custom overlay (#slides-ng-grid) instead
+    // of reveal's stock overview.
     await clickSpeakerButtonByText("Grid");
-
-    // Wait for reveal to enter overview mode — adds .overview class to
-    // .reveal root.
     await switchToSlideFrame();
     try {
       await browser.waitUntil(
-        async () => {
-          const isOverview = await browser.execute(() => {
-            const r = document.querySelector(".reveal");
-            return r?.classList.contains("overview") ?? false;
-          });
-          return isOverview;
-        },
-        { timeout: 5000, timeoutMsg: "iframe never entered reveal overview mode" }
+        async () =>
+          await browser.execute(() => !!document.getElementById("slides-ng-grid")),
+        { timeout: 5000, timeoutMsg: "Grid overlay never opened" }
       );
-      const isOverview = await browser.execute(() => {
-        const r = document.querySelector(".reveal");
-        return r?.classList.contains("overview") ?? false;
-      });
-      expect(isOverview).toBe(true);
     } finally {
       await switchToTop();
     }

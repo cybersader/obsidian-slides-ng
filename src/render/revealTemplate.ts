@@ -747,9 +747,98 @@ ${sectionsHtml}
             case 'first':  Reveal.slide(0); break;
             case 'last':   Reveal.slide(Reveal.getTotalSlides() - 1); break;
             case 'goto':   if (typeof data.idx === 'number') Reveal.slide(data.idx); break;
-            case 'toggleOverview':
-              if (typeof Reveal.toggleOverview === 'function') Reveal.toggleOverview();
+            case 'toggleOverview': {
+              // Custom slides-picker overlay (v0.7.3+). Replaces reveal's
+              // stock overview for the Grid-button path because the stock
+              // overview's CSS-transform approach can't reliably clip
+              // overflowing slide content. Tiles here are simple text
+              // (number + title); always-correct layout regardless of
+              // what's on each slide. Reveal's stock overview still
+              // works via the Esc key for users who want it.
+              var existingOverlay = document.getElementById('slides-ng-grid');
+              if (existingOverlay) {
+                existingOverlay.remove();
+                break;
+              }
+              var meta = harvestSlideMeta();
+              var overlay = document.createElement('div');
+              overlay.id = 'slides-ng-grid';
+              overlay.setAttribute('role', 'dialog');
+              overlay.style.cssText =
+                'position:fixed;inset:0;background:rgba(0,0,0,0.96);z-index:10000;' +
+                'overflow-y:auto;overflow-x:hidden;padding:1.25rem;' +
+                'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);' +
+                'color:#fff;cursor:default;';
+              var header = document.createElement('div');
+              header.style.cssText =
+                'display:flex;justify-content:space-between;align-items:center;' +
+                'margin-bottom:1rem;padding:0 0.5rem;';
+              var title = document.createElement('div');
+              title.textContent = 'All slides — click to jump';
+              title.style.cssText = 'font-size:1.1em;font-weight:600;';
+              var hint = document.createElement('div');
+              hint.textContent = 'click outside or press Esc to close';
+              hint.style.cssText = 'font-size:0.8em;opacity:0.6;';
+              header.appendChild(title);
+              header.appendChild(hint);
+              overlay.appendChild(header);
+              var grid = document.createElement('div');
+              grid.style.cssText =
+                'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));' +
+                'gap:0.75rem;';
+              overlay.appendChild(grid);
+              var currentIdx = (Reveal.getIndices() || {}).h || 0;
+              meta.forEach(function (s) {
+                var tile = document.createElement('button');
+                var isCurrent = s.idx === currentIdx;
+                tile.style.cssText =
+                  'aspect-ratio:16/9;background:' +
+                  (isCurrent ? 'var(--r-link-color, #42affa)' : 'rgba(255,255,255,0.06)') +
+                  ';border:1px solid ' +
+                  (isCurrent ? 'var(--r-link-color, #42affa)' : 'rgba(255,255,255,0.15)') +
+                  ';border-radius:8px;padding:0.75rem;cursor:pointer;' +
+                  'color:' + (isCurrent ? '#000' : '#fff') + ';' +
+                  'display:flex;flex-direction:column;justify-content:space-between;' +
+                  'text-align:left;font:inherit;transition:background 80ms ease;';
+                tile.addEventListener('mouseenter', function () {
+                  if (!isCurrent) tile.style.background = 'rgba(255,255,255,0.12)';
+                });
+                tile.addEventListener('mouseleave', function () {
+                  if (!isCurrent) tile.style.background = 'rgba(255,255,255,0.06)';
+                });
+                var tTitle = document.createElement('div');
+                tTitle.textContent = s.title || '(untitled)';
+                tTitle.style.cssText =
+                  'font-size:0.92em;line-height:1.3;overflow:hidden;' +
+                  'display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;';
+                var tNum = document.createElement('div');
+                tNum.textContent = '# ' + (s.idx + 1);
+                tNum.style.cssText = 'font-size:0.75em;opacity:0.7;align-self:flex-end;';
+                tile.appendChild(tTitle);
+                tile.appendChild(tNum);
+                tile.addEventListener('click', function () {
+                  Reveal.slide(s.idx);
+                  overlay.remove();
+                });
+                grid.appendChild(tile);
+              });
+              // Click outside any tile (on the overlay backdrop) closes.
+              overlay.addEventListener('click', function (e) {
+                if (e.target === overlay || e.target === header || e.target === title || e.target === hint) {
+                  overlay.remove();
+                }
+              });
+              // Esc closes too.
+              var escHandler = function (e) {
+                if (e.key === 'Escape') {
+                  overlay.remove();
+                  document.removeEventListener('keydown', escHandler);
+                }
+              };
+              document.addEventListener('keydown', escHandler);
+              document.body.appendChild(overlay);
               break;
+            }
             case 'toggleMenu': {
               // reveal-menu installs a clickable button in the DOM
               // (.slide-menu-button). Programmatic click is the most

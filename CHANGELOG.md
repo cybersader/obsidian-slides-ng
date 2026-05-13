@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-05-12
+
+### Fixed
+
+- **Grid button — content overflowing tiles** — v0.7.0/0.7.1/0.7.2
+  tried to make reveal's stock overview behave with CSS overrides
+  (aspect-ratio tiles, scale transform, clip-path). Real decks with
+  images that exceed the slide width still overflowed horizontally
+  no matter what. v0.7.3 abandons reveal's stock overview for the
+  Grid button entirely and renders a **custom slides-picker
+  overlay** instead: one text tile per slide showing number +
+  title, click to jump, click outside or press Esc to close.
+  Always-correct layout regardless of slide content. Reveal's
+  stock overview is still reachable via the Esc keybinding for
+  anyone who wants the pixel-perfect minis (with their bugs).
+
 ## [0.7.2] — 2026-05-12
 
 ### Fixed
