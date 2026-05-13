@@ -218,10 +218,11 @@ export default class SlidesNGPlugin extends Plugin {
       workspace.revealLeaf(existing[0]);
       return;
     }
-    // Horizontal split → speaker view sits below the current pane so
-    // preview + speaker are both visible. User can still drag the tab to
-    // a new window for true second-monitor use.
-    const leaf = workspace.getLeaf("split", "horizontal");
+    // New tab in the current pane — doesn't take screen space until
+    // explicitly switched to. User can drag the tab to a new window
+    // for second-monitor use, or split manually if they want
+    // simultaneous preview + speaker visibility.
+    const leaf = workspace.getLeaf("tab");
     await leaf.setViewState({
       type: VIEW_TYPE_SLIDES_NG_SPEAKER,
       active: true,

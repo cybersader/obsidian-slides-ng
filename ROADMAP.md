@@ -10,6 +10,7 @@ move between sections as work happens. Released versions live in
 
 - **Light drag-and-drop modular panels** — each speaker panel (status / controls / timer / next / notes / picker / scenes / visual-next-preview) gets a drag handle, vertical reorder, order persists per-user
 - **Per-panel show/hide** — settings toggles to hide panels you don't use during presentation
+- **Per-panel resize** — each panel gets a draggable bottom-edge handle to resize its height. Most useful for the visual-next-slide preview which the user wants larger by default
 - **Compact picker redesign** — current compact mode is sparse; rethink with the modular layout
 - **Clickable slide-N-of-M status label** — opens a slide picker overlay
 - **Editable speaker notes from the speaker view** — click notes panel, edit inline, write back to deck file on debounce

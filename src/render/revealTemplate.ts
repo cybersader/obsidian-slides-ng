@@ -138,7 +138,11 @@ export function buildIframeHtml(
       openSlideNumber: false,
       keyboard: true,
       sticky: false,
-      autoOpen: true,
+      // autoOpen relates to the menu's own keyboard shortcut handling
+      // in some reveal-menu builds; safer to disable so it doesn't
+      // unexpectedly auto-render the menu (or its side indicators)
+      // in embedded mode.
+      autoOpen: false,
       delayInit: false,
       openOnInit: false,
       loadIcons: false,

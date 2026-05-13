@@ -244,7 +244,10 @@ export class SlidesNGView extends ItemView {
       workspace.revealLeaf(existing[0]);
       return;
     }
-    const leaf = workspace.getLeaf("split", "horizontal");
+    // New tab next to the preview pane (rather than a horizontal split)
+    // so the speaker view doesn't shrink the preview by default. Drag-
+    // to-popout or manual split for simultaneous visibility.
+    const leaf = workspace.getLeaf("tab");
     await leaf.setViewState({
       type: VIEW_TYPE_SLIDES_NG_SPEAKER,
       active: true,

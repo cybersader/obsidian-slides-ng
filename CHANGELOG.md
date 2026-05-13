@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.5] — 2026-05-12
+
+### Changed
+
+- **Speaker view opens as a new tab, not a horizontal split** — used
+  to split the current pane horizontally (preview top, speaker
+  bottom), which shrank the slide preview by ~half. Now opens as
+  a sibling tab in the current pane; user can switch via tab,
+  drag to a new window for second-monitor use, or manually split
+  if they want simultaneous visibility.
+
+### Fixed
+
+- **reveal.js-menu `autoOpen: true` → `false`** — speculative fix
+  for user-reported "dots on the left side" of the iframe.
+  Disabling autoOpen ensures the menu doesn't auto-render any
+  side-indicator UI in embedded mode. If the dots persist, they're
+  from a different source (reveal stock controls, slide-number,
+  etc.) and need targeted follow-up.
+
+### Roadmap
+
+- **Per-panel resize handle** added to the 0.8.0 modular-panels work
+  per user request — most useful for the visual-next-slide preview.
+
 ## [0.7.4] — 2026-05-12
 
 ### Added
