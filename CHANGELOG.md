@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-05-12
+
+### Fixed
+
+- **Scene overlay newlines (round two)** — v0.7.1 made marked emit
+  proper block elements (`<h1>`, `<p>`) for multi-line scene content,
+  but the overlay's flex container used default `flex-direction: row`
+  so the block children laid out horizontally as a single row. Now
+  uses `flex-direction: column` so blocks stack vertically. Also
+  added explicit `font-size: 2em`, `line-height: 1.4`, and `gap`
+  between children so the overlay reads like a full-screen
+  presentation slide rather than a tight inline blob.
+
 ## [0.7.1] — 2026-05-12
 
 ### Added

@@ -705,14 +705,18 @@ ${sectionsHtml}
         if (el) return el;
         el = document.createElement('div');
         el.id = 'slides-ng-scene';
-        // Full-viewport overlay; flex-center for arbitrary content.
+        // Full-viewport overlay; flex-column so multiple block-level
+        // markdown children (h1 + p, lists, etc.) stack VERTICALLY
+        // rather than laying out horizontally as a single row (which
+        // was the v0.7.0/0.7.1 bug — newlines appeared collapsed).
         // Background is solid black by default — for "blackout" the
         // empty content + dark background is the blackout effect.
         el.style.cssText =
           'position:fixed;inset:0;background:#000;color:#fff;z-index:9999;' +
-          'display:none;align-items:center;justify-content:center;' +
-          'text-align:center;padding:5%;overflow:auto;' +
-          'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);';
+          'display:none;flex-direction:column;align-items:center;' +
+          'justify-content:center;text-align:center;padding:5%;overflow:auto;' +
+          'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);' +
+          'font-size:2em;line-height:1.4;gap:0.5em;';
         document.body.appendChild(el);
         return el;
       }
