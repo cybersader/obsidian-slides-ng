@@ -113,6 +113,14 @@ export interface SlidesNGSettings {
   speakerPanelVisibility: Record<SpeakerPanelId, boolean>;
 
   /**
+   * User-set vertical order of the speaker-view panels. Any panel ids
+   * missing from the array fall back to their DEFAULT_SPEAKER_PANEL_ORDER
+   * position so a settings file written by an older plugin version
+   * remains valid. v0.8.1+.
+   */
+  speakerPanelOrder: SpeakerPanelId[];
+
+  /**
    * User-set height of the visual-next-slide preview iframe (px).
    * `null` = use the default aspect-ratio sizing. Persisted via
    * settings rather than localStorage so the user's preference
@@ -153,6 +161,18 @@ export const DEFAULT_SPEAKER_PANEL_VISIBILITY: Record<SpeakerPanelId, boolean> =
   notes: true,
   picker: true,
 };
+
+/** Default vertical order of the speaker-view panels. */
+export const DEFAULT_SPEAKER_PANEL_ORDER: SpeakerPanelId[] = [
+  "status",
+  "controls",
+  "timer",
+  "nextLine",
+  "visualNext",
+  "scenes",
+  "notes",
+  "picker",
+];
 
 export interface SceneDefinition {
   /** Stable identifier — used in postMessage payloads + active-scene tracking. */
@@ -232,5 +252,6 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   magicMoveDurationMs: 500,
   scenes: DEFAULT_SCENES.map((s) => ({ ...s })),
   speakerPanelVisibility: { ...DEFAULT_SPEAKER_PANEL_VISIBILITY },
+  speakerPanelOrder: [...DEFAULT_SPEAKER_PANEL_ORDER],
   speakerVisualNextHeightPx: null,
 };

@@ -31,7 +31,10 @@ import type {
   SceneDefinition,
   SpeakerPanelId,
 } from "./settings";
-import { DEFAULT_SPEAKER_PANEL_VISIBILITY } from "./settings";
+import {
+  DEFAULT_SPEAKER_PANEL_VISIBILITY,
+  DEFAULT_SPEAKER_PANEL_ORDER,
+} from "./settings";
 
 // Lightweight markdown → HTML for scene content. Synchronous + fast +
 // no Obsidian-render-cycle hang risk. Scenes are presentational
@@ -158,6 +161,11 @@ export class SlidesNGSpeakerView extends ItemView {
     const setPanelVisible = (el: HTMLElement, id: SpeakerPanelId): void => {
       el.dataset.speakerPanel = id;
       el.style.display = visibility[id] ? "" : "none";
+      // Add a drag handle so the user can reorder this panel. The
+      // handle is the only draggable surface — accidental drags on
+      // the rest of the panel are blocked via `draggable="false"` on
+      // child elements where it matters.
+      this.attachDragHandle(el, id);
     };
 
     // Status bar — clickable as a whole to open the Grid (slide N of M
@@ -230,12 +238,15 @@ export class SlidesNGSpeakerView extends ItemView {
       onClick: () => this.resetTimer(),
     });
 
-    // Next-slide preview line (text)
-    this.nextLineEl = container.createDiv({
-      cls: "slides-ng-speaker-next",
+    // Next-slide preview line (text). Use a child span for the
+    // actual text so we can call setText on it without wiping the
+    // drag handle (which setPanelVisible inserts as a sibling).
+    const nextLineWrap = container.createDiv({ cls: "slides-ng-speaker-next" });
+    this.nextLineEl = nextLineWrap.createSpan({
+      cls: "slides-ng-speaker-next-text",
       text: "Next: —",
     });
-    setPanelVisible(this.nextLineEl, "nextLine");
+    setPanelVisible(nextLineWrap, "nextLine");
 
     // Visual next-slide preview — a second iframe rendering the same
     // deck pinned to currentIdx + 1. Synced via postMessage on every
@@ -327,12 +338,132 @@ export class SlidesNGSpeakerView extends ItemView {
       this.resizeObserver.observe(frameWrap);
     }
 
+    // Apply the user's configured panel order. Panels are still
+    // created in source-code order above; reordering happens here
+    // by appending them in the configured sequence (the DOM moves
+    // the existing nodes — no re-creation).
+    this.applyPanelOrder();
+
     // Wire postMessage listener for state from the preview iframe.
     window.addEventListener("message", this.messageHandler);
 
     // Ask the preview for its current state (handles the case where this
     // view opens AFTER the preview has already rendered).
     this.send("requestState");
+  }
+
+  /**
+   * Reorder the speaker panels in the DOM to match the user's
+   * `speakerPanelOrder` setting. Panels missing from the setting fall
+   * back to their default position (which makes settings forward-
+   * compatible across plugin updates that add new panels).
+   */
+  private applyPanelOrder(): void {
+    const container = this.contentEl;
+    const panels = new Map<SpeakerPanelId, HTMLElement>();
+    container.querySelectorAll<HTMLElement>("[data-speaker-panel]").forEach((el) => {
+      const id = el.dataset.speakerPanel as SpeakerPanelId | undefined;
+      if (id) panels.set(id, el);
+    });
+    const configured = this.getSettings?.()?.speakerPanelOrder ?? [];
+    // De-dupe + filter to known panels.
+    const seen = new Set<SpeakerPanelId>();
+    const order: SpeakerPanelId[] = [];
+    for (const id of configured) {
+      if (panels.has(id) && !seen.has(id)) {
+        seen.add(id);
+        order.push(id);
+      }
+    }
+    // Append any default-order panels not in the configured list, in
+    // their default position. Forward-compat for new panels.
+    for (const id of DEFAULT_SPEAKER_PANEL_ORDER) {
+      if (panels.has(id) && !seen.has(id)) {
+        seen.add(id);
+        order.push(id);
+      }
+    }
+    for (const id of order) {
+      const el = panels.get(id);
+      if (el) container.appendChild(el);
+    }
+  }
+
+  /**
+   * Attach a small drag handle (top-right corner) to a panel + wire
+   * HTML5 DnD. Only the handle is draggable; the rest of the panel
+   * stays interactive.
+   */
+  private attachDragHandle(panel: HTMLElement, id: SpeakerPanelId): void {
+    panel.classList.add("slides-ng-speaker-panel");
+    const handle = document.createElement("button");
+    handle.type = "button";
+    handle.className = "slides-ng-speaker-panel-handle";
+    handle.title = "Drag to reorder this panel";
+    handle.draggable = true;
+    setIcon(handle, "grip-vertical");
+    handle.addEventListener("dragstart", (e) => {
+      if (!e.dataTransfer) return;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/x-slides-ng-panel", id);
+      panel.classList.add("dragging");
+      this.contentEl.classList.add("slides-ng-speaker-dragging");
+    });
+    handle.addEventListener("dragend", () => {
+      panel.classList.remove("dragging");
+      this.contentEl.classList.remove("slides-ng-speaker-dragging");
+      this.contentEl
+        .querySelectorAll(".drop-target")
+        .forEach((el) => el.classList.remove("drop-target"));
+    });
+    panel.addEventListener("dragover", (e) => {
+      const dt = e.dataTransfer;
+      if (!dt) return;
+      const draggedId = dt.types.includes("text/x-slides-ng-panel");
+      if (!draggedId) return;
+      e.preventDefault();
+      dt.dropEffect = "move";
+      panel.classList.add("drop-target");
+    });
+    panel.addEventListener("dragleave", () => {
+      panel.classList.remove("drop-target");
+    });
+    panel.addEventListener("drop", (e) => {
+      const dt = e.dataTransfer;
+      if (!dt) return;
+      const draggedId = dt.getData("text/x-slides-ng-panel") as SpeakerPanelId;
+      if (!draggedId || draggedId === id) {
+        panel.classList.remove("drop-target");
+        return;
+      }
+      e.preventDefault();
+      panel.classList.remove("drop-target");
+      // Compute new order: remove draggedId from current order, insert
+      // it before `id`. Persist to settings + re-apply.
+      const settings = this.getSettings?.();
+      if (!settings) return;
+      const current: SpeakerPanelId[] =
+        settings.speakerPanelOrder && settings.speakerPanelOrder.length > 0
+          ? [...settings.speakerPanelOrder]
+          : [...DEFAULT_SPEAKER_PANEL_ORDER];
+      const filtered = current.filter((p) => p !== draggedId);
+      const insertAt = filtered.indexOf(id);
+      if (insertAt === -1) {
+        filtered.push(draggedId);
+      } else {
+        filtered.splice(insertAt, 0, draggedId);
+      }
+      // Make sure every known panel id is in the list (defensive — guard
+      // against stale settings that omit new panels).
+      for (const known of DEFAULT_SPEAKER_PANEL_ORDER) {
+        if (!filtered.includes(known)) filtered.push(known);
+      }
+      settings.speakerPanelOrder = filtered;
+      void this.saveSettings?.();
+      this.applyPanelOrder();
+    });
+    // Insert the handle as the first child of the panel.
+    panel.insertBefore(handle, panel.firstChild);
   }
 
   async onClose(): Promise<void> {

@@ -259,6 +259,61 @@
   container-type: inline-size;
 }
 
+/* Drag-to-reorder speaker panels (v0.8.1+). Each panel carries a
+ * `.slides-ng-speaker-panel` class + a `.slides-ng-speaker-panel-handle`
+ * child (the only draggable surface). Handle is hidden by default;
+ * fades in on panel hover so it doesn't visually compete with content. */
+.slides-ng-speaker-panel {
+  position: relative;
+}
+.slides-ng-speaker-panel-handle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 80ms ease, background 80ms ease;
+  z-index: 5;
+}
+.slides-ng-speaker-panel:hover > .slides-ng-speaker-panel-handle,
+.slides-ng-speaker-dragging .slides-ng-speaker-panel-handle {
+  opacity: 0.75;
+}
+.slides-ng-speaker-panel-handle:hover {
+  opacity: 1 !important;
+  background: var(--background-modifier-hover);
+}
+.slides-ng-speaker-panel-handle:active {
+  cursor: grabbing;
+}
+.slides-ng-speaker-panel-handle .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.slides-ng-speaker-panel.dragging {
+  opacity: 0.5;
+}
+.slides-ng-speaker-panel.drop-target {
+  outline: 2px dashed var(--interactive-accent);
+  outline-offset: 2px;
+}
+/* While dragging, give every panel a clearer outline so the user can
+ * see drop targets at a glance. */
+.slides-ng-speaker-dragging .slides-ng-speaker-panel {
+  outline: 1px dashed var(--background-modifier-border);
+  outline-offset: 1px;
+}
+
 .slides-ng-speaker-visual-next-wrap {
   display: flex;
   flex-direction: column;

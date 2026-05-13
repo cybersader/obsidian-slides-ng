@@ -6,10 +6,9 @@ move between sections as work happens. Released versions live in
 
 ## In flight
 
-### 0.8.1 — DnD modular panels + editable notes
+### 0.8.2 — editable speaker notes
 
-- **Light drag-and-drop modular panels** — each speaker panel gets a drag handle, vertical reorder, order persists per-user
-- **Editable speaker notes from the speaker view** — click notes panel, edit inline, write back to deck file on debounce
+- **Editable speaker notes from the speaker view** — click notes panel, edit inline, write back to deck file on debounce. Need a careful writeback story (parse deck → find slide → update/insert `<!-- ... -->` comment → write).
 
 ### 0.8.x — PDF export options
 
@@ -25,6 +24,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.8.1** — drag-and-drop modular speaker panels (grip handles, vertical reorder, persists via speakerPanelOrder)
 - **0.8.0** — per-panel show/hide, resizable visual-next-slide preview, clickable Slide N of M opens Grid, compact picker redesign with clickable rows + view-all footer
 - **0.7.5** — speaker view opens as new tab instead of horizontal split; menu-plugin autoOpen disabled
 - **0.7.4** — Grid tiles show real slide thumbnails via DOM clone + idle-time prewarm

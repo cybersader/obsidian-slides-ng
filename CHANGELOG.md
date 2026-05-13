@@ -6,6 +6,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-05-12
+
+### Added
+
+- **Drag-and-drop modular speaker panels** — every panel now carries
+  a small grip-vertical handle (top-right corner, fades in on
+  hover). Drag a handle onto another panel to drop the dragged
+  panel into that slot. Order persists via the new
+  `speakerPanelOrder` setting and is forward-compatible (settings
+  from older versions are merged with default order).
+- Visual feedback during drag: dragged panel goes 50% opacity;
+  hover-target gets an accent dashed outline; every panel gets a
+  subtle ghost outline so drop targets are obvious at a glance.
+
+### Fixed
+
+- **Next-line panel structure** — the "Next: …" text element used
+  to be the panel container itself, so `setText` calls in
+  `applyState` would wipe the drag handle that
+  `setPanelVisible` inserts. Now wrapped in a parent + child-span
+  pattern: setText hits the child only, handle stays put.
+
+### Tests
+
+- New `test/e2e/speaker-panel-dnd.spec.ts` (3 tests): every panel
+  has a drag handle; writing `speakerPanelOrder` to settings +
+  reopening the speaker view reorders the DOM accordingly; resetting
+  to defaults restores the source order.
+- Totals: 308 unit / 21 E2E spec files.
+
+### Deferred to 0.8.2
+
+- Editable speaker notes from the speaker view (needs a writeback-
+  to-vault story; deserves its own focused release).
+
 ## [0.8.0] — 2026-05-12
 
 ### Added
