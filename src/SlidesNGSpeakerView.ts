@@ -169,11 +169,11 @@ export class SlidesNGSpeakerView extends ItemView {
     const setPanelVisible = (el: HTMLElement, id: SpeakerPanelId): void => {
       el.dataset.speakerPanel = id;
       el.style.display = visibility[id] ? "" : "none";
-      // Add a drag handle so the user can reorder this panel. The
-      // handle is the only draggable surface — accidental drags on
-      // the rest of the panel are blocked via `draggable="false"` on
-      // child elements where it matters.
-      this.attachDragHandle(el, id);
+      el.classList.add("slides-ng-speaker-panel");
+      // Drag handles are attached AFTER all panel content is built
+      // (via `attachAllDragHandles` at the end of onOpen) so we can
+      // detect each panel's title and place the handle inline next
+      // to it.
     };
 
     // Status bar — clickable as a whole to open the Grid (slide N of M
@@ -368,6 +368,12 @@ export class SlidesNGSpeakerView extends ItemView {
     // the existing nodes — no re-creation).
     this.applyPanelOrder();
 
+    // Attach drag handles AFTER all panels are built so we can find
+    // each panel's section title (where present) and place the handle
+    // inline next to it. Panels without a title get a top-left
+    // floating handle instead.
+    this.attachAllDragHandles();
+
     // Wire postMessage listener for state from the preview iframe.
     window.addEventListener("message", this.messageHandler);
 
@@ -413,12 +419,23 @@ export class SlidesNGSpeakerView extends ItemView {
     }
   }
 
+  /** Attach handles for every panel currently in the DOM. */
+  private attachAllDragHandles(): void {
+    const panels = this.contentEl.querySelectorAll<HTMLElement>(
+      "[data-speaker-panel]"
+    );
+    panels.forEach((panel) => {
+      const id = panel.dataset.speakerPanel as SpeakerPanelId | undefined;
+      if (id) this.attachDragHandle(panel, id);
+    });
+  }
+
   /**
-   * Attach a small drag handle (top-right corner) to a panel + wire
-   * HTML5 DnD. Only the handle is draggable; the rest of the panel
-   * stays interactive. v0.8.3+: shows a floating horizontal-line
-   * indicator at the exact drop position (above vs below based on
-   * cursor Y within the hovered panel).
+   * Attach a drag handle to a panel + wire HTML5 DnD. The handle is
+   * placed INLINE next to the panel's section title (when present);
+   * otherwise floats at top-left. Only the handle is draggable; the
+   * rest of the panel stays interactive. v0.8.3+: floating drop-line
+   * indicator at the exact drop position.
    */
   private attachDragHandle(panel: HTMLElement, id: SpeakerPanelId): void {
     panel.classList.add("slides-ng-speaker-panel");
@@ -483,8 +500,26 @@ export class SlidesNGSpeakerView extends ItemView {
       void this.saveSettings?.();
       this.applyPanelOrder();
     });
-    // Insert the handle as the first child of the panel.
-    panel.insertBefore(handle, panel.firstChild);
+    // Placement: inline next to the section title when there is one
+    // (so the handle sits with the panel's label text), otherwise
+    // floating at top-left for title-less panels (status, controls,
+    // timer, nextLine).
+    const title = panel.querySelector<HTMLElement>(
+      ":scope > .slides-ng-speaker-section-title, " +
+        ":scope > [class*='-header'] > .slides-ng-speaker-section-title"
+    );
+    if (title) {
+      const titleParent = title.parentElement;
+      if (titleParent) {
+        titleParent.classList.add("slides-ng-speaker-panel-header");
+        titleParent.insertBefore(handle, title);
+      } else {
+        panel.insertBefore(handle, panel.firstChild);
+      }
+    } else {
+      handle.classList.add("slides-ng-speaker-panel-handle--floating");
+      panel.insertBefore(handle, panel.firstChild);
+    }
   }
 
   /**

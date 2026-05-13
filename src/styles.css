@@ -268,38 +268,48 @@
   position: relative;
 }
 
-/* Drag-to-reorder speaker panels (v0.8.1+, refined in 0.8.3). Each
- * panel carries a `.slides-ng-speaker-panel-handle` child positioned
- * on the LEFT edge (vertically centered) so it never collides with
- * right-side panel UI like Edit / mode-toggle. Handle is invisible
- * unless hovering its own panel. */
+/* Drag-to-reorder speaker panels (v0.8.1+; redesigned in 0.8.4).
+ * The handle sits INLINE next to each panel's section title where
+ * one exists (so it reads as "[≡] Speaker notes" etc.), or floats
+ * at top-left for title-less panels (status, controls, timer,
+ * nextLine). Visibility: invisible until hovering THIS panel. */
 .slides-ng-speaker-panel-handle {
-  position: absolute;
-  top: 50%;
-  left: -2px;
-  transform: translateY(-50%);
-  width: 16px;
-  height: 28px;
-  padding: 0;
-  display: flex;
+  /* Inline default: small flex-item that sits next to title text. */
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
   background: transparent;
   border: 0;
   border-radius: 3px;
   color: var(--text-muted);
   cursor: grab;
+  flex-shrink: 0;
   opacity: 0;
   transition: opacity 60ms ease, background 60ms ease;
+}
+/* Floating variant — for panels with no section title. Positioned
+ * absolutely at top-left of the panel. */
+.slides-ng-speaker-panel-handle--floating {
+  position: absolute;
+  top: 4px;
+  left: 0;
   z-index: 6;
 }
-/* Show only when hovering THIS panel specifically. The `:has` query
- * ensures the handle is gated on hover of the panel container, not
- * the surrounding speaker view chrome. While dragging, ALL handles
- * are visible so the user can see what's draggable. */
-.slides-ng-speaker-panel:hover > .slides-ng-speaker-panel-handle,
+/* When inline alongside a title, the title's parent becomes a flex
+ * row. Add a small gap between handle and title text. */
+.slides-ng-speaker-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+/* Show only when hovering THIS panel specifically. While dragging,
+ * ALL handles are visible so the user can see what's draggable. */
+.slides-ng-speaker-panel:hover .slides-ng-speaker-panel-handle,
 .slides-ng-speaker-dragging .slides-ng-speaker-panel-handle {
-  opacity: 0.6;
+  opacity: 0.55;
 }
 .slides-ng-speaker-panel-handle:hover {
   opacity: 1 !important;
@@ -314,6 +324,11 @@
 }
 .slides-ng-speaker-panel.dragging {
   opacity: 0.5;
+}
+/* Title-less panels get a small top-margin to make room for the
+ * floating handle (so it doesn't overlap the first content row). */
+.slides-ng-speaker-panel:has(> .slides-ng-speaker-panel-handle--floating) {
+  margin-top: 4px;
 }
 /* Floating drop-indicator line. Positioned absolutely inside the
  * speaker view container; moved during dragover to mark the exact

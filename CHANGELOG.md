@@ -6,6 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.4] — 2026-05-12
+
+### Changed
+
+- **Drag handle placement** — moved from floating-on-left-edge to
+  **inline next to each panel's section title**. Reads as
+  `[⋮⋮] Speaker notes` / `[⋮⋮] Slides` / etc. Title-less panels
+  (status, controls, timer, nextLine) keep a small floating
+  handle at top-left, with a 4-px margin so it doesn't overlap
+  the first content row.
+- **Handle visibility** still strictly hover-gated — invisible by
+  default; reveals only when hovering the specific panel; all
+  handles visible during an active drag.
+
+### Why
+
+User feedback on 0.8.3: the left-edge floating handle felt
+disconnected from the panel content. Inline placement next to
+the title text reads as "this row controls this panel" without
+needing to teach the affordance.
+
 ## [0.8.3] — 2026-05-12
 
 ### Fixed
