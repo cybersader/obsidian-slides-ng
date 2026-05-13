@@ -418,6 +418,53 @@
   min-height: 4rem;
   line-height: 1.45;
 }
+.slides-ng-speaker-notes-editing {
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.slides-ng-speaker-notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.slides-ng-speaker-notes-edit {
+  font-size: 0.8em;
+  padding: 0.25rem 0.55rem;
+  /* Hide the Edit affordance until the user hovers the notes panel,
+   * so it doesn't compete with the section title. */
+  opacity: 0.45;
+  transition: opacity 80ms ease;
+}
+.slides-ng-speaker-notes-wrap:hover .slides-ng-speaker-notes-edit,
+.slides-ng-speaker-notes-edit:focus-visible {
+  opacity: 1;
+}
+.slides-ng-speaker-notes-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 0.5rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font: inherit;
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+  line-height: 1.4;
+  resize: vertical;
+}
+.slides-ng-speaker-notes-textarea:focus {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -1px;
+}
+.slides-ng-speaker-notes-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
 .slides-ng-speaker-picker-header {
   display: flex;
   align-items: center;

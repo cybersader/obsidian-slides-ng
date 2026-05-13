@@ -6,6 +6,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-05-12
+
+### Added
+
+- **Editable speaker notes from the speaker view** — every notes
+  panel now has a small "Edit" affordance (fades in on hover). Click
+  to swap the rendered HTML for a textarea pre-filled with the
+  current slide's raw notes markdown. Save (or Ctrl/Cmd-Enter)
+  writes back to the deck file; Cancel (or Esc) discards.
+- **`src/parser/editSlideNotes.ts`** — pure helpers (`findSlideRanges`,
+  `readSlideNotes`, `replaceSlideNotes`) that locate a slide's
+  range in deck markdown and replace/insert its trailing
+  `<!-- ... -->` notes comment. Skips YAML frontmatter, code
+  fences, and slide-annotation comments (those start with
+  `<!-- slide ...` or `<!-- element ...`).
+
+### Notes on the editor's contract
+
+- Saves write SINGLE-LINE `<!-- ... -->` comments. Newlines in the
+  textarea are flattened to spaces on save. The textarea allows
+  multi-line input for ergonomic typing, but the on-disk format
+  stays one line. Multi-line notes can be edited directly in the
+  markdown editor as before.
+- Save re-reads the file before writing so concurrent edits in
+  the markdown editor aren't clobbered.
+- Notes panel doesn't repaint while you're typing — `applyState`
+  guards on a `notesEditing` flag.
+
+### Tests
+
+- New `tests/editSlideNotes.test.ts` (19 unit tests) — slide-range
+  detection, notes lookup, replace + insert paths, annotation
+  comments left untouched, empty-string-removes-note, out-of-range
+  indices.
+- New `test/e2e/editable-notes.spec.ts` (3 tests) — full round-trip:
+  click Edit → textarea shows current notes → Save writes new
+  notes to the deck file; Cancel discards.
+- Totals: 327 unit / 22 E2E spec files.
+
 ## [0.8.1] — 2026-05-12
 
 ### Added

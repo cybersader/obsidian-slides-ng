@@ -26,6 +26,7 @@ import {
 import { Marked } from "marked";
 import { VIEW_TYPE_SLIDES_NG, SlidesNGView } from "./SlidesNGView";
 import { renderDeck } from "./render/renderDeck";
+import { readSlideNotes, replaceSlideNotes } from "./parser/editSlideNotes";
 import type {
   SlidesNGSettings,
   SceneDefinition,
@@ -117,6 +118,8 @@ export class SlidesNGSpeakerView extends ItemView {
 
   private saveSettings?: SpeakerSettingsPersist;
   private resizeObserver?: ResizeObserver;
+  private notesWrapEl?: HTMLElement;
+  private notesEditing = false;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -284,11 +287,27 @@ export class SlidesNGSpeakerView extends ItemView {
     // configured scene; active scene gets the accent treatment.
     this.renderScenesPanel(container, setPanelVisible);
 
-    // Notes panel
+    // Notes panel — read-only HTML rendering by default, with an Edit
+    // button that swaps in a textarea + Save/Cancel. Save writes the
+    // edited markdown back to the deck file via replaceSlideNotes.
     const notesWrap = container.createDiv({ cls: "slides-ng-speaker-notes-wrap" });
     setPanelVisible(notesWrap, "notes");
-    notesWrap.createEl("div", { cls: "slides-ng-speaker-section-title", text: "Speaker notes" });
+    const notesHeader = notesWrap.createDiv({ cls: "slides-ng-speaker-notes-header" });
+    notesHeader.createEl("div", {
+      cls: "slides-ng-speaker-section-title",
+      text: "Speaker notes",
+    });
+    const editBtn = notesHeader.createEl("button", {
+      cls: "slides-ng-speaker-btn slides-ng-speaker-notes-edit",
+      attr: { type: "button" },
+    });
+    const editIcon = editBtn.createSpan({ cls: "slides-ng-speaker-btn-icon" });
+    setIcon(editIcon, "pencil");
+    editBtn.createSpan({ cls: "slides-ng-speaker-btn-label", text: "Edit" });
+    setTooltip(editBtn, "Edit the current slide's speaker notes");
+    editBtn.addEventListener("click", () => this.enterNotesEditMode());
     this.notesEl = notesWrap.createDiv({ cls: "slides-ng-speaker-notes" });
+    this.notesWrapEl = notesWrap;
 
     // Picker — header + content. setPanelVisible wraps both so they hide together.
     const pickerWrap = container.createDiv({ cls: "slides-ng-speaker-picker-wrap" });
@@ -600,6 +619,104 @@ export class SlidesNGSpeakerView extends ItemView {
   }
 
   /**
+   * Swap the notes panel into edit mode. Reads the current slide's
+   * raw notes markdown from the deck file (NOT the rendered HTML,
+   * which has lost newlines / wikilink fidelity), shows it in a
+   * textarea, and offers Save / Cancel buttons. Save writes back
+   * via `replaceSlideNotes`.
+   */
+  private async enterNotesEditMode(): Promise<void> {
+    if (this.notesEditing || !this.notesEl) return;
+    const deckPath = this.findPreviewDeckPath();
+    const currentIdx = this.state?.currentIdx;
+    if (!deckPath || typeof currentIdx !== "number") {
+      new Notice("Open a deck first.");
+      return;
+    }
+    const file = this.app.vault.getAbstractFileByPath(deckPath);
+    if (!(file instanceof TFile)) {
+      new Notice(`Deck file not found: ${deckPath}`);
+      return;
+    }
+    const markdown = await this.app.vault.read(file);
+    const currentNotes = readSlideNotes(markdown, currentIdx);
+
+    this.notesEditing = true;
+    this.notesEl.empty();
+    this.notesEl.addClass("slides-ng-speaker-notes-editing");
+    const textarea = this.notesEl.createEl("textarea", {
+      cls: "slides-ng-speaker-notes-textarea",
+      attr: { rows: "5" },
+    });
+    textarea.value = currentNotes;
+    // Auto-focus + place cursor at end.
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    }, 0);
+
+    const actions = this.notesEl.createDiv({ cls: "slides-ng-speaker-notes-actions" });
+    const save = actions.createEl("button", {
+      cls: "slides-ng-speaker-btn mod-cta",
+      text: "Save",
+      attr: { type: "button" },
+    });
+    const cancel = actions.createEl("button", {
+      cls: "slides-ng-speaker-btn",
+      text: "Cancel",
+      attr: { type: "button" },
+    });
+
+    save.addEventListener("click", async () => {
+      const newValue = textarea.value;
+      try {
+        // Re-read fresh content (the deck file might have changed
+        // since we entered edit mode — e.g. another save from the
+        // editor). Then write back the updated slice.
+        const fresh = await this.app.vault.read(file);
+        const updated = replaceSlideNotes(fresh, currentIdx, newValue);
+        await this.app.vault.modify(file, updated);
+      } catch (err) {
+        new Notice(
+          "Failed to save notes: " +
+            (err instanceof Error ? err.message : String(err))
+        );
+        return;
+      }
+      this.exitNotesEditMode();
+      // The vault modify event triggers the preview re-render, which
+      // posts a new state with the updated notesHtml — applyState
+      // will repaint the notes panel automatically.
+    });
+
+    cancel.addEventListener("click", () => {
+      this.exitNotesEditMode();
+      // Repaint with the last-known state notes.
+      if (this.state && this.notesEl) {
+        this.notesEl.innerHTML = this.state.notesHtml || "<em>No notes</em>";
+      }
+    });
+
+    // Esc cancels; Cmd/Ctrl+Enter saves.
+    textarea.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cancel.click();
+      } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        save.click();
+      }
+    });
+  }
+
+  private exitNotesEditMode(): void {
+    this.notesEditing = false;
+    if (this.notesEl) {
+      this.notesEl.removeClass("slides-ng-speaker-notes-editing");
+    }
+  }
+
+  /**
    * Find the file path the main preview is showing, by reading its
    * leaf state. Used by the visual next-slide preview to know which
    * deck to render in its mini-iframe.
@@ -731,7 +848,7 @@ export class SlidesNGSpeakerView extends ItemView {
         this.state.nextTitle ? `Next: ${this.state.nextTitle}` : "Next: (end)"
       );
     }
-    if (this.notesEl) {
+    if (this.notesEl && !this.notesEditing) {
       this.notesEl.innerHTML = this.state.notesHtml || "<em>No notes</em>";
     }
     // Highlight whichever scene is currently active; clear the others.

@@ -6,9 +6,6 @@ move between sections as work happens. Released versions live in
 
 ## In flight
 
-### 0.8.2 — editable speaker notes
-
-- **Editable speaker notes from the speaker view** — click notes panel, edit inline, write back to deck file on debounce. Need a careful writeback story (parse deck → find slide → update/insert `<!-- ... -->` comment → write).
 
 ### 0.8.x — PDF export options
 
@@ -24,6 +21,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.8.2** — editable speaker notes (click Edit → textarea → Save writes back to deck file; pure-function helpers in editSlideNotes.ts)
 - **0.8.1** — drag-and-drop modular speaker panels (grip handles, vertical reorder, persists via speakerPanelOrder)
 - **0.8.0** — per-panel show/hide, resizable visual-next-slide preview, clickable Slide N of M opens Grid, compact picker redesign with clickable rows + view-all footer
 - **0.7.5** — speaker view opens as new tab instead of horizontal split; menu-plugin autoOpen disabled
