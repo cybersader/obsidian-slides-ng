@@ -120,6 +120,11 @@ export class SlidesNGSpeakerView extends ItemView {
   private resizeObserver?: ResizeObserver;
   private notesWrapEl?: HTMLElement;
   private notesEditing = false;
+  /** Drop-position indicator line (DnD). Shows where the dragged panel will land. */
+  private dropIndicatorEl?: HTMLElement;
+  /** True = drop ABOVE the current hover target; false = drop BELOW. */
+  private dropAbove = true;
+  private dropTargetEl?: HTMLElement;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -411,7 +416,9 @@ export class SlidesNGSpeakerView extends ItemView {
   /**
    * Attach a small drag handle (top-right corner) to a panel + wire
    * HTML5 DnD. Only the handle is draggable; the rest of the panel
-   * stays interactive.
+   * stays interactive. v0.8.3+: shows a floating horizontal-line
+   * indicator at the exact drop position (above vs below based on
+   * cursor Y within the hovered panel).
    */
   private attachDragHandle(panel: HTMLElement, id: SpeakerPanelId): void {
     panel.classList.add("slides-ng-speaker-panel");
@@ -431,34 +438,30 @@ export class SlidesNGSpeakerView extends ItemView {
     handle.addEventListener("dragend", () => {
       panel.classList.remove("dragging");
       this.contentEl.classList.remove("slides-ng-speaker-dragging");
-      this.contentEl
-        .querySelectorAll(".drop-target")
-        .forEach((el) => el.classList.remove("drop-target"));
+      this.hideDropIndicator();
     });
     panel.addEventListener("dragover", (e) => {
       const dt = e.dataTransfer;
       if (!dt) return;
-      const draggedId = dt.types.includes("text/x-slides-ng-panel");
-      if (!draggedId) return;
+      if (!dt.types.includes("text/x-slides-ng-panel")) return;
       e.preventDefault();
       dt.dropEffect = "move";
-      panel.classList.add("drop-target");
-    });
-    panel.addEventListener("dragleave", () => {
-      panel.classList.remove("drop-target");
+      this.updateDropIndicator(panel, e.clientY);
     });
     panel.addEventListener("drop", (e) => {
       const dt = e.dataTransfer;
       if (!dt) return;
       const draggedId = dt.getData("text/x-slides-ng-panel") as SpeakerPanelId;
       if (!draggedId || draggedId === id) {
-        panel.classList.remove("drop-target");
+        this.hideDropIndicator();
         return;
       }
       e.preventDefault();
-      panel.classList.remove("drop-target");
-      // Compute new order: remove draggedId from current order, insert
-      // it before `id`. Persist to settings + re-apply.
+      // Resolve drop position from the indicator state. Computed during
+      // dragover; default to "above" if for some reason the indicator
+      // wasn't updated (shouldn't happen but defensive).
+      const dropAbove = this.dropAbove;
+      this.hideDropIndicator();
       const settings = this.getSettings?.();
       if (!settings) return;
       const current: SpeakerPanelId[] =
@@ -466,14 +469,13 @@ export class SlidesNGSpeakerView extends ItemView {
           ? [...settings.speakerPanelOrder]
           : [...DEFAULT_SPEAKER_PANEL_ORDER];
       const filtered = current.filter((p) => p !== draggedId);
-      const insertAt = filtered.indexOf(id);
-      if (insertAt === -1) {
+      const targetPos = filtered.indexOf(id);
+      if (targetPos === -1) {
         filtered.push(draggedId);
       } else {
+        const insertAt = dropAbove ? targetPos : targetPos + 1;
         filtered.splice(insertAt, 0, draggedId);
       }
-      // Make sure every known panel id is in the list (defensive — guard
-      // against stale settings that omit new panels).
       for (const known of DEFAULT_SPEAKER_PANEL_ORDER) {
         if (!filtered.includes(known)) filtered.push(known);
       }
@@ -483,6 +485,54 @@ export class SlidesNGSpeakerView extends ItemView {
     });
     // Insert the handle as the first child of the panel.
     panel.insertBefore(handle, panel.firstChild);
+  }
+
+  /**
+   * Lazily create the floating drop-indicator line. One per speaker
+   * view; positioned absolutely inside the container so we can move
+   * it during dragover without re-layout.
+   */
+  private ensureDropIndicator(): HTMLElement {
+    if (this.dropIndicatorEl && this.dropIndicatorEl.isConnected) {
+      return this.dropIndicatorEl;
+    }
+    const ind = document.createElement("div");
+    ind.className = "slides-ng-speaker-drop-indicator";
+    this.contentEl.appendChild(ind);
+    this.dropIndicatorEl = ind;
+    return ind;
+  }
+
+  /**
+   * Position the drop-indicator line at the top OR bottom of the
+   * hovered panel, depending on which half of the panel the cursor
+   * is in. Standard reorder-DnD UX: drop above if hovering top
+   * half, below if bottom half.
+   */
+  private updateDropIndicator(target: HTMLElement, cursorY: number): void {
+    const rect = target.getBoundingClientRect();
+    const containerRect = this.contentEl.getBoundingClientRect();
+    const middle = rect.top + rect.height / 2;
+    const isAbove = cursorY < middle;
+    this.dropAbove = isAbove;
+    this.dropTargetEl = target;
+    const ind = this.ensureDropIndicator();
+    ind.style.display = "block";
+    ind.style.left = `${rect.left - containerRect.left}px`;
+    ind.style.width = `${rect.width}px`;
+    // Position the line so it visually sits BETWEEN panels — half
+    // above + half below the boundary, which makes "where will it
+    // drop" obvious at a glance.
+    ind.style.top = isAbove
+      ? `${rect.top - containerRect.top - 1}px`
+      : `${rect.bottom - containerRect.top - 1}px`;
+  }
+
+  private hideDropIndicator(): void {
+    if (this.dropIndicatorEl) {
+      this.dropIndicatorEl.style.display = "none";
+    }
+    this.dropTargetEl = undefined;
   }
 
   async onClose(): Promise<void> {

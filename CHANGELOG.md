@@ -6,6 +6,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-05-12
+
+### Fixed
+
+- **Drag-and-drop reorder UX** — v0.8.1 used a single
+  `drop-target` outline on the hovered panel, which left the user
+  guessing whether the dragged item would land above or below the
+  target. v0.8.3 replaces that with a **floating horizontal-line
+  indicator** that snaps to the exact drop position: top edge of
+  the hovered panel if the cursor is in its upper half, bottom
+  edge if in its lower half. Standard reorder-DnD UX. Drop
+  position is computed live during `dragover` and persisted
+  exactly.
+- **Drag handle moved to the left edge** of each panel (vertically
+  centered, 16×28 px). Was top-right, which collided with the
+  Notes panel's new Edit button. Left-edge position never
+  conflicts with any right-side panel UI (Edit, mode toggle,
+  scenes, etc.).
+- **Handle visibility** is now strictly hover-gated. Default
+  opacity `0`; reveals to `0.6` only when hovering its own panel.
+  All handles become visible during an active drag so the user
+  can see drop targets.
+
+### Notes
+
+- The `drop-target` ring overlay on individual panels was
+  removed in favour of the line indicator (cleaner; no double
+  signal).
+- The "ghost outline on every panel during drag" pattern was
+  also removed — the line indicator + the dragged panel's 50%
+  opacity is enough visual feedback.
+
 ## [0.8.2] — 2026-05-12
 
 ### Added
