@@ -700,6 +700,39 @@ ${sectionsHtml}
           window.parent.postMessage(state, '*');
         }
       }
+
+      // Thumbnail cache for the Grid overlay. Populated in idle time
+      // after Reveal becomes ready so opening Grid is instant —
+      // cloning each slide's .slides-ng-layout takes a few ms per
+      // slide; doing it in advance avoids any perceived stutter on
+      // big decks. Cache key = slide idx; value = a detached cloned
+      // element we cloneNode() again when actually rendering a tile
+      // (cached node can't be appended to multiple places, but it
+      // can be cloned as many times as needed).
+      var slidesNgThumbCache = null;
+      function warmThumbnailCache() {
+        if (slidesNgThumbCache) return;
+        var sections = Array.from(
+          document.querySelectorAll('.reveal > .slides > section')
+        );
+        slidesNgThumbCache = sections.map(function (section) {
+          var content = section.querySelector('.slides-ng-layout');
+          return content ? content.cloneNode(true) : null;
+        });
+      }
+      function scheduleThumbnailWarmup() {
+        var run = function () { warmThumbnailCache(); };
+        if (typeof requestIdleCallback === 'function') {
+          requestIdleCallback(run, { timeout: 2000 });
+        } else {
+          setTimeout(run, 100);
+        }
+      }
+      function getCachedSlideClone(idx) {
+        if (!slidesNgThumbCache) warmThumbnailCache();
+        var cached = slidesNgThumbCache[idx];
+        return cached ? cached.cloneNode(true) : null;
+      }
       function ensureSceneEl() {
         var el = document.getElementById('slides-ng-scene');
         if (el) return el;
@@ -748,19 +781,22 @@ ${sectionsHtml}
             case 'last':   Reveal.slide(Reveal.getTotalSlides() - 1); break;
             case 'goto':   if (typeof data.idx === 'number') Reveal.slide(data.idx); break;
             case 'toggleOverview': {
-              // Custom slides-picker overlay (v0.7.3+). Replaces reveal's
-              // stock overview for the Grid-button path because the stock
-              // overview's CSS-transform approach can't reliably clip
-              // overflowing slide content. Tiles here are simple text
-              // (number + title); always-correct layout regardless of
-              // what's on each slide. Reveal's stock overview still
-              // works via the Esc key for users who want it.
+              // Custom slides-picker overlay (v0.7.4+). Each tile contains
+              // a CLONE of the actual slide's content (.slides-ng-layout)
+              // scaled to fit via CSS transform. Outside reveal's
+              // positioning system the transform works cleanly — no clip
+              // escape, no horizontal overflow, no library dependency.
+              // The clones inherit the theme + slides-ng CSS, so tiles
+              // look like real miniatures of each slide.
               var existingOverlay = document.getElementById('slides-ng-grid');
               if (existingOverlay) {
                 existingOverlay.remove();
                 break;
               }
               var meta = harvestSlideMeta();
+              var sections = Array.from(
+                document.querySelectorAll('.reveal > .slides > section')
+              );
               var overlay = document.createElement('div');
               overlay.id = 'slides-ng-grid';
               overlay.setAttribute('role', 'dialog');
@@ -783,52 +819,102 @@ ${sectionsHtml}
               header.appendChild(hint);
               overlay.appendChild(header);
               var grid = document.createElement('div');
+              // Fixed-width tiles (220px) so the CSS transform's scale of
+              // 220/960 ≈ 0.229 always exactly fills the tile. Larger
+              // viewports just fit more tiles per row.
               grid.style.cssText =
-                'display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));' +
-                'gap:0.75rem;';
+                'display:grid;grid-template-columns:repeat(auto-fill, 220px);' +
+                'justify-content:start;gap:0.85rem;';
               overlay.appendChild(grid);
               var currentIdx = (Reveal.getIndices() || {}).h || 0;
+              var SLIDE_W = 960;
+              var SLIDE_H = 700;
+              var TILE_W = 220;
+              var THUMB_SCALE = TILE_W / SLIDE_W;
               meta.forEach(function (s) {
-                var tile = document.createElement('button');
+                // Prefer the pre-warmed clone (populated at idle time
+                // after Reveal ready); fall back to a live clone if the
+                // cache isn't warm yet.
+                var sourceContent = getCachedSlideClone(s.idx);
+                if (!sourceContent) {
+                  var section = sections[s.idx];
+                  sourceContent = section
+                    ? section.querySelector('.slides-ng-layout')
+                    : null;
+                  if (sourceContent) sourceContent = sourceContent.cloneNode(true);
+                }
                 var isCurrent = s.idx === currentIdx;
+                var tile = document.createElement('button');
                 tile.style.cssText =
-                  'aspect-ratio:16/9;background:' +
-                  (isCurrent ? 'var(--r-link-color, #42affa)' : 'rgba(255,255,255,0.06)') +
-                  ';border:1px solid ' +
-                  (isCurrent ? 'var(--r-link-color, #42affa)' : 'rgba(255,255,255,0.15)') +
-                  ';border-radius:8px;padding:0.75rem;cursor:pointer;' +
-                  'color:' + (isCurrent ? '#000' : '#fff') + ';' +
-                  'display:flex;flex-direction:column;justify-content:space-between;' +
-                  'text-align:left;font:inherit;transition:background 80ms ease;';
+                  'position:relative;width:' + TILE_W + 'px;' +
+                  'height:' + Math.round(TILE_W * SLIDE_H / SLIDE_W) + 'px;' +
+                  'background:#000;border:2px solid ' +
+                  (isCurrent ? 'var(--r-link-color, #42affa)' : 'rgba(255,255,255,0.18)') +
+                  ';border-radius:6px;padding:0;cursor:pointer;' +
+                  'overflow:hidden;font:inherit;color:#fff;' +
+                  'transition:border-color 80ms ease, box-shadow 80ms ease;';
                 tile.addEventListener('mouseenter', function () {
-                  if (!isCurrent) tile.style.background = 'rgba(255,255,255,0.12)';
+                  if (!isCurrent) tile.style.borderColor = 'rgba(255,255,255,0.4)';
+                  tile.style.boxShadow = '0 0 0 3px rgba(66, 175, 250, 0.25)';
                 });
                 tile.addEventListener('mouseleave', function () {
-                  if (!isCurrent) tile.style.background = 'rgba(255,255,255,0.06)';
+                  if (!isCurrent) tile.style.borderColor = 'rgba(255,255,255,0.18)';
+                  tile.style.boxShadow = '';
                 });
-                var tTitle = document.createElement('div');
-                tTitle.textContent = s.title || '(untitled)';
-                tTitle.style.cssText =
-                  'font-size:0.92em;line-height:1.3;overflow:hidden;' +
-                  'display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;';
-                var tNum = document.createElement('div');
-                tNum.textContent = '# ' + (s.idx + 1);
-                tNum.style.cssText = 'font-size:0.75em;opacity:0.7;align-self:flex-end;';
-                tile.appendChild(tTitle);
-                tile.appendChild(tNum);
+
+                // Append the cached (or live-cloned) slide content into
+                // the tile, scaled. The clone inherits all document CSS
+                // so it renders with theme + layouts + Shiki + image
+                // attachment paths intact — a true miniature.
+                if (sourceContent) {
+                  var thumb = document.createElement('div');
+                  thumb.style.cssText =
+                    'position:absolute;top:0;left:0;width:100%;height:100%;' +
+                    'overflow:hidden;pointer-events:none;';
+                  sourceContent.style.cssText =
+                    'position:absolute;top:0;left:0;' +
+                    'width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;' +
+                    'transform:scale(' + THUMB_SCALE + ');transform-origin:0 0;' +
+                    'pointer-events:none;';
+                  thumb.appendChild(sourceContent);
+                  tile.appendChild(thumb);
+                }
+
+                // Slide-number badge (bottom-right, on top of thumbnail).
+                var num = document.createElement('div');
+                num.textContent = String(s.idx + 1);
+                num.style.cssText =
+                  'position:absolute;bottom:4px;right:6px;' +
+                  'background:rgba(0,0,0,0.85);color:#fff;padding:2px 8px;' +
+                  'border-radius:3px;font-size:12px;font-weight:600;' +
+                  'pointer-events:none;z-index:2;';
+                tile.appendChild(num);
+
+                // Title overlay (top-left, faded so it doesn't drown the thumbnail).
+                if (s.title) {
+                  var titleEl = document.createElement('div');
+                  titleEl.textContent = s.title;
+                  titleEl.style.cssText =
+                    'position:absolute;top:0;left:0;right:0;' +
+                    'background:linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);' +
+                    'color:#fff;padding:4px 8px 12px;font-size:11px;line-height:1.2;' +
+                    'overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;' +
+                    '-webkit-box-orient:vertical;text-align:left;pointer-events:none;z-index:2;';
+                  tile.appendChild(titleEl);
+                }
+
                 tile.addEventListener('click', function () {
                   Reveal.slide(s.idx);
                   overlay.remove();
                 });
                 grid.appendChild(tile);
               });
-              // Click outside any tile (on the overlay backdrop) closes.
+              // Click outside any tile closes.
               overlay.addEventListener('click', function (e) {
                 if (e.target === overlay || e.target === header || e.target === title || e.target === hint) {
                   overlay.remove();
                 }
               });
-              // Esc closes too.
               var escHandler = function (e) {
                 if (e.key === 'Escape') {
                   overlay.remove();
@@ -885,7 +971,14 @@ ${sectionsHtml}
           setTimeout(attachListeners, 50);
           return;
         }
-        Reveal.on('ready', postState);
+        Reveal.on('ready', function () {
+          postState();
+          // Pre-warm the Grid-overlay thumbnail cache in idle time so
+          // the first Grid open is instant. Cloning N small DOM trees
+          // off the main loop costs nothing while reveal is otherwise
+          // idle, and saves a perceptible stutter on big decks.
+          scheduleThumbnailWarmup();
+        });
         Reveal.on('slidechanged', postState);
         Reveal.on('fragmentshown', postState);
         Reveal.on('fragmenthidden', postState);

@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.4] — 2026-05-12
+
+### Added
+
+- **Grid overlay now shows real slide thumbnails** — instead of just
+  number + title text (0.7.3), each tile contains a scaled clone of
+  the slide's actual `.slides-ng-layout` DOM. Theme, layouts, Shiki
+  syntax highlighting, image attachments — all preserved. No
+  library dependency (no html2canvas / dom-to-image bloat); pure
+  CSS-transform clone since we're outside reveal's positioning
+  system, so no clip-escape edge cases.
+- **Pre-warmed thumbnail cache** — clones are computed once in idle
+  time after Reveal ready (`requestIdleCallback`, falls back to
+  `setTimeout(100)`), not when the user clicks Grid. First Grid
+  open is instant on big decks; the warm-up never blocks the main
+  loop.
+- **Tile UI polish**: 220px fixed-width tiles for crisp scaling,
+  number badge bottom-right, title gradient overlay top, hover
+  ring + accent border on the current slide.
+
 ## [0.7.3] — 2026-05-12
 
 ### Fixed
