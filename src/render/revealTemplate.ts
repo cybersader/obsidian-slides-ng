@@ -1137,21 +1137,35 @@ ${sectionsHtml}
             applyCurrentTileStyle(t);
           }
         });
-        // v0.11.18b: only auto mode needs the post-rAF rescale,
-        // because its tile width comes from CSS grid auto-fill and
-        // is unknown at apply-time. Fixed-column modes (vertical-1,
-        // vertical-2, horizontal) have pixel-pinned tile widths so
-        // the scale calculated above already matches.
-        if (orientation === 'auto') {
-          requestAnimationFrame(function () {
-            var firstTile = strip.querySelector('.slides-ng-picker-tile');
-            if (!firstTile) return;
-            var actualW = firstTile.clientWidth;
-            if (!(actualW > 0)) return;
-            var actualScale = actualW / slideW;
-            strip.querySelectorAll('.slides-ng-picker-thumb-content').forEach(function (c) {
-              c.style.transform = 'scale(' + actualScale + ')';
+        // v0.11.20: per-tile ResizeObserver keeps the inner scale
+        // synced with each tile's actual rendered width. The previous
+        // approach (compute scale from tileW, set inline transform
+        // once) broke under several races: reveal.js's own .reveal
+        // selectors competing with our fake .reveal scopes via cascade,
+        // the post-rAF measure firing before CSS settled, and the
+        // strip-level relayout hook stomping inline styles. RO per
+        // tile is local + idempotent — every cell rebuild ends with
+        // scale exactly matching the rendered cell, no race window.
+        if (typeof window.ResizeObserver === 'function') {
+          tiles.forEach(function (t) {
+            var thumb = t.querySelector('.slides-ng-picker-thumb');
+            if (!thumb) return;
+            var content = thumb.querySelector('.slides-ng-picker-thumb-content');
+            if (!content) return;
+            // Stash a single RO per tile so multiple layout passes
+            // don't stack listeners. The previous instance is fine to
+            // garbage-collect once we replace it.
+            if (t.__slidesNgRo) { t.__slidesNgRo.disconnect(); }
+            var ro = new ResizeObserver(function (entries) {
+              var entry = entries[0];
+              if (!entry) return;
+              var w = entry.contentRect.width;
+              if (!(w > 0)) return;
+              var live = w / slideW;
+              content.style.transform = 'scale(' + live + ')';
             });
+            ro.observe(t);
+            t.__slidesNgRo = ro;
           });
         }
       }

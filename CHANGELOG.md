@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.20] — 2026-05-14
+
+### Fixed
+
+- **Picker tile content overlap (still seen in 0.11.18-19).**
+  Adds a `ResizeObserver` per picker tile that recomputes the
+  inner scale (`actualW / slideW`) whenever the tile resizes.
+  This makes the layout robust against the races we kept
+  hitting in 0.11.18/0.11.19 — reveal.js's stock `.reveal`
+  cascade competing with our fake `.reveal` scopes, post-rAF
+  measurements firing before CSS settled, and the strip-level
+  relayout hook stomping inline transforms set milliseconds
+  earlier. Per-tile RO is local + idempotent; every cell
+  rebuild ends with a `transform: scale(N)` that matches the
+  actual rendered cell width by construction.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — at the end of
+  `applyPickerStripLayout`, install a single
+  `ResizeObserver` per `.slides-ng-picker-tile`. The RO
+  callback updates the inner
+  `.slides-ng-picker-thumb-content` element's
+  `style.transform` to `scale(contentRect.width / slideW)`.
+  Old RO instances are disconnected before being replaced
+  (stashed on `tile.__slidesNgRo`).
+
 ## [0.11.19] — 2026-05-14
 
 ### Fixed
