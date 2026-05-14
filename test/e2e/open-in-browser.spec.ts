@@ -525,4 +525,207 @@ describe("slides-ng open-in-browser", function () {
       });
     });
   });
+
+  // v0.11.33: Grid button + S-key speaker-view popup in the
+  // standalone export. These are the standalone-only enhancements
+  // gated behind `embedded === false`. We test both inside the
+  // probe iframe we already use for hamburger/keyboard tests.
+  describe("standalone-only enhancements", function () {
+    async function getOrInjectProbe(): Promise<void> {
+      const exists = await browser.execute(() => {
+        return !!document.getElementById("slides-ng-hamburger-probe");
+      });
+      if (exists) return;
+      const exportContent = await browser.executeObsidian(async ({ app }) => {
+        // @ts-expect-error — adapter.list is internal API
+        const all = (await app.vault.adapter.list("/")).files as string[];
+        const exports = all.filter((p) => p.includes(".slides-ng-export-"));
+        if (exports.length === 0) return null;
+        exports.sort();
+        const latest = exports[exports.length - 1];
+        // @ts-expect-error — adapter.read is internal API
+        return (await app.vault.adapter.read(latest)) as string;
+      });
+      await browser.execute((html: string) => {
+        const iframe = document.createElement("iframe");
+        iframe.id = "slides-ng-hamburger-probe";
+        iframe.style.cssText =
+          "position:fixed;bottom:0;right:0;width:800px;height:600px;" +
+          "border:1px solid #888;z-index:9999;";
+        iframe.srcdoc = html;
+        document.body.appendChild(iframe);
+      }, exportContent);
+      const probe = await $("#slides-ng-hamburger-probe");
+      await probe.waitForExist({ timeout: 8000 });
+      for (let i = 0; i < 40; i++) {
+        await browser.switchFrame(probe);
+        let ready = false;
+        try {
+          ready = await browser.execute(() => {
+            const w = window as unknown as { Reveal?: { isReady?: () => boolean } };
+            return !!w.Reveal && typeof w.Reveal.isReady === "function" && w.Reveal.isReady();
+          });
+        } finally {
+          await browser.switchFrame(null);
+        }
+        if (ready) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+
+    it("Grid button is mounted in the corner", async () => {
+      await getOrInjectProbe();
+      const probe = await $("#slides-ng-hamburger-probe");
+      await browser.switchFrame(probe);
+      try {
+        const buttonInfo = await browser.execute(() => {
+          const btn = document.getElementById(
+            "slides-ng-grid-btn"
+          ) as HTMLElement | null;
+          if (!btn) return null;
+          const r = btn.getBoundingClientRect();
+          return {
+            present: true,
+            // Just sanity-check the visible position is somewhere
+            // toward the top-right.
+            top: Math.round(r.top),
+            right: Math.round(window.innerWidth - r.right),
+            width: Math.round(r.width),
+            height: Math.round(r.height),
+          };
+        });
+        if (!buttonInfo) {
+          throw new Error("Grid button (#slides-ng-grid-btn) not found.");
+        }
+        if (buttonInfo.top > 50 || buttonInfo.right > 50) {
+          throw new Error(
+            `Grid button is too far from the top-right corner: ` +
+              `${JSON.stringify(buttonInfo)}`
+          );
+        }
+      } finally {
+        await browser.switchFrame(null);
+      }
+    });
+
+    it("clicking the Grid button opens the slides overview", async () => {
+      await getOrInjectProbe();
+      const probe = await $("#slides-ng-hamburger-probe");
+      await browser.switchFrame(probe);
+      try {
+        // Use the exposed helper for determinism (avoids click-coord
+        // math). Verifies the helper is wired correctly + the
+        // toggleOverview message handler is reachable.
+        await browser.execute(() => {
+          const w = window as unknown as { __slidesNgToggleGrid?: () => void };
+          w.__slidesNgToggleGrid?.();
+        });
+        // toggleOverview is async (builds grid + clones sections).
+        let overlayPresent = false;
+        for (let i = 0; i < 20; i++) {
+          overlayPresent = await browser.execute(() => {
+            return !!document.getElementById("slides-ng-grid");
+          });
+          if (overlayPresent) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        if (!overlayPresent) {
+          throw new Error(
+            "Grid overlay (#slides-ng-grid) didn't appear after clicking the Grid button."
+          );
+        }
+        // Close it so subsequent tests aren't affected.
+        await browser.execute(() => {
+          const w = window as unknown as { __slidesNgToggleGrid?: () => void };
+          w.__slidesNgToggleGrid?.();
+        });
+      } finally {
+        await browser.switchFrame(null);
+      }
+    });
+
+    it("S-key speaker view popup function is exposed", async () => {
+      await getOrInjectProbe();
+      const probe = await $("#slides-ng-hamburger-probe");
+      await browser.switchFrame(probe);
+      try {
+        // Verify the helper exists (we can't reliably test
+        // window.open from inside a sandboxed iframe — popups are
+        // often blocked in test environments).
+        const hasHelper = await browser.execute(() => {
+          const w = window as unknown as {
+            __slidesNgOpenSpeakerView?: () => void;
+          };
+          return typeof w.__slidesNgOpenSpeakerView === "function";
+        });
+        if (!hasHelper) {
+          throw new Error(
+            "window.__slidesNgOpenSpeakerView function not exposed in the export. " +
+              "The S-key handler wiring is broken."
+          );
+        }
+        // Stub window.open + call the helper to verify it actually
+        // tries to open a popup with the right contents.
+        const opened: string | null = await browser.execute(() => {
+          const w = window as unknown as {
+            __slidesNgOpenSpeakerView?: () => void;
+            open?: (
+              url: string,
+              target?: string,
+              features?: string
+            ) => Window | null;
+          };
+          const originalOpen = w.open;
+          let writtenHtml: string | null = null;
+          w.open = (..._args: unknown[]) => {
+            // Return a stub object whose `document.write` captures
+            // the popup HTML we'd have rendered.
+            const stub: {
+              document: {
+                open: () => void;
+                close: () => void;
+                write: (html: string) => void;
+              };
+              closed: boolean;
+              focus: () => void;
+            } = {
+              document: {
+                open: () => {},
+                close: () => {},
+                write: (html: string) => {
+                  writtenHtml = html;
+                },
+              },
+              closed: false,
+              focus: () => {},
+            };
+            return stub as unknown as Window;
+          };
+          try {
+            w.__slidesNgOpenSpeakerView?.();
+          } finally {
+            w.open = originalOpen;
+          }
+          return writtenHtml;
+        });
+        if (!opened) {
+          throw new Error("window.open was not called by the S-key helper.");
+        }
+        // Verify the popup HTML has the expected speaker-view panels.
+        if (!opened.includes("Speaker view")) {
+          throw new Error("Popup HTML missing 'Speaker view' title.");
+        }
+        if (!opened.includes("Current slide") || !opened.includes("Next slide")) {
+          throw new Error(
+            "Popup HTML missing 'Current slide' / 'Next slide' panels."
+          );
+        }
+        if (!opened.includes("Speaker notes") || !opened.includes("Timer")) {
+          throw new Error("Popup HTML missing 'Speaker notes' / 'Timer' panels.");
+        }
+      } finally {
+        await browser.switchFrame(null);
+      }
+    });
+  });
 });

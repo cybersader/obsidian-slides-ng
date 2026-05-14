@@ -621,6 +621,236 @@ ${sectionsHtml}
             setTimeout(callInit, 200);
           }
         })();` : ""}
+        ${!embedded ? `/* v0.11.33: standalone-only enhancements —
+         * (a) Grid button in the top-right corner that opens the
+         *     thumbnail-grid overlay (same as the embedded preview's
+         *     Grid toolbar button + the G keyboard shortcut).
+         * (b) S key opens a speaker-view popup window with two
+         *     synced iframes (current + next slide), the active
+         *     slide's notes, and a running timer.
+         * Both are skipped when the page loads inside another iframe
+         * (window.self !== window.top) so the speaker-view popup's
+         * own iframes don't double-bind these handlers. */
+        if (window.self === window.top) {
+          (function setupStandaloneEnhancements() {
+            try {
+              /* === Grid button === */
+              var gridBtn = document.createElement('button');
+              gridBtn.id = 'slides-ng-grid-btn';
+              gridBtn.title = 'Show all slides (G)';
+              gridBtn.setAttribute('aria-label', 'Grid view');
+              gridBtn.innerHTML =
+                '<svg viewBox="0 0 24 24" width="20" height="20" ' +
+                'fill="none" stroke="currentColor" stroke-width="2" ' +
+                'stroke-linecap="round" stroke-linejoin="round">' +
+                '<rect x="3" y="3" width="7" height="7" rx="1"/>' +
+                '<rect x="14" y="3" width="7" height="7" rx="1"/>' +
+                '<rect x="3" y="14" width="7" height="7" rx="1"/>' +
+                '<rect x="14" y="14" width="7" height="7" rx="1"/>' +
+                '</svg>';
+              gridBtn.style.cssText =
+                'position:fixed;top:12px;right:12px;z-index:9999;' +
+                'background:rgba(0,0,0,0.45);color:#fff;' +
+                'border:1px solid rgba(255,255,255,0.2);' +
+                'border-radius:6px;padding:6px;cursor:pointer;' +
+                'opacity:0.55;transition:opacity 80ms ease, background 80ms ease;' +
+                'display:flex;align-items:center;justify-content:center;';
+              gridBtn.onmouseenter = function () {
+                gridBtn.style.opacity = '1';
+                gridBtn.style.background = 'rgba(0,0,0,0.8)';
+              };
+              gridBtn.onmouseleave = function () {
+                gridBtn.style.opacity = '0.55';
+                gridBtn.style.background = 'rgba(0,0,0,0.45)';
+              };
+              gridBtn.onclick = function () {
+                window.postMessage(
+                  { type: 'slides-ng-cmd', cmd: 'toggleOverview' },
+                  '*'
+                );
+              };
+              document.body.appendChild(gridBtn);
+
+              /* === G keyboard shortcut for the same grid === */
+              document.addEventListener('keydown', function (e) {
+                if (e.key !== 'g' && e.key !== 'G') return;
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                e.preventDefault();
+                window.postMessage(
+                  { type: 'slides-ng-cmd', cmd: 'toggleOverview' },
+                  '*'
+                );
+              });
+
+              /* === Speaker view popup (S key) === */
+              var speakerWin = null;
+              function buildSpeakerPopupHtml(deckUrl) {
+                /* Generated as a string so we can srcdoc-inject it
+                 * into the popup. The popup contains two iframes
+                 * each pointing at the same exported HTML; we
+                 * postMessage 'goto idx' into each one to set the
+                 * current and next slide. Notes + timer live in
+                 * the popup directly. */
+                return [
+                  '<!doctype html><html><head>',
+                  '<meta charset="utf-8">',
+                  '<title>Slides NG — Speaker view</title>',
+                  '<style>',
+                  'html, body { margin: 0; height: 100%; background: #1a1a1a; color: #fff; font-family: sans-serif; }',
+                  'body { display: grid; grid-template-rows: 1fr 1fr; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; box-sizing: border-box; }',
+                  '.panel { background: #0a0a0a; border: 1px solid #333; overflow: hidden; display: flex; flex-direction: column; border-radius: 6px; }',
+                  '.label { font-size: 0.75em; color: #999; padding: 0.3rem 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; flex: 0 0 auto; }',
+                  '.frame-wrap { position: relative; flex: 1 1 auto; }',
+                  '.frame-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }',
+                  '.notes { padding: 0.6rem 0.8rem; overflow-y: auto; flex: 1 1 auto; font-size: 1em; line-height: 1.5; }',
+                  '.notes .empty { color: #666; font-style: italic; }',
+                  '.notes br { display: block; margin-bottom: 0.5em; }',
+                  '.timer-wrap { display: flex; align-items: center; justify-content: center; flex: 1 1 auto; }',
+                  '.timer { font-family: monospace; font-size: 3.5em; color: #e0e0e0; }',
+                  '.timer-controls { display: flex; gap: 0.4rem; margin-top: 0.5rem; justify-content: center; }',
+                  '.timer-controls button { background: #222; color: #ccc; border: 1px solid #444; padding: 0.25rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.85em; }',
+                  '.timer-controls button:hover { background: #333; }',
+                  '.slide-counter { position: absolute; top: 6px; left: 8px; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px; font-size: 0.75em; }',
+                  '</style></head><body>',
+                  '<div class="panel">',
+                  '  <div class="label">Current slide</div>',
+                  '  <div class="frame-wrap"><iframe id="current-frame" src="' + deckUrl + '" sandbox="allow-scripts allow-same-origin"></iframe><div class="slide-counter" id="current-counter">—</div></div>',
+                  '</div>',
+                  '<div class="panel">',
+                  '  <div class="label">Next slide</div>',
+                  '  <div class="frame-wrap"><iframe id="next-frame" src="' + deckUrl + '" sandbox="allow-scripts allow-same-origin"></iframe><div class="slide-counter" id="next-counter">—</div></div>',
+                  '</div>',
+                  '<div class="panel">',
+                  '  <div class="label">Speaker notes</div>',
+                  '  <div class="notes" id="notes"><span class="empty">(waiting for sync…)</span></div>',
+                  '</div>',
+                  '<div class="panel">',
+                  '  <div class="label">Timer</div>',
+                  '  <div class="timer-wrap"><div><div class="timer" id="timer">00:00</div><div class="timer-controls"><button id="timer-reset">Reset</button><button id="timer-pause">Pause</button></div></div></div>',
+                  '</div>',
+                  '<script>',
+                  'var start = Date.now();',
+                  'var paused = false;',
+                  'var pausedAt = 0;',
+                  'function fmt(ms) {',
+                  '  var s = Math.floor(ms / 1000);',
+                  '  var m = Math.floor(s / 60);',
+                  '  var h = Math.floor(m / 60);',
+                  '  m = m % 60; s = s % 60;',
+                  '  var pad = function(n) { return (n < 10 ? "0" : "") + n; };',
+                  '  return (h > 0 ? pad(h) + ":" : "") + pad(m) + ":" + pad(s);',
+                  '}',
+                  'setInterval(function () {',
+                  '  var t = document.getElementById("timer");',
+                  '  if (!t) return;',
+                  '  t.textContent = fmt(paused ? pausedAt - start : Date.now() - start);',
+                  '}, 250);',
+                  'document.getElementById("timer-reset").onclick = function () { start = Date.now(); paused = false; pausedAt = 0; document.getElementById("timer-pause").textContent = "Pause"; };',
+                  'document.getElementById("timer-pause").onclick = function () {',
+                  '  if (paused) { start = Date.now() - (pausedAt - start); paused = false; this.textContent = "Pause"; }',
+                  '  else { pausedAt = Date.now(); paused = true; this.textContent = "Resume"; }',
+                  '};',
+                  '/* Tell the two iframes to navigate to their target slide. */',
+                  'function gotoFrame(id, idx) {',
+                  '  var f = document.getElementById(id);',
+                  '  if (!f || !f.contentWindow) return;',
+                  '  try {',
+                  '    f.contentWindow.postMessage({ type: "slides-ng-cmd", cmd: "goto", idx: idx }, "*");',
+                  '  } catch (_) {}',
+                  '}',
+                  '/* Receive state from the opener (main deck window). */',
+                  'window.addEventListener("message", function (e) {',
+                  '  var d = e.data;',
+                  '  if (!d || d.type !== "slides-ng-speaker-update") return;',
+                  '  var notesEl = document.getElementById("notes");',
+                  '  if (notesEl) {',
+                  '    notesEl.innerHTML = d.notesHtml ? d.notesHtml : "<span class=\\"empty\\">(no notes for this slide)</span>";',
+                  '  }',
+                  '  var cur = document.getElementById("current-counter");',
+                  '  var nxt = document.getElementById("next-counter");',
+                  '  if (cur) cur.textContent = (d.idx + 1) + " / " + d.totalSlides;',
+                  '  if (nxt) nxt.textContent = d.idx + 2 > d.totalSlides ? "end" : ((d.idx + 2) + " / " + d.totalSlides);',
+                  '  gotoFrame("current-frame", d.idx);',
+                  '  gotoFrame("next-frame", Math.min(d.idx + 1, d.totalSlides - 1));',
+                  '});',
+                  '/* Ask the opener for a refresh on load. */',
+                  'function poke() {',
+                  '  if (window.opener) {',
+                  '    try { window.opener.postMessage({ type: "slides-ng-speaker-poke" }, "*"); } catch (_) {}',
+                  '  }',
+                  '}',
+                  'setTimeout(poke, 100);',
+                  'setTimeout(poke, 800);',
+                  'setTimeout(poke, 2000);',
+                  '<\\/script>',
+                  '</body></html>',
+                ].join('\\n');
+              }
+              function postStateToSpeaker() {
+                if (!speakerWin || speakerWin.closed) return;
+                try {
+                  var idx = Reveal.getIndices().h;
+                  var sections = document.querySelectorAll('.reveal .slides > section');
+                  var section = sections[idx];
+                  var noteEl = section ? section.querySelector('aside.notes') : null;
+                  speakerWin.postMessage({
+                    type: 'slides-ng-speaker-update',
+                    idx: idx,
+                    totalSlides: Reveal.getTotalSlides(),
+                    notesHtml: noteEl ? noteEl.innerHTML : '',
+                  }, '*');
+                } catch (err) {
+                  console.warn('[slides-ng] postStateToSpeaker', err);
+                }
+              }
+              Reveal.on('slidechanged', postStateToSpeaker);
+              window.addEventListener('message', function (e) {
+                if (e.data && e.data.type === 'slides-ng-speaker-poke') {
+                  postStateToSpeaker();
+                }
+              });
+              function openSpeakerPopup() {
+                if (speakerWin && !speakerWin.closed) {
+                  try { speakerWin.focus(); } catch (_) {}
+                  return;
+                }
+                var deckUrl = location.href.split('?')[0];
+                var popupHtml = buildSpeakerPopupHtml(deckUrl);
+                speakerWin = window.open('', 'slides-ng-speaker-' + Date.now(), 'width=1100,height=800');
+                if (!speakerWin) {
+                  alert('Speaker view popup was blocked by the browser. Allow popups for this page and press S again.');
+                  return;
+                }
+                try {
+                  speakerWin.document.open();
+                  speakerWin.document.write(popupHtml);
+                  speakerWin.document.close();
+                } catch (err) {
+                  console.warn('[slides-ng] failed to write popup', err);
+                }
+              }
+              document.addEventListener('keydown', function (e) {
+                if (e.key !== 's' && e.key !== 'S') return;
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                e.preventDefault();
+                openSpeakerPopup();
+              });
+              /* Expose for tests + power users — same trigger an
+               * external script could use. */
+              window.__slidesNgOpenSpeakerView = openSpeakerPopup;
+              window.__slidesNgToggleGrid = function () {
+                window.postMessage(
+                  { type: 'slides-ng-cmd', cmd: 'toggleOverview' },
+                  '*'
+                );
+              };
+            } catch (err) {
+              console.warn('[slides-ng] standalone enhancements failed', err);
+            }
+          })();
+        }` : ""}
       } catch (err) {
         document.body.innerHTML = '<pre style="color:#f99;padding:1em;font-family:monospace;white-space:pre-wrap">slides-ng: reveal.js failed to initialize\\n' + (err && err.stack ? String(err.stack) : String(err)) + '</pre>';
       }

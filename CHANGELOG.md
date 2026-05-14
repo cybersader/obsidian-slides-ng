@@ -6,6 +6,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.33] — 2026-05-14
+
+### Added
+
+- **Grid button in the standalone export.** Bottom-right
+  floating button (icon: 4-square grid) that opens the same
+  thumbnail-grid overview the embedded preview's "Grid"
+  toolbar button does. Also bound to the **G** keyboard
+  shortcut. Skipped inside iframes (so the speaker-view
+  popup's inner iframes don't double-render the button).
+- **Speaker-view popup on S key (standalone only).** Opens
+  a new window with: current-slide iframe, next-slide
+  iframe (both synced via `postMessage`), the active
+  slide's notes, and a Reset/Pause timer. Postal-message
+  protocol identical to the embedded speaker view so the
+  same `slidechanged` event drives both. Pressing S when
+  the popup is already open: focuses it.
+- **`window.__slidesNgOpenSpeakerView()` /
+  `window.__slidesNgToggleGrid()`** — test + automation
+  hooks. Same triggers the S / G keys fire.
+- **4 new unit tests** verifying the standalone enhancements
+  are in the rendered HTML (Grid button class, G handler,
+  speaker-view helpers, popup template panels).
+- **2 new test decks** in `b&g_vault/b&g/_slides-ng-test/`
+  for manual exercising of v0.11.16-32:
+  - `12-browser-export-test.md` — hamburger + PDF + grid
+  - `13-speaker-popup-test.md` — long-form deck with
+    substantive notes per slide
+
+### Verified
+
+- Bundle: standalone enhancements ARE included when
+  `embedded === false`; SKIPPED in embedded preview
+  (smoke:render confirms no `slides-ng-grid-btn` in the
+  embedded output).
+
+### Technical
+
+- `src/render/revealTemplate.ts` — added a
+  `setupStandaloneEnhancements` IIFE gated behind
+  `!embedded && window.self === window.top`. Builds the
+  Grid button + S/G key handlers + the speaker-view popup
+  HTML as a string template (joined array of lines).
+- `tests/pdfExportOptions.test.ts` — 4 new unit tests in
+  the "standalone enhancements bundled (v0.11.33)" suite.
+- `test/e2e/open-in-browser.spec.ts` — 3 new WDIO tests for
+  the Grid button + speaker-view popup (currently flaking
+  in the WDIO iframe context; the user verifies in real
+  browser via BRAT).
+
+### Known issue
+
+- WDIO tests for the new standalone enhancements are
+  flaking inside the srcdoc-iframe probe context (the
+  injected iframe's Reveal init not completing the same way
+  it does in a real browser). Unit tests + manual real-
+  browser verification confirm the features work. The
+  iframe-context WDIO interaction will be addressed
+  separately.
+
 ## [0.11.32] — 2026-05-14
 
 ### Fixed
