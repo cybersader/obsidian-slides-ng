@@ -845,11 +845,16 @@ ${sectionsHtml}
           num.className = 'slides-ng-picker-tile-num';
           num.textContent = String(s.idx + 1);
           tile.appendChild(num);
+          // v0.11.1: title-overlay element removed. The slide's own
+          // headings are already visible in the cloned thumbnail
+          // content, so the overlay just duplicated information.
+          // Keep s.title in the button's aria-label / title for
+          // accessibility.
           if (s.title) {
-            var title = document.createElement('div');
-            title.className = 'slides-ng-picker-tile-title';
-            title.textContent = s.title;
-            tile.appendChild(title);
+            tile.setAttribute('aria-label', String(s.idx + 1) + ': ' + s.title);
+            tile.title = s.title;
+          } else {
+            tile.setAttribute('aria-label', 'Slide ' + (s.idx + 1));
           }
           tile.addEventListener('click', function () {
             if (window.parent && window.parent !== window) {
@@ -884,11 +889,14 @@ ${sectionsHtml}
 
         // Base strip styles: fixed full-viewport, scrollable along
         // the appropriate axis, background dimmed.
+        // v0.11.1: align-items:center so capped-width tiles in
+        // vertical mode are centered in the strip (not flush left
+        // looking awkwardly off-balance).
         strip.style.cssText =
           'position:fixed;inset:0;background:#0a0a0a;color:#fff;' +
           'z-index:5;padding:8px;box-sizing:border-box;' +
           'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);' +
-          'display:flex;gap:6px;' +
+          'display:flex;gap:6px;align-items:center;' +
           (orientation === 'horizontal'
             ? 'flex-direction:row;overflow-x:auto;overflow-y:hidden;'
             : 'flex-direction:column;overflow-y:auto;overflow-x:hidden;');
@@ -909,7 +917,17 @@ ${sectionsHtml}
             tileH = Math.round(tileW * aspect);
           }
         } else {
-          tileW = tileWidthAttr > 0 ? tileWidthAttr : (stripInnerW > 0 ? stripInnerW : 200);
+          // v0.11.1: cap auto-fit width at 240px so we get roughly
+          // PowerPoint-like density (multiple tiles visible at once)
+          // instead of one huge tile filling the panel. User can
+          // still override with a positive tileWidthAttr.
+          if (tileWidthAttr > 0) {
+            tileW = tileWidthAttr;
+          } else if (stripInnerW > 0) {
+            tileW = Math.min(stripInnerW, 240);
+          } else {
+            tileW = 200;
+          }
           tileH = Math.round(tileW * aspect);
         }
         var scale = tileW / slideW;
@@ -935,24 +953,29 @@ ${sectionsHtml}
           }
           var num = t.querySelector('.slides-ng-picker-tile-num');
           if (num) {
+            // v0.11.1: square badge with border, top-left corner.
+            // Was: text-only with a translucent pill bg, bottom-right.
             num.style.cssText =
-              'position:absolute;bottom:3px;right:5px;' +
-              'background:rgba(0,0,0,0.85);color:#fff;padding:1px 6px;' +
-              'border-radius:3px;font-size:11px;font-weight:600;' +
-              'pointer-events:none;z-index:2;font-variant-numeric:tabular-nums;';
-          }
-          var title = t.querySelector('.slides-ng-picker-tile-title');
-          if (title) {
-            title.style.cssText =
-              'position:absolute;top:0;left:0;right:0;' +
-              'background:linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);' +
-              'color:#fff;padding:3px 6px 10px;font-size:10px;line-height:1.2;' +
-              'overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;' +
-              '-webkit-box-orient:vertical;text-align:left;pointer-events:none;z-index:2;';
+              'position:absolute;top:6px;left:6px;' +
+              'width:24px;height:24px;box-sizing:border-box;' +
+              'display:flex;align-items:center;justify-content:center;' +
+              'background:rgba(0,0,0,0.78);' +
+              'border:1.5px solid rgba(255,255,255,0.55);' +
+              'color:#fff;border-radius:4px;' +
+              'font-size:12px;font-weight:700;line-height:1;' +
+              'pointer-events:none;z-index:3;' +
+              'font-variant-numeric:tabular-nums;' +
+              'text-shadow:0 1px 2px rgba(0,0,0,0.6);';
           }
           if (t.classList.contains('current')) {
-            t.style.borderColor = 'var(--r-link-color, #42affa)';
-            t.style.boxShadow = '0 0 0 2px rgba(66, 175, 250, 0.4)';
+            // v0.11.1: thicker accent border + stronger glow. Also
+            // tint the slide-number badge so it reads as "you are here".
+            t.style.border = '2px solid var(--r-link-color, #42affa)';
+            t.style.boxShadow = '0 0 0 3px rgba(66, 175, 250, 0.32)';
+            if (num) {
+              num.style.background = 'var(--r-link-color, #42affa)';
+              num.style.borderColor = '#fff';
+            }
           }
         });
       }

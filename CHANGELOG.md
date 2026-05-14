@@ -6,6 +6,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.1] — 2026-05-14
+
+### Changed
+
+- **Picker thumbnail polish.** v0.11.0 ship review surfaced three
+  issues; this patch addresses them:
+  - **Title overlay removed.** The gradient-backed title banner
+    duplicated information already visible in the cloned slide
+    content. Tiles are now clean miniatures of the actual slide.
+    Title still lives on the button's `aria-label` + `title`
+    attribute for accessibility / hover tooltips.
+  - **Slide-number badge redesigned.** Was a small text pill in
+    the bottom-right corner; now a 24×24 px bordered square in
+    the top-left with high-contrast white-on-dark, bold tabular-
+    numeric figures, and a 1.5 px white-translucent outline.
+    Visible at a glance even on dark-themed thumbnails.
+  - **Stronger current-slide indicator.** Border thickness 2 px
+    (was 2 px implicit but inconsistent), accent-colored box-
+    shadow halo, AND the slide-number badge tints to the accent
+    colour with a white border — so the "you are here" tile
+    reads from across the screen.
+- **Vertical auto-fit width capped at 240 px.** Previously a
+  vertical picker in a wide panel would render one giant tile per
+  row; now it caps at 240 px so multiple tiles are visible at
+  once (PowerPoint-like density). Tiles are also center-aligned
+  in the strip so they don't hug the left edge. Override with
+  `Settings → Speaker → Picker tile width` (0 = auto, positive =
+  pinned).
+
+### Technical
+
+- `src/render/revealTemplate.ts` — `buildPickerStrip()` no longer
+  creates a `.slides-ng-picker-tile-title` element (kept the
+  alt-text on the button); `applyPickerStripLayout()` writes the
+  new square-badge style + tints it on `.current`; auto-fit
+  tileW uses `Math.min(stripInnerW, 240)`; strip flex container
+  has `align-items: center`.
+
 ## [0.11.0] — 2026-05-14
 
 ### Added
