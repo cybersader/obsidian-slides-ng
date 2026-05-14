@@ -116,6 +116,15 @@ export class SlidesNGSpeakerView extends ItemView {
   /** Magnifier-cycle button in the picker header (v0.11.17). */
   private pickerSizeBtn?: HTMLButtonElement;
   /**
+   * v0.11.21: pending setPickerCurrent burst timers. The burst posts
+   * the same idx at t=0 + several follow-ups to defeat bridge-install
+   * races on fresh mounts. If a new state event arrives mid-burst, the
+   * previous burst's stale posts would overwrite the new highlight
+   * (the v0.11.20 flicker bug). Tracking them lets us cancel before
+   * scheduling the next burst.
+   */
+  private pickerCurrentBurstTimers: number[] = [];
+  /**
    * Per-deck override read from `slides-ng-picker-tile-width` in
    * frontmatter; cached so we don't re-peek on every tile re-render.
    * `undefined` = no override, fall back to settings; `0` = explicit
@@ -1738,6 +1747,15 @@ export class SlidesNGSpeakerView extends ItemView {
         // mounts (observed in E2E screenshots where the strip
         // stayed marked at tile 0 even though the deck had
         // advanced 10 slides). Cheap — ~5 messages total.
+        // v0.11.21: cancel any prior burst's delayed posts before
+        // scheduling new ones. Without this, rapid navigation
+        // caused the previous idx to overwrite the new highlight
+        // mid-flight — the user-reported "tile flips back and forth
+        // for a second after click" bug.
+        for (const id of this.pickerCurrentBurstTimers) {
+          window.clearTimeout(id);
+        }
+        this.pickerCurrentBurstTimers = [];
         const idx = this.state!.currentIdx;
         const post = (): void => {
           this.postToPicker({
@@ -1748,7 +1766,7 @@ export class SlidesNGSpeakerView extends ItemView {
         };
         post();
         for (const delay of [60, 180, 400, 900, 1500, 2500]) {
-          window.setTimeout(post, delay);
+          this.pickerCurrentBurstTimers.push(window.setTimeout(post, delay));
         }
       });
     } else {

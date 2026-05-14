@@ -1014,6 +1014,20 @@ ${sectionsHtml}
           'z-index:5;padding:8px;box-sizing:border-box;' +
           'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);';
         var minCellPx = tileWidthAttr > 0 ? tileWidthAttr : 160;
+        // v0.11.21: compute column count + tile pixel dimensions
+        // deterministically from strip width and magnifier preset.
+        // We previously tried width:100% + aspect-ratio + per-tile
+        // ResizeObserver for auto mode (v0.11.20) and width:100% +
+        // aspect-ratio + post-rAF measure (v0.11.18). Both had narrow
+        // race windows where the inner-content scale never landed.
+        // Pixel-pin is the only approach we have not seen fail.
+        var autoCols = 1;
+        var autoTileW = 0;
+        if (orientation === 'auto') {
+          autoCols = Math.max(1, Math.floor(stripInnerW / Math.max(1, minCellPx)));
+          var autoGapTotal = (autoCols - 1) * 6;
+          autoTileW = Math.max(40, Math.floor((stripInnerW - autoGapTotal) / autoCols));
+        }
         if (orientation === 'horizontal') {
           strip.style.cssText = stripBase +
             'display:flex;gap:6px;align-items:center;' +
@@ -1023,15 +1037,13 @@ ${sectionsHtml}
             'display:grid;grid-template-columns:1fr 1fr;gap:6px;' +
             'align-content:start;overflow-y:auto;overflow-x:hidden;';
         } else if (orientation === 'auto') {
-          // Auto-fill grid. minmax(min(100%, MIN_CELL_PX), 1fr) is
-          // the magic incantation: at least MIN_CELL_PX wide
-          // (unless that's wider than the whole strip, in which case
-          // a single column) and otherwise fills the available
-          // width with 1+ cells.
+          // Fixed column count chosen from strip width + magnifier
+          // preset. Each column gets a fixed pixel width matching
+          // autoTileW so tiles are pinned (no aspect-ratio gymnastics).
           strip.style.cssText = stripBase +
             'display:grid;' +
-            'grid-template-columns:repeat(auto-fill, minmax(min(100%, ' + minCellPx + 'px), 1fr));' +
-            'gap:6px;align-content:start;' +
+            'grid-template-columns:repeat(' + autoCols + ', ' + autoTileW + 'px);' +
+            'gap:6px;align-content:start;justify-content:center;' +
             'overflow-y:auto;overflow-x:hidden;';
         } else {
           // vertical-1 (default)
@@ -1055,13 +1067,8 @@ ${sectionsHtml}
           tileW = colW > 0 ? colW : 100;
           tileH = Math.round(tileW * aspect);
         } else if (orientation === 'auto') {
-          // For auto-fill grid we don't pin the tile to a pixel value
-          // — width:100% lets CSS grid decide. We compute a
-          // representative tileW for the inner scale transform only,
-          // assuming the cell will be the MIN size at minimum and
-          // sometimes wider. Using minCellPx as the representative
-          // pinch-point keeps the scale calc consistent.
-          tileW = minCellPx;
+          // Pixel pin from the column math we did above.
+          tileW = autoTileW;
           tileH = Math.round(tileW * aspect);
         } else {
           // vertical-1: fill strip width. User pref ignored.
@@ -1083,25 +1090,21 @@ ${sectionsHtml}
         var tiles = strip.querySelectorAll('.slides-ng-picker-tile');
         var scale = tileW / slideW;
         tiles.forEach(function (t) {
-          var sizeCss;
-          if (orientation === 'auto') {
-            // CSS grid sets width via auto-fill; we provide a min
-            // size hint here and let grid stretch us. The aspect
-            // ratio gives the tile its height.
-            sizeCss =
-              'min-width:' + tileW + 'px;width:100%;' +
-              'aspect-ratio:' + slideW + '/' + slideH + ';';
-          } else {
-            // vertical-1 / vertical-2 / horizontal: pixel-pin.
-            sizeCss =
-              'width:' + tileW + 'px;height:' + tileH + 'px;' +
-              'flex:0 0 auto;';
-          }
+          // v0.11.21: pixel-pin tile dimensions for ALL modes,
+          // including auto. The earlier width:100%+aspect-ratio
+          // approach for auto was racy — clientHeight didn't always
+          // settle to tileW * aspect before the inner content's
+          // transform was applied, so content rendered unscaled.
+          // We now compute autoTileW deterministically from strip
+          // width and minCellPx, and tileW/tileH match it.
+          var sizeCss =
+            'width:' + tileW + 'px;height:' + tileH + 'px;' +
+            (orientation === 'horizontal' ? 'flex:0 0 auto;' : '');
           t.style.cssText =
             'position:relative;' + sizeCss +
             'background:' + stripBodyBg + ';border:2px solid rgba(255,255,255,0.18);' +
             'border-radius:6px;padding:0;cursor:pointer;overflow:hidden;color:#fff;' +
-            'font:inherit;';
+            'font:inherit;display:block;';
           var thumb = t.querySelector('.slides-ng-picker-thumb');
           if (thumb) {
             thumb.style.cssText =
@@ -1137,37 +1140,12 @@ ${sectionsHtml}
             applyCurrentTileStyle(t);
           }
         });
-        // v0.11.20: per-tile ResizeObserver keeps the inner scale
-        // synced with each tile's actual rendered width. The previous
-        // approach (compute scale from tileW, set inline transform
-        // once) broke under several races: reveal.js's own .reveal
-        // selectors competing with our fake .reveal scopes via cascade,
-        // the post-rAF measure firing before CSS settled, and the
-        // strip-level relayout hook stomping inline styles. RO per
-        // tile is local + idempotent — every cell rebuild ends with
-        // scale exactly matching the rendered cell, no race window.
-        if (typeof window.ResizeObserver === 'function') {
-          tiles.forEach(function (t) {
-            var thumb = t.querySelector('.slides-ng-picker-thumb');
-            if (!thumb) return;
-            var content = thumb.querySelector('.slides-ng-picker-thumb-content');
-            if (!content) return;
-            // Stash a single RO per tile so multiple layout passes
-            // don't stack listeners. The previous instance is fine to
-            // garbage-collect once we replace it.
-            if (t.__slidesNgRo) { t.__slidesNgRo.disconnect(); }
-            var ro = new ResizeObserver(function (entries) {
-              var entry = entries[0];
-              if (!entry) return;
-              var w = entry.contentRect.width;
-              if (!(w > 0)) return;
-              var live = w / slideW;
-              content.style.transform = 'scale(' + live + ')';
-            });
-            ro.observe(t);
-            t.__slidesNgRo = ro;
-          });
-        }
+        // v0.11.21: ResizeObserver per-tile (added in v0.11.20) is no
+        // longer needed because every mode now pins tile width in
+        // pixels — the inline transform set above already matches the
+        // rendered tile size. The relayout hook re-invokes
+        // applyPickerStripLayout on iframe resize, which recomputes
+        // tileW from the new stripInnerW and writes fresh styles.
       }
 
       // v0.11.13: when true (default), scenes inherit the theme's

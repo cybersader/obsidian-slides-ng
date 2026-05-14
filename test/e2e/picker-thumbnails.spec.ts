@@ -105,7 +105,9 @@ describe("v0.11.0 picker thumbnails", function () {
       const plugin = app.plugins.plugins["slides-ng"];
       return plugin?.settings?.speakerPickerOrientation ?? null;
     });
-    expect(before).toBe("vertical");
+    // v0.11.15+: default is "vertical-1" (the legacy "vertical" alias
+    // is migrated to "vertical-1" on settings load).
+    expect(before).toBe("vertical-1");
 
     await browser.execute(() => {
       const btn = document.querySelector<HTMLButtonElement>(
@@ -114,6 +116,8 @@ describe("v0.11.0 picker thumbnails", function () {
       btn?.click();
     });
 
+    // v0.11.15+: cycle is vertical-1 → vertical-2 → horizontal → auto.
+    // First click goes from vertical-1 to vertical-2.
     await browser.waitUntil(
       async () => {
         const cur = await browser.executeObsidian(({ app }) => {
@@ -121,9 +125,9 @@ describe("v0.11.0 picker thumbnails", function () {
           const plugin = app.plugins.plugins["slides-ng"];
           return plugin?.settings?.speakerPickerOrientation ?? null;
         });
-        return cur === "horizontal";
+        return cur === "vertical-2";
       },
-      { timeout: 3000, timeoutMsg: "orientation didn't flip to horizontal" }
+      { timeout: 3000, timeoutMsg: "orientation didn't flip to vertical-2" }
     );
   });
 

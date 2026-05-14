@@ -6,6 +6,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.21] — 2026-05-14
+
+### Fixed
+
+- **Picker auto-mode now actually renders distinct layouts per
+  magnifier preset.** v0.11.20's `width:100% + aspect-ratio +
+  ResizeObserver` approach for auto mode left content unscaled
+  visually even though geometry measurements reported correct
+  scale — `aspect-ratio` on `<button>` grid items raced with
+  the inner content's transform write. v0.11.21 pixel-pins
+  tile width in auto mode too: column count is computed
+  deterministically from strip width and the magnifier preset
+  (`Math.floor(stripWidth / minCellPx)`), then tile width =
+  stripWidth / cols. Same approach as the other three
+  orientations. Verified by the new
+  `test/e2e/picker-sizing.spec.ts` which drives every (4
+  orientation × 4 magnifier preset) combination and asserts
+  every tile's scaled content fits its container.
+- **Picker current-tile indicator no longer flips back and
+  forth after navigating.** `applyState` was queuing a burst
+  of 7 delayed `setPickerCurrent` posts (over 2.5 s) to defeat
+  bridge-install races on fresh mounts. When the user
+  navigated rapidly, an earlier burst's stale posts kept
+  overwriting the new highlight. The burst timer IDs are now
+  tracked + cleared before scheduling the next burst.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — `applyPickerStripLayout`
+  auto-mode rewrite: grid template is
+  `repeat(N, autoTileW px)` for an explicit N from
+  `Math.floor(stripInnerW / minCellPx)`. Tile cssText is
+  pixel-pin for every orientation (auto included). Removed
+  the per-tile ResizeObserver (v0.11.20) and the aspect-ratio
+  branch — both were workarounds for races introduced by the
+  non-pinned approach and unnecessary once the tile is
+  pinned.
+- `src/SlidesNGSpeakerView.ts` — new
+  `pickerCurrentBurstTimers: number[]` field stores timer IDs
+  from the most recent burst; `applyState` clears them before
+  enqueuing new ones.
+- `test/e2e/picker-sizing.spec.ts` — new WDIO spec drives the
+  speaker view through every (orientation × magnifier)
+  combination, switches into the sandboxed picker iframe via
+  CDP, measures each tile's `clientWidth`/`clientHeight` and
+  the inner `.slides-ng-picker-thumb-content` computed
+  transform, computes `scale * 960` and asserts it doesn't
+  exceed `tileW` by more than 4 px. Screenshots every combo
+  for human review.
+
 ## [0.11.20] — 2026-05-14
 
 ### Fixed
