@@ -221,6 +221,57 @@ export class SlidesNGSettingTab extends PluginSettingTab {
     // The `speakerPickerDefaultMode` field stays on the settings
     // type for back-compat read, but the UI is gone.
 
+    // v0.11.0: picker style + orientation + tile width
+    new Setting(containerEl)
+      .setName("Slide picker style")
+      .setDesc(
+        "`Thumbnails` shows real slide miniatures (PowerPoint-like). `Text` shows numbered titles only — lighter weight, useful for very long decks."
+      )
+      .addDropdown((d) => {
+        d.addOption("thumbnails", "Thumbnails");
+        d.addOption("text", "Text");
+        d.setValue(this.plugin.settings.speakerPickerStyle ?? "thumbnails").onChange(
+          async (v) => {
+            this.plugin.settings.speakerPickerStyle = v as "thumbnails" | "text";
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
+    new Setting(containerEl)
+      .setName("Picker orientation")
+      .setDesc(
+        "Layout direction for the thumbnail picker. `Vertical` stacks tiles in a column (PowerPoint default); `horizontal` flows them in a row (film-strip view)."
+      )
+      .addDropdown((d) => {
+        d.addOption("vertical", "Vertical");
+        d.addOption("horizontal", "Horizontal");
+        d.setValue(this.plugin.settings.speakerPickerOrientation ?? "vertical").onChange(
+          async (v) => {
+            this.plugin.settings.speakerPickerOrientation =
+              v as "vertical" | "horizontal";
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
+    new Setting(containerEl)
+      .setName("Picker tile width (px)")
+      .setDesc(
+        "Override tile width for the thumbnail picker. Zero (the default) auto-fits tiles to the panel size."
+      )
+      .addText((t) => {
+        t.setValue(String(this.plugin.settings.speakerPickerTileWidth ?? 0)).onChange(
+          async (v) => {
+            const n = parseInt(v, 10);
+            if (Number.isFinite(n) && n >= 0 && n <= 1000) {
+              this.plugin.settings.speakerPickerTileWidth = n;
+              await this.plugin.saveSettings();
+            }
+          }
+        );
+      });
+
     new Setting(containerEl)
       .setName("Timer tick interval (ms)")
       .setDesc(

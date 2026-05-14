@@ -88,6 +88,18 @@ export class SlidesNGSpeakerView extends ItemView {
   private timerToggleBtn?: HTMLButtonElement;
   private notesEl?: HTMLElement;
   private pickerEl?: HTMLElement;
+  /** Thumbnail-picker iframe (v0.11.0). Renders the deck and is
+   * switched into strip mode via the `enablePickerStrip` bridge
+   * command. Click events come back as `slides-ng-picker` messages
+   * which we forward as `goto` commands to the main preview. */
+  private pickerStripIframe?: HTMLIFrameElement;
+  /** Path / mtime cache for the picker iframe — same pattern as
+   * the visual-next-slide iframe, so save-driven re-renders are
+   * cheap and idempotent. */
+  private lastPickerRenderedPath?: string;
+  private lastPickerRenderedMtime?: number;
+  /** Orientation toggle button in the picker header (v0.11.0). */
+  private pickerOrientationBtn?: HTMLButtonElement;
   private sceneButtons = new Map<string, HTMLButtonElement>();
   /** Visual next-slide preview mini-iframe (v0.7.0). */
   private nextSlideIframe?: HTMLIFrameElement;
@@ -97,8 +109,22 @@ export class SlidesNGSpeakerView extends ItemView {
   private lastMiniRenderedMtime?: number;
 
   private messageHandler = (event: MessageEvent) => {
-    const data = event.data as Partial<PreviewState> & { type?: string };
-    if (!data || data.type !== "slides-ng-state") return;
+    const data = event.data as Partial<PreviewState> & {
+      type?: string;
+      event?: string;
+      idx?: number;
+    };
+    if (!data) return;
+    // v0.11.0: picker-strip iframe sends `slides-ng-picker` events
+    // when the user clicks a thumbnail. Forward as `goto` to the
+    // MAIN preview iframe so the deck navigates there.
+    if (data.type === "slides-ng-picker" && data.event === "click") {
+      if (typeof data.idx === "number") {
+        this.send("goto", data.idx);
+      }
+      return;
+    }
+    if (data.type !== "slides-ng-state") return;
     // Only accept state from the MAIN preview iframe. The visual next-
     // slide mini-iframe (introduced in v0.7) also runs the bridge and
     // posts state events — those represent a different slide position
@@ -400,17 +426,61 @@ export class SlidesNGSpeakerView extends ItemView {
     this.notesEl = notesWrap.createDiv({ cls: "slides-ng-speaker-notes" });
     this.notesWrapEl = notesWrap;
 
-    // Picker — header + content. setPanelVisible wraps both so they
-    // hide together. v0.10.3: dropped the compact/list mode toggle
-    // (and the corresponding "Show all N slides →" footer link).
-    // The picker is now a single scrollable column of slide rows
-    // (numbered badge + title), auto-scrolled to keep the current
-    // slide in view.
+    // Picker — header + content. v0.11.0: two styles —
+    //   "thumbnails": iframe rendered in picker-strip mode (PowerPoint-like)
+    //   "text":       v0.10.3 scrollable column of numbered text rows
+    // Toggleable via the orientation button in the header AND via
+    // settings. Either way, only one is mounted at a time.
     const pickerWrap = container.createDiv({ cls: "slides-ng-speaker-picker-wrap" });
     setPanelVisible(pickerWrap, "picker");
     const pickerHeader = pickerWrap.createDiv({ cls: "slides-ng-speaker-picker-header" });
     pickerHeader.createEl("div", { cls: "slides-ng-speaker-section-title", text: "Slides" });
-    this.pickerEl = pickerWrap.createDiv({ cls: "slides-ng-speaker-picker" });
+
+    const pickerStyle = settings?.speakerPickerStyle ?? "thumbnails";
+    if (pickerStyle === "thumbnails") {
+      // Orientation toggle button: rotate-3d-2d-like icon. Click
+      // flips vertical ⇄ horizontal and persists the setting.
+      this.pickerOrientationBtn = pickerHeader.createEl("button", {
+        cls: "slides-ng-speaker-btn slides-ng-speaker-picker-orient-btn",
+        attr: { type: "button" },
+      });
+      const initialOrient = settings?.speakerPickerOrientation ?? "vertical";
+      this.applyPickerOrientButton(initialOrient);
+      this.pickerOrientationBtn.addEventListener("click", () => {
+        const s = this.getSettings?.();
+        if (!s) return;
+        const next = (s.speakerPickerOrientation ?? "vertical") === "vertical"
+          ? "horizontal" : "vertical";
+        s.speakerPickerOrientation = next;
+        void this.saveSettings?.();
+        this.applyPickerOrientButton(next);
+        // Post live update to the iframe (no re-render needed).
+        this.postToPicker({
+          type: "slides-ng-cmd",
+          cmd: "setPickerOrientation",
+          orientation: next,
+        });
+      });
+
+      this.pickerEl = pickerWrap.createDiv({ cls: "slides-ng-speaker-picker slides-ng-speaker-picker-thumbs" });
+      this.pickerStripIframe = this.pickerEl.createEl("iframe", {
+        cls: "slides-ng-speaker-picker-iframe",
+        attr: { sandbox: "allow-scripts" },
+      });
+      // Re-render when the deck file changes (matches visual-next pattern).
+      this.registerEvent(
+        this.app.vault.on("modify", (file: TAbstractFile) => {
+          if (this.lastPickerRenderedPath && file.path === this.lastPickerRenderedPath) {
+            this.lastPickerRenderedPath = undefined;
+            this.lastPickerRenderedMtime = undefined;
+            void this.ensurePickerStripRendered();
+          }
+        })
+      );
+    } else {
+      // Legacy text-list picker.
+      this.pickerEl = pickerWrap.createDiv({ cls: "slides-ng-speaker-picker" });
+    }
 
     // Visual-next-preview height: apply the user's persisted height
     // if any, and wire a ResizeObserver to persist subsequent drag-
@@ -1056,6 +1126,94 @@ export class SlidesNGSpeakerView extends ItemView {
     }
   }
 
+  // ===== v0.11.0 picker-strip support =====
+
+  /**
+   * Render the deck into the picker iframe + switch the iframe into
+   * picker-strip mode. Mirrors `ensureVisualNextSlideRendered()`:
+   * only re-renders when the deck path or mtime changes.
+   */
+  private async ensurePickerStripRendered(): Promise<void> {
+    if (!this.pickerStripIframe) return;
+    const deckPath = this.findPreviewDeckPath();
+    if (!deckPath) return;
+    const file = this.app.vault.getAbstractFileByPath(deckPath);
+    if (!(file instanceof TFile)) return;
+    const mtime = file.stat.mtime;
+    if (
+      deckPath === this.lastPickerRenderedPath &&
+      mtime === this.lastPickerRenderedMtime
+    ) {
+      return;
+    }
+    try {
+      const markdown = await this.app.vault.read(file);
+      const settings = this.getSettings?.();
+      const html = renderDeck(markdown, file.path, {
+        defaultTheme: settings?.defaultTheme,
+        defaultTransition: settings?.defaultTransition,
+        defaultLayout: settings?.defaultLayout,
+        codeTheme: settings?.codeTheme,
+        imageLayoutSplit: settings?.imageLayoutSplit,
+        lineStepDimOpacity: settings?.lineStepDimOpacity,
+        codeBlockMaxHeight: settings?.codeBlockMaxHeight,
+        codeBlockOverflowScroll: settings?.codeBlockOverflowScroll,
+        transitionSpeed: settings?.transitionSpeed,
+        magicMoveDurationMs: settings?.magicMoveDurationMs,
+        showRevealControlsEmbedded: false,
+        showRevealMenuEmbedded: false,
+        resolveImage: (raw) => this.resolveDeckImage(raw, file.path),
+      });
+      this.pickerStripIframe.srcdoc = html;
+      this.lastPickerRenderedPath = deckPath;
+      this.lastPickerRenderedMtime = mtime;
+      // After the iframe loads, post enablePickerStrip. Use a short
+      // retry burst because the bridge listener may not be up yet.
+      const orient = settings?.speakerPickerOrientation ?? "vertical";
+      const tileWidth = settings?.speakerPickerTileWidth ?? 0;
+      const post = (): void => {
+        this.postToPicker({
+          type: "slides-ng-cmd",
+          cmd: "enablePickerStrip",
+          orientation: orient,
+          tileWidth,
+        });
+      };
+      post();
+      for (const delay of [80, 200, 450, 900]) {
+        window.setTimeout(post, delay);
+      }
+    } catch (err) {
+      console.warn("[slides-ng] picker-strip render failed", err);
+    }
+  }
+
+  /** Forward a message to the picker iframe. No-op if not mounted. */
+  private postToPicker(payload: Record<string, unknown>): void {
+    const win = this.pickerStripIframe?.contentWindow;
+    if (!win) return;
+    win.postMessage(payload, "*");
+  }
+
+  /**
+   * Update the orientation-toggle button's icon + tooltip based on
+   * the CURRENT orientation. Called on view init + on click.
+   */
+  private applyPickerOrientButton(orientation: "vertical" | "horizontal"): void {
+    if (!this.pickerOrientationBtn) return;
+    this.pickerOrientationBtn.empty();
+    const iconEl = this.pickerOrientationBtn.createSpan({
+      cls: "slides-ng-speaker-btn-icon",
+    });
+    setIcon(iconEl, orientation === "vertical" ? "panel-bottom" : "panel-right");
+    setTooltip(
+      this.pickerOrientationBtn,
+      orientation === "vertical"
+        ? "Switch picker to horizontal (film-strip) layout"
+        : "Switch picker to vertical layout"
+    );
+  }
+
   /** Image-attachment resolver — mirrors SlidesNGView.resolveImageAttachment. */
   private resolveDeckImage(raw: string, deckPath: string): string | null {
     if (/^(https?:|data:|file:)/.test(raw)) return raw;
@@ -1125,7 +1283,19 @@ export class SlidesNGSpeakerView extends ItemView {
     void this.ensureVisualNextSlideRendered().then(() => {
       this.driveVisualNextSlideTo(this.state!.currentIdx + 1);
     });
-    this.renderPicker();
+    // v0.11.0: drive the picker. Either render the text list (legacy)
+    // or update the thumbnail-strip iframe's current-tile highlight.
+    if (this.pickerStripIframe) {
+      void this.ensurePickerStripRendered().then(() => {
+        this.postToPicker({
+          type: "slides-ng-cmd",
+          cmd: "setPickerCurrent",
+          idx: this.state!.currentIdx,
+        });
+      });
+    } else {
+      this.renderPicker();
+    }
   }
 
   /**

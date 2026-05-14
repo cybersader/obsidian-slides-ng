@@ -803,6 +803,160 @@ ${sectionsHtml}
         var cached = slidesNgThumbCache[idx];
         return cached ? cached.cloneNode(true) : null;
       }
+
+      /*
+       * v0.11.0: build a scrollable strip of slide thumbnails over
+       * the whole iframe. Used by the speaker view's picker panel.
+       * Replaces reveal's slide presentation in this iframe. Tile
+       * clicks post slides-ng-picker events back up; parent forwards
+       * as goto commands.
+       *
+       * orientation: 'vertical' (column) or 'horizontal' (row)
+       * tileWidth: pixel width for tiles; 0 = auto-fit container
+       */
+      function buildPickerStrip(orientation, tileWidth) {
+        var existing = document.getElementById('slides-ng-picker-strip');
+        if (existing) existing.remove();
+        var revealEl = document.querySelector('.reveal');
+        if (revealEl) revealEl.style.display = 'none';
+        var revealConfig2 = (typeof Reveal.getConfig === 'function' ? Reveal.getConfig() : {}) || {};
+        var SLIDE_W2 = typeof revealConfig2.width === 'number' && revealConfig2.width > 0 ? revealConfig2.width : 960;
+        var SLIDE_H2 = typeof revealConfig2.height === 'number' && revealConfig2.height > 0 ? revealConfig2.height : 700;
+        var strip = document.createElement('div');
+        strip.id = 'slides-ng-picker-strip';
+        strip.setAttribute('data-orientation', orientation);
+        strip.setAttribute('data-tile-width', String(tileWidth || 0));
+        document.body.appendChild(strip);
+        var meta = harvestSlideMeta();
+        meta.forEach(function (s) {
+          var tile = document.createElement('button');
+          tile.setAttribute('type', 'button');
+          tile.setAttribute('data-slide-idx', String(s.idx));
+          tile.className = 'slides-ng-picker-tile';
+          var thumb = document.createElement('div');
+          thumb.className = 'slides-ng-picker-thumb';
+          tile.appendChild(thumb);
+          var content = getCachedSlideClone(s.idx);
+          if (content) {
+            content.className = (content.className || '') + ' slides-ng-picker-thumb-content';
+            thumb.appendChild(content);
+          }
+          var num = document.createElement('div');
+          num.className = 'slides-ng-picker-tile-num';
+          num.textContent = String(s.idx + 1);
+          tile.appendChild(num);
+          if (s.title) {
+            var title = document.createElement('div');
+            title.className = 'slides-ng-picker-tile-title';
+            title.textContent = s.title;
+            tile.appendChild(title);
+          }
+          tile.addEventListener('click', function () {
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage(
+                { type: 'slides-ng-picker', event: 'click', idx: s.idx },
+                '*'
+              );
+            }
+          });
+          strip.appendChild(tile);
+        });
+        // Store dimensions on the strip so layout helper can compute scale.
+        strip.setAttribute('data-slide-w', String(SLIDE_W2));
+        strip.setAttribute('data-slide-h', String(SLIDE_H2));
+        applyPickerStripLayout(strip);
+        // Highlight the current slide right away.
+        var idx0 = (Reveal.getIndices() || {}).h || 0;
+        var current = strip.querySelector('button[data-slide-idx="' + idx0 + '"]');
+        if (current) current.classList.add('current');
+      }
+
+      /**
+       * Re-apply CSS based on the strip's current orientation. Called
+       * on initial build and on every setPickerOrientation command.
+       */
+      function applyPickerStripLayout(strip) {
+        var orientation = strip.getAttribute('data-orientation') || 'vertical';
+        var tileWidthAttr = parseInt(strip.getAttribute('data-tile-width') || '0', 10);
+        var slideW = parseInt(strip.getAttribute('data-slide-w') || '960', 10) || 960;
+        var slideH = parseInt(strip.getAttribute('data-slide-h') || '700', 10) || 700;
+        var aspect = slideH / slideW;
+
+        // Base strip styles: fixed full-viewport, scrollable along
+        // the appropriate axis, background dimmed.
+        strip.style.cssText =
+          'position:fixed;inset:0;background:#0a0a0a;color:#fff;' +
+          'z-index:5;padding:8px;box-sizing:border-box;' +
+          'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);' +
+          'display:flex;gap:6px;' +
+          (orientation === 'horizontal'
+            ? 'flex-direction:row;overflow-x:auto;overflow-y:hidden;'
+            : 'flex-direction:column;overflow-y:auto;overflow-x:hidden;');
+
+        // Tile dimensions. Auto-fit: in vertical, tile width = strip
+        // inner width; in horizontal, tile height = strip inner height.
+        // Manual: tileWidthAttr sets tile width; height is derived
+        // from aspect ratio.
+        var stripInnerW = strip.clientWidth - 16;
+        var stripInnerH = strip.clientHeight - 16;
+        var tileW, tileH;
+        if (orientation === 'horizontal') {
+          tileH = stripInnerH > 0 ? stripInnerH - 8 : 80;
+          tileW = Math.round(tileH / aspect);
+          // Override with explicit width if user set one
+          if (tileWidthAttr > 0) {
+            tileW = tileWidthAttr;
+            tileH = Math.round(tileW * aspect);
+          }
+        } else {
+          tileW = tileWidthAttr > 0 ? tileWidthAttr : (stripInnerW > 0 ? stripInnerW : 200);
+          tileH = Math.round(tileW * aspect);
+        }
+        var scale = tileW / slideW;
+        var tiles = strip.querySelectorAll('.slides-ng-picker-tile');
+        tiles.forEach(function (t) {
+          t.style.cssText =
+            'position:relative;width:' + tileW + 'px;height:' + tileH + 'px;' +
+            'flex:0 0 auto;background:#000;border:2px solid rgba(255,255,255,0.18);' +
+            'border-radius:6px;padding:0;cursor:pointer;overflow:hidden;color:#fff;' +
+            'font:inherit;';
+          var thumb = t.querySelector('.slides-ng-picker-thumb');
+          if (thumb) {
+            thumb.style.cssText =
+              'position:absolute;inset:0;overflow:hidden;pointer-events:none;';
+            var content = thumb.querySelector('.slides-ng-picker-thumb-content');
+            if (content) {
+              content.style.cssText =
+                'position:absolute;top:0;left:0;' +
+                'width:' + slideW + 'px;height:' + slideH + 'px;' +
+                'transform:scale(' + scale + ');transform-origin:0 0;' +
+                'pointer-events:none;';
+            }
+          }
+          var num = t.querySelector('.slides-ng-picker-tile-num');
+          if (num) {
+            num.style.cssText =
+              'position:absolute;bottom:3px;right:5px;' +
+              'background:rgba(0,0,0,0.85);color:#fff;padding:1px 6px;' +
+              'border-radius:3px;font-size:11px;font-weight:600;' +
+              'pointer-events:none;z-index:2;font-variant-numeric:tabular-nums;';
+          }
+          var title = t.querySelector('.slides-ng-picker-tile-title');
+          if (title) {
+            title.style.cssText =
+              'position:absolute;top:0;left:0;right:0;' +
+              'background:linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);' +
+              'color:#fff;padding:3px 6px 10px;font-size:10px;line-height:1.2;' +
+              'overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;' +
+              '-webkit-box-orient:vertical;text-align:left;pointer-events:none;z-index:2;';
+          }
+          if (t.classList.contains('current')) {
+            t.style.borderColor = 'var(--r-link-color, #42affa)';
+            t.style.boxShadow = '0 0 0 2px rgba(66, 175, 250, 0.4)';
+          }
+        });
+      }
+
       function ensureSceneEl() {
         var el = document.getElementById('slides-ng-scene');
         if (el) return el;
@@ -1051,6 +1205,44 @@ ${sectionsHtml}
               clearScene();
               break;
             case 'requestState': postState(); break;
+            case 'enablePickerStrip': {
+              // v0.11.0: turn this iframe into a strip of slide
+              // thumbnails for the speaker view picker panel.
+              // Hides reveal slide stage; tile clicks post
+              // slides-ng-picker events back up.
+              try {
+                var orient = (data && data.orientation === 'horizontal')
+                  ? 'horizontal' : 'vertical';
+                var tileWidth = (data && typeof data.tileWidth === 'number')
+                  ? data.tileWidth : 0;
+                buildPickerStrip(orient, tileWidth);
+              } catch (e) { console.warn('[slides-ng] enablePickerStrip', e); }
+              break;
+            }
+            case 'setPickerOrientation': {
+              var stripEl = document.getElementById('slides-ng-picker-strip');
+              if (stripEl && data && (data.orientation === 'horizontal' || data.orientation === 'vertical')) {
+                stripEl.setAttribute('data-orientation', data.orientation);
+                applyPickerStripLayout(stripEl);
+              }
+              break;
+            }
+            case 'setPickerCurrent': {
+              var stripEl2 = document.getElementById('slides-ng-picker-strip');
+              if (stripEl2 && data && typeof data.idx === 'number') {
+                var tiles = stripEl2.querySelectorAll('button[data-slide-idx]');
+                tiles.forEach(function (t) {
+                  var tIdx = parseInt(t.getAttribute('data-slide-idx') || '0', 10);
+                  if (tIdx === data.idx) {
+                    t.classList.add('current');
+                    t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                  } else {
+                    t.classList.remove('current');
+                  }
+                });
+              }
+              break;
+            }
             case 'relayout': {
               // v0.10.4: parent posts this when the iframe element
               // resizes. The in-iframe ResizeObserver guard observes

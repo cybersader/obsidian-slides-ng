@@ -6,6 +6,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-05-14
+
+### Added
+
+- **PowerPoint-style thumbnail picker.** The speaker view's
+  `Slides` panel can now render real miniatures of each slide
+  instead of a text-row list. Click any thumbnail to jump there
+  in the main preview.
+- **Vertical OR horizontal orientation.** Inline toggle button
+  in the picker header flips between modes; the default is set
+  in Settings → Speaker → Picker orientation.
+- **Responsive tile sizing.** Tiles auto-fit the panel's
+  dimensions (vertical: width follows panel width; horizontal:
+  height follows panel height). Override with a fixed pixel
+  width via Settings → Speaker → Picker tile width.
+- **Drag-resize picker panel height** — the thumbnail picker
+  has `resize: vertical`, so the panel can be made taller for
+  big decks or shorter to make room for other panels.
+- **Settings → Speaker → Slide picker style** lets users opt
+  back to the v0.10.3 text-row picker (lighter weight; useful
+  for very long decks where rendering 100+ thumbnails would be
+  wasteful).
+
+### How it works
+
+- The picker mounts a single iframe rendered via the same
+  `renderDeck()` call as the visual-next-slide preview.
+- Once the iframe loads, the speaker view posts a new bridge
+  command `enablePickerStrip` (with orientation + optional
+  tileWidth). The iframe's bridge replaces reveal's normal
+  slide stage with a scrollable strip of DOM-cloned slide
+  thumbnails (reusing the Grid overlay's clone-and-scale
+  trick + the idle-time prewarm cache).
+- Tile clicks post `slides-ng-picker` events back to the
+  speaker view, which forwards them as `goto` commands to the
+  MAIN preview iframe.
+- Current slide is highlighted via `setPickerCurrent` posts on
+  every state event.
+- Orientation toggle posts `setPickerOrientation` for an instant
+  layout flip (no re-render).
+
+### Technical
+
+- `src/render/revealTemplate.ts` — new bridge cases
+  `enablePickerStrip`, `setPickerOrientation`, `setPickerCurrent`;
+  new functions `buildPickerStrip()` + `applyPickerStripLayout()`.
+- `src/SlidesNGSpeakerView.ts` — new `pickerStripIframe` field +
+  `ensurePickerStripRendered()` + `postToPicker()` +
+  `applyPickerOrientButton()`; messageHandler accepts
+  `slides-ng-picker` events with `event: "click"` for tile-click
+  forwarding; picker construction branches on `speakerPickerStyle`.
+- `src/settings.ts` — `speakerPickerStyle`, `speakerPickerOrientation`,
+  `speakerPickerTileWidth` fields + defaults.
+- `src/SlidesNGSettingTab.ts` — Settings rows for all three.
+- `src/styles.css` — `.slides-ng-speaker-picker-thumbs`,
+  `-picker-iframe`, `-picker-orient-btn` rules.
+
 ## [0.10.8] — 2026-05-14
 
 ### Fixed

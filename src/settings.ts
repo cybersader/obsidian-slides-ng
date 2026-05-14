@@ -161,6 +161,31 @@ export interface SlidesNGSettings {
    * to false in settings once your install is stable. v0.10.2+.
    */
   debugLogging: boolean;
+
+  /**
+   * Picker rendering style. `"thumbnails"` mounts a strip of real
+   * slide miniatures inside an iframe (PowerPoint-like); `"text"`
+   * keeps the v0.10.3 text-row list. Default `"thumbnails"`.
+   * v0.11.0+.
+   */
+  speakerPickerStyle: "thumbnails" | "text";
+
+  /**
+   * Thumbnail-picker orientation. `"vertical"` stacks tiles in a
+   * scrollable column (PowerPoint default); `"horizontal"` flows
+   * them in a row (PowerPoint film-strip view). Live-toggleable
+   * via a button in the picker header. Default `"vertical"`.
+   * v0.11.0+.
+   */
+  speakerPickerOrientation: "vertical" | "horizontal";
+
+  /**
+   * Override tile width in pixels. `0` = auto-fit (tile width
+   * follows panel width in vertical mode; tile height follows
+   * panel height in horizontal mode). Set a positive integer to
+   * pin tile dimensions. v0.11.0+.
+   */
+  speakerPickerTileWidth: number;
 }
 
 /** All draggable/toggleable speaker-view panels. */
@@ -305,4 +330,7 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   speakerTimerCountdownMinutes: 30,
   speakerPanelsMultiColumn: true,
   debugLogging: true,
+  speakerPickerStyle: "thumbnails",
+  speakerPickerOrientation: "vertical",
+  speakerPickerTileWidth: 0,
 };

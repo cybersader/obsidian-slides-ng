@@ -644,6 +644,37 @@
   /* Smooth scroll for auto-scroll-into-view of current slide. */
   scroll-behavior: smooth;
 }
+
+/* v0.11.0 thumbnail-picker mode. The picker contains a single
+ * iframe in strip mode (vertical OR horizontal). The iframe fills
+ * the picker box; orientation toggle button lives in the header. */
+.slides-ng-speaker-picker-thumbs {
+  /* Override text-list overflow + flex column. The iframe sits
+   * full-bleed inside this container. */
+  padding: 0;
+  overflow: hidden;
+  min-height: 200px;
+  max-height: 50vh;
+  height: 32vh;
+  resize: vertical; /* user can drag picker height */
+}
+.slides-ng-speaker-picker-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 6px;
+  display: block;
+  background: #0a0a0a;
+}
+.slides-ng-speaker-picker-orient-btn {
+  /* Small icon button in the picker header. */
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85em;
+}
+.slides-ng-speaker-picker-orient-btn .svg-icon {
+  width: 14px;
+  height: 14px;
+}
 /* v0.10.3: compact-row + compact-all CSS rules deleted along with
  * the picker's compact/list mode toggle and "Show all N slides →"
  * footer link. The picker is now a single scrollable column of
