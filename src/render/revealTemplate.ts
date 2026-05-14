@@ -984,6 +984,13 @@ ${sectionsHtml}
 
         var stripInnerW = strip.clientWidth - 16;
         var stripInnerH = strip.clientHeight - 16;
+        // v0.11.18b: when the strip is appended sync and layout
+        // hasn't run yet, clientWidth/clientHeight can be 0. Defer to
+        // the next animation frame so the measurements are real.
+        if (stripInnerW <= 0 || stripInnerH <= 0) {
+          requestAnimationFrame(function () { applyPickerStripLayout(strip); });
+          return;
+        }
 
         // v0.11.18 layout rewrite. Layout semantics:
         //   vertical-1   exactly 1 column; tile FILLS the strip width
@@ -1061,18 +1068,35 @@ ${sectionsHtml}
           tileW = stripInnerW > 0 ? stripInnerW : 200;
           tileH = Math.round(tileW * aspect);
         }
-        // v0.11.18: in flex/grid vertical modes use width:100% plus
-        // aspect-ratio:SLIDE_W/SLIDE_H so tiles fill their cell and
-        // height tracks aspect. In horizontal mode we still pin pixel
-        // width because the row flexbox needs intrinsic widths to lay
-        // tiles out side-by-side.
+        // v0.11.18b: pixel-pin tile dimensions for ALL modes. The
+        // aspect-ratio/width:100% approach was correct in theory but
+        // the post-rAF scale measure raced with iframe layout and
+        // sometimes left tiles at slideW-sized inner content (the
+        // "content overflows tile" bug from v0.11.18). Pixel pins are
+        // robust and the scale value matches the actual tile width
+        // since we control both.
+        //
+        // For auto mode, tileW is the MIN cell size; CSS grid
+        // auto-fill spreads tiles wider when there's room. We measure
+        // the actual rendered tile width post-rAF and rescale only
+        // for auto.
         var tiles = strip.querySelectorAll('.slides-ng-picker-tile');
-        var verticalFillMode = orientation !== 'horizontal';
         var scale = tileW / slideW;
         tiles.forEach(function (t) {
-          var sizeCss = verticalFillMode
-            ? 'width:100%;aspect-ratio:' + slideW + '/' + slideH + ';'
-            : 'width:' + tileW + 'px;height:' + tileH + 'px;flex:0 0 auto;';
+          var sizeCss;
+          if (orientation === 'auto') {
+            // CSS grid sets width via auto-fill; we provide a min
+            // size hint here and let grid stretch us. The aspect
+            // ratio gives the tile its height.
+            sizeCss =
+              'min-width:' + tileW + 'px;width:100%;' +
+              'aspect-ratio:' + slideW + '/' + slideH + ';';
+          } else {
+            // vertical-1 / vertical-2 / horizontal: pixel-pin.
+            sizeCss =
+              'width:' + tileW + 'px;height:' + tileH + 'px;' +
+              'flex:0 0 auto;';
+          }
           t.style.cssText =
             'position:relative;' + sizeCss +
             'background:' + stripBodyBg + ';border:2px solid rgba(255,255,255,0.18);' +
@@ -1113,14 +1137,12 @@ ${sectionsHtml}
             applyCurrentTileStyle(t);
           }
         });
-        // v0.11.18: in vertical fill modes the tiles use width:100% +
-        // aspect-ratio, so the actual rendered width isn't known until
-        // CSS lays out the grid/flex container. Re-measure on the next
-        // animation frame and recompute the inner scale so the cloned
-        // section content matches the tile size. Same trick the Grid
-        // overlay uses (v0.11.14). Without this, auto-fill rendered
-        // at minCellPx scale even when each cell ended up much wider.
-        if (verticalFillMode) {
+        // v0.11.18b: only auto mode needs the post-rAF rescale,
+        // because its tile width comes from CSS grid auto-fill and
+        // is unknown at apply-time. Fixed-column modes (vertical-1,
+        // vertical-2, horizontal) have pixel-pinned tile widths so
+        // the scale calculated above already matches.
+        if (orientation === 'auto') {
           requestAnimationFrame(function () {
             var firstTile = strip.querySelector('.slides-ng-picker-tile');
             if (!firstTile) return;

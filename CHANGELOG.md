@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.19] — 2026-05-14
+
+### Fixed
+
+- **Picker tile content overflowed in v0.11.18.** The
+  width:100% + aspect-ratio + post-rAF scale approach worked
+  in the Grid overlay but raced against the picker iframe's
+  layout — sometimes the post-rAF measurement fired before
+  CSS had laid out the tiles, leaving the cloned section
+  rendering at full slideW (960 px) inside a ~360 px tile (so
+  slide titles overflowed and got clipped). Reverted fixed-
+  column modes (vertical-1, vertical-2, horizontal) to
+  pixel-pinned tile widths so the scale value matches the
+  actual tile width by construction. `auto` mode keeps the
+  width:100%/aspect-ratio + rAF measure path because its tile
+  widths come from CSS grid auto-fill and can't be known up
+  front. Added a defensive 1-rAF retry inside
+  `applyPickerStripLayout` for when the strip is appended
+  before layout has run (clientWidth/Height = 0).
+
 ## [0.11.18] — 2026-05-14
 
 ### Fixed
