@@ -5,10 +5,13 @@
  * matching @slidev/parser's convention (the LAST HTML comment in a
  * slide becomes the speaker note).
  *
+ * v0.11.16: multi-line notes are now preserved. When the textarea
+ * value contains newlines, the comment is written as the slidev
+ * convention `<!--\nline1\nline2\n-->` (one comment, multiple
+ * lines). Single-line input still writes a single-line comment for
+ * backwards-compatibility with existing decks.
+ *
  * Caveats:
- *   - Only single-line `<!-- ... -->` comments are recognised/written.
- *     Multi-line notes are not yet supported (the user can always
- *     edit the deck file directly for that case).
  *   - Slide annotations `<!-- slide ... -->` and `<!-- element ... -->`
  *     are explicitly NOT treated as notes.
  *   - v0.11.14: when the deck uses `slides-ng-auto-h1-breaks: true`
@@ -111,53 +114,85 @@ export function findSlideRanges(markdown: string): SlideRange[] {
 }
 
 /**
- * Find the line index (within the slide range) of the existing notes
- * comment, or -1 if none. A "notes" comment is the LAST single-line
- * `<!-- ... -->` in the slide whose content doesn't start with
- * `slide ` or `element ` (those are annotations, not notes).
+ * Span (inclusive on both ends) of an existing notes comment within
+ * a slide, with the comment's content already extracted and trimmed.
+ * Returns null when the slide has no trailing notes comment.
+ *
+ * Recognises BOTH formats:
+ *   - Single line:  `<!-- content -->`
+ *   - Multi-line:   `<!--`  ...  `-->`  (slidev's stringify format)
+ *
+ * Annotations (`<!-- slide ... -->`, `<!-- element ... -->`) are
+ * NOT treated as notes.
  */
-export function findNotesLine(
+export interface NotesSpan {
+  startLine: number;
+  endLine: number;
+  content: string;
+}
+
+export function findNotesSpan(
   lines: string[],
   range: SlideRange
-): number {
-  for (let i = range.endLine - 1; i >= range.startLine; i--) {
-    const line = lines[i].trim();
-    if (line.length === 0) continue;
-    const m = /^<!--\s*([\s\S]*?)\s*-->$/.exec(line);
-    if (m) {
-      const content = m[1];
-      if (/^(slide|element)\s+/.test(content)) continue;
-      return i;
-    }
-    // First non-empty non-comment line — stop searching.
-    break;
+): NotesSpan | null {
+  // Walk past trailing blank lines.
+  let bottom = range.endLine - 1;
+  while (bottom >= range.startLine && lines[bottom].trim() === "") bottom--;
+  if (bottom < range.startLine) return null;
+
+  const bottomTrim = lines[bottom].trim();
+
+  // Single-line `<!-- ... -->`
+  const single = /^<!--\s*([\s\S]*?)\s*-->$/.exec(bottomTrim);
+  if (single) {
+    const content = single[1];
+    if (/^(slide|element)\s+/.test(content)) return null;
+    return { startLine: bottom, endLine: bottom, content };
   }
-  return -1;
+
+  // Multi-line: bottom line must be just `-->` (allow trailing space).
+  if (bottomTrim !== "-->") return null;
+  // Walk backward for the opening `<!--` on its own line.
+  let top = bottom - 1;
+  while (top >= range.startLine && lines[top].trim() !== "<!--") top--;
+  if (top < range.startLine) return null;
+  const inner = lines.slice(top + 1, bottom).join("\n");
+  const content = inner.replace(/^\s+|\s+$/g, "");
+  if (/^(slide|element)\s+/.test(content)) return null;
+  return { startLine: top, endLine: bottom, content };
 }
 
 /**
- * Read the existing notes markdown for a slide (the comment's content)
- * or `""` if none.
+ * Backwards-compat shim. Returns the start line of the notes
+ * comment (single- or multi-line) or -1.
+ */
+export function findNotesLine(lines: string[], range: SlideRange): number {
+  const span = findNotesSpan(lines, range);
+  return span ? span.startLine : -1;
+}
+
+/**
+ * Read the existing notes markdown for a slide (the comment's content,
+ * with leading/trailing whitespace trimmed) or `""` if none.
  */
 export function readSlideNotes(markdown: string, slideIdx: number): string {
   const ranges = findSlideRanges(markdown);
   if (slideIdx < 0 || slideIdx >= ranges.length) return "";
   const lines = markdown.split("\n");
-  const noteLine = findNotesLine(lines, ranges[slideIdx]);
-  if (noteLine === -1) return "";
-  const m = /^<!--\s*([\s\S]*?)\s*-->$/.exec(lines[noteLine].trim());
-  return m ? m[1] : "";
+  const span = findNotesSpan(lines, ranges[slideIdx]);
+  return span ? span.content : "";
 }
 
 /**
  * Replace (or insert) the notes for a slide. Returns the updated
- * markdown. If `newNotes` is empty/whitespace and a notes line
- * exists, it's removed. If no notes line exists and `newNotes` is
- * non-empty, a new `<!-- ... -->` line is inserted at the end of
+ * markdown. If `newNotes` is empty/whitespace and an existing notes
+ * comment is found, it's removed. If no comment exists and
+ * `newNotes` is non-empty, a new comment is inserted at the end of
  * the slide (after the last non-empty content line).
  *
- * Multi-line newNotes is flattened to a single line (newlines → ` `)
- * since the writer only emits single-line comments.
+ * Format selection:
+ *   - Single-line input → `<!-- content -->` (one line)
+ *   - Multi-line input → `<!--\nline1\nline2\n-->` (slidev format)
  */
 export function replaceSlideNotes(
   markdown: string,
@@ -168,30 +203,34 @@ export function replaceSlideNotes(
   if (slideIdx < 0 || slideIdx >= ranges.length) return markdown;
   const lines = markdown.split("\n");
   const range = ranges[slideIdx];
-  const noteLine = findNotesLine(lines, range);
+  const existing = findNotesSpan(lines, range);
 
-  // Flatten newlines for safe single-line storage. The Speaker-view
-  // editor allows multi-line input but we serialize as one line.
-  const flat = newNotes.replace(/\r?\n+/g, " ").trim();
+  const trimmed = newNotes.replace(/^\s+|\s+$/g, "");
+  const isMultiline = /\r?\n/.test(trimmed);
 
-  if (noteLine !== -1) {
-    if (flat.length === 0) {
-      lines.splice(noteLine, 1);
-    } else {
-      lines[noteLine] = `<!-- ${flat} -->`;
-    }
-  } else if (flat.length > 0) {
+  let replacement: string[];
+  if (trimmed.length === 0) {
+    replacement = [];
+  } else if (isMultiline) {
+    replacement = ["<!--", ...trimmed.split(/\r?\n/), "-->"];
+  } else {
+    replacement = [`<!-- ${trimmed} -->`];
+  }
+
+  if (existing) {
+    const count = existing.endLine - existing.startLine + 1;
+    lines.splice(existing.startLine, count, ...replacement);
+  } else if (replacement.length > 0) {
     // Insert at end of slide. Skip trailing blank lines.
     let insertAt = range.endLine;
     while (insertAt > range.startLine && lines[insertAt - 1].trim() === "") {
       insertAt--;
     }
-    // Add a blank line before the comment if the preceding line has content.
     const preceding = insertAt > 0 ? lines[insertAt - 1] : "";
     if (preceding.trim().length > 0) {
-      lines.splice(insertAt, 0, "", `<!-- ${flat} -->`);
+      lines.splice(insertAt, 0, "", ...replacement);
     } else {
-      lines.splice(insertAt, 0, `<!-- ${flat} -->`);
+      lines.splice(insertAt, 0, ...replacement);
     }
   }
 

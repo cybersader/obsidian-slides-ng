@@ -97,9 +97,15 @@ describe("replaceSlideNotes — replace existing", () => {
     expect(updated).toContain("<!-- spaced -->");
   });
 
-  test("flattens newlines to single spaces (single-line comment format)", () => {
+  test("preserves newlines via slidev multi-line comment format (v0.11.16)", () => {
     const updated = replaceSlideNotes(DECK, 0, "line one\nline two");
-    expect(updated).toContain("<!-- line one line two -->");
+    // Multi-line input must NOT be flattened to a single line.
+    expect(updated).not.toContain("<!-- line one line two -->");
+    // It should be written as the slidev convention: opening `<!--`
+    // on one line, content lines verbatim, closing `-->` on its own.
+    expect(updated).toContain("<!--\nline one\nline two\n-->");
+    // And the old single-line comment must be gone.
+    expect(updated).not.toContain("<!-- note for slide 1 -->");
   });
 
   test("empty newNotes removes the comment line entirely", () => {
@@ -203,6 +209,56 @@ describe("replaceSlideNotes — auto-h1-breaks decks (v0.11.14)", () => {
     ].join("\n");
     expect(readSlideNotes(deckWithNote, 0)).toBe("note A");
     expect(readSlideNotes(deckWithNote, 1)).toBe("note B");
+  });
+});
+
+describe("replaceSlideNotes / readSlideNotes — multi-line notes (v0.11.16)", () => {
+  test("round-trips a 3-line note: write multi-line, read it back intact", () => {
+    const written = replaceSlideNotes(DECK, 1, "one\ntwo\nthree");
+    expect(readSlideNotes(written, 1)).toBe("one\ntwo\nthree");
+  });
+
+  test("replacing an existing single-line note with multi-line replaces in-place", () => {
+    // Slide 0 has the existing `<!-- note for slide 1 -->`.
+    const updated = replaceSlideNotes(DECK, 0, "first\nsecond");
+    // The old single-line comment is gone.
+    expect(updated).not.toContain("<!-- note for slide 1 -->");
+    // Multi-line block is present.
+    expect(updated).toContain("<!--\nfirst\nsecond\n-->");
+    // And reading it back gives the same multi-line content.
+    expect(readSlideNotes(updated, 0)).toBe("first\nsecond");
+  });
+
+  test("replacing an existing multi-line note with single-line collapses back to single-line", () => {
+    const ml = replaceSlideNotes(DECK, 0, "a\nb");
+    const sl = replaceSlideNotes(ml, 0, "just one line");
+    expect(sl).toContain("<!-- just one line -->");
+    // No leftover multi-line comment block.
+    expect(sl).not.toContain("<!--\na\nb\n-->");
+  });
+
+  test("reads a slidev-style multi-line note already in the file", () => {
+    const deck = [
+      "# A",
+      "",
+      "body",
+      "",
+      "<!--",
+      "alpha",
+      "beta",
+      "gamma",
+      "-->",
+    ].join("\n");
+    expect(readSlideNotes(deck, 0)).toBe("alpha\nbeta\ngamma");
+  });
+
+  test("empty multi-line note removes the comment block entirely", () => {
+    const withMulti = replaceSlideNotes(DECK, 1, "first\nsecond");
+    expect(withMulti).toContain("<!--\nfirst\nsecond\n-->");
+    const cleared = replaceSlideNotes(withMulti, 1, "");
+    expect(cleared).not.toContain("<!--\nfirst\nsecond\n-->");
+    expect(cleared).not.toContain("alpha");
+    expect(readSlideNotes(cleared, 1)).toBe("");
   });
 });
 

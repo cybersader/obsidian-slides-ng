@@ -6,6 +6,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.16] — 2026-05-14
+
+### Fixed
+
+- **Speaker notes save no longer strips newlines.** The notes
+  editor in the speaker view used to flatten multi-line input
+  to a single space-joined line because the writer only emitted
+  single-line `<!-- ... -->` comments. The writer now uses the
+  slidev convention `<!--\nline1\nline2\n-->` (a single
+  multi-line comment) whenever the textarea contains a newline.
+  Single-line input still writes a single-line comment so
+  diffs against existing decks stay minimal. Reader supports
+  both formats. Five new round-trip tests pin the contract.
+- **Picker orientation 2-col + auto now actually apply.** The
+  iframe-side bridge handler for `enablePickerStrip` and
+  `setPickerOrientation` only accepted `'horizontal'` and the
+  legacy `'vertical'` value, silently coercing every other
+  request (`vertical-1`, `vertical-2`, `auto`) back to 1-col.
+  The handler now passes the full canonical set through.
+  Symptom: the orientation cycle button visibly changed icon
+  but the strip stayed in single-column.
+
+### Changed
+
+- **Drag handle + hide-button moved to the RIGHT of each
+  panel title** (previously: LEFT). The two icon-only controls
+  now share a `slides-ng-speaker-panel-controls` group placed
+  at the right edge of the title row, freeing the title text
+  to sit at the natural left edge. For title-less panels
+  (status, controls, timer) the group floats top-right. No
+  behaviour change — purely a layout tweak based on user
+  feedback that the left-side placement made the header read
+  awkwardly.
+
+### Technical
+
+- `src/parser/editSlideNotes.ts` — new `findNotesSpan` returns
+  the inclusive line range + content of an existing notes
+  comment (single- or multi-line). `findNotesLine` becomes a
+  thin compat shim. `replaceSlideNotes` picks the format
+  based on whether the input contains a newline.
+- `src/render/revealTemplate.ts` — `enablePickerStrip` and
+  `setPickerOrientation` accept the canonical orientation set
+  (`vertical-1`, `vertical-2`, `horizontal`, `auto`, plus
+  legacy `vertical` → migrated to `vertical-1`).
+- `src/SlidesNGSpeakerView.ts` — `attachDragHandle` groups
+  handle + hide-button in a single `panel-controls` div
+  inserted to the right of the title (or floated top-right for
+  title-less panels).
+- `src/styles.css` — `.slides-ng-speaker-panel-controls` group
+  + `--floating` variant replace the per-button floating
+  variants; obsolete `panel-header-group` rule deleted;
+  `panel-header` gains `width: 100%` so the controls' right-
+  alignment via `margin-left: auto` actually anchors to the
+  right edge.
+
 ## [0.11.15] — 2026-05-14
 
 ### Added

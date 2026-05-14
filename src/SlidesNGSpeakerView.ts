@@ -742,40 +742,53 @@ export class SlidesNGSpeakerView extends ItemView {
       ":scope > .slides-ng-speaker-section-title, " +
         ":scope > [class*='-header'] > .slides-ng-speaker-section-title"
     );
+    // v0.11.16: layout rewrite — drag handle + hide button live in
+    // a "panel-controls" group on the RIGHT side of the title row,
+    // freeing left space for the title text. Previously they were
+    // on the left, awkwardly pushing the title rightward. The new
+    // group also coexists with any trailing action button the
+    // panel already had (Edit on notes, orientation toggle on
+    // picker) — both end up on the right, with the controls group
+    // closer to the title.
+    const controls = document.createElement("div");
+    controls.className = "slides-ng-speaker-panel-controls";
+    controls.appendChild(handle);
+    controls.appendChild(hideBtn);
+
     if (!title) {
-      handle.classList.add("slides-ng-speaker-panel-handle--floating");
-      hideBtn.classList.add("slides-ng-speaker-panel-hide--floating");
-      panel.insertBefore(hideBtn, panel.firstChild);
-      panel.insertBefore(handle, panel.firstChild);
+      // Title-less panels (status, controls, timer): float the
+      // controls group at the TOP-RIGHT of the panel.
+      controls.classList.add("slides-ng-speaker-panel-controls--floating");
+      panel.insertBefore(controls, panel.firstChild);
       return;
     }
     const titleParent = title.parentElement;
     const titleParentIsHeader =
       !!titleParent && /-header\b/.test(titleParent.className);
-    if (titleParentIsHeader) {
-      // The existing header (notesHeader, pickerHeader) uses
-      // `justify-content: space-between` to push the title to the
-      // left and a trailing action button (Edit / Mode toggle) to
-      // the right. Wrap handle + hide + title in a sub-group so
-      // the header still sees two children and distributes correctly.
-      const group = document.createElement("div");
-      group.className = "slides-ng-speaker-panel-header-group";
-      titleParent!.insertBefore(group, title);
-      group.appendChild(handle);
-      group.appendChild(hideBtn);
-      group.appendChild(title);
+    if (titleParentIsHeader && titleParent) {
+      // Existing header with an action button already on the right
+      // (notesHeader → Edit; pickerHeader → orientation toggle).
+      // Insert the controls AFTER the title, BEFORE the action
+      // button — so the action stays rightmost and the controls
+      // sit between title and action.
+      const actionBtn = titleParent.querySelector<HTMLElement>(
+        "button:not(.slides-ng-speaker-panel-handle):not(.slides-ng-speaker-panel-hide)"
+      );
+      if (actionBtn) {
+        titleParent.insertBefore(controls, actionBtn);
+      } else {
+        titleParent.appendChild(controls);
+      }
     } else if (titleParent) {
-      // Wrap title in a new header div so the handle + hide + title
-      // sit on a row without forcing row-direction on the panel.
+      // No existing header — wrap the title in a new header div
+      // with the controls group on its right.
       const header = document.createElement("div");
       header.className = "slides-ng-speaker-panel-header";
       titleParent.insertBefore(header, title);
-      header.appendChild(handle);
-      header.appendChild(hideBtn);
       header.appendChild(title);
+      header.appendChild(controls);
     } else {
-      panel.insertBefore(hideBtn, panel.firstChild);
-      panel.insertBefore(handle, panel.firstChild);
+      panel.insertBefore(controls, panel.firstChild);
     }
   }
 

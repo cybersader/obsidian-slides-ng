@@ -363,40 +363,35 @@
   opacity: 0;
   transition: opacity 60ms ease, background 60ms ease;
 }
-/* Floating variant — for panels with no section title. Positioned
- * absolutely at top-left of the panel. */
-.slides-ng-speaker-panel-handle--floating {
+/* v0.11.16: handle + hide-button live together in a "panel-controls"
+ * group placed on the RIGHT of each panel title row (was: left,
+ * which pushed the title text awkwardly inward). For title-less
+ * panels the group floats at top-right. */
+.slides-ng-speaker-panel-controls {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: auto; /* push to the right edge of its header row */
+  flex-shrink: 0;
+}
+.slides-ng-speaker-panel-controls--floating {
   position: absolute;
   top: 4px;
-  left: 0;
+  right: 4px;
   z-index: 6;
+  margin-left: 0;
 }
-/* Title + handle sit on a row. v0.10.0: this used to be applied
- * directly to the panel root, which forced any column-flex panels
- * (visualNext, scenes wrap, picker wrap) to center their other
- * children horizontally. Now attachDragHandle wraps title+handle in
- * a fresh `panel-header` sub-div so the panel root keeps its own
- * layout intact. `justify-content:flex-start` is explicit so the
- * header never accidentally centers its contents. */
+/* New-header wrapper (created when a title-bearing panel has no
+ * pre-existing `*-header` row). Title sits left; controls group
+ * uses margin-left:auto to claim the right edge. */
 .slides-ng-speaker-panel-header {
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
   gap: 0.35rem;
-}
-/* v0.10.1: subgroup that wraps handle + title when both are
- * inserted into an existing space-between header (notesHeader,
- * pickerHeader). Without this wrapper the header would see 3
- * children [handle, title, button] and distribute them with the
- * title in the middle — which was the v0.10.0 centering bug. */
-.slides-ng-speaker-panel-header-group {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.35rem;
-  min-width: 0; /* allow ellipsis if title overflows */
+  width: 100%;
 }
 /* Show only when hovering THIS panel specifically. While dragging,
  * ALL handles are visible so the user can see what's draggable. */
@@ -433,12 +428,6 @@
   opacity: 0;
   transition: opacity 60ms ease, background 60ms ease;
 }
-.slides-ng-speaker-panel-hide--floating {
-  position: absolute;
-  top: 4px;
-  left: 22px; /* sit just right of the floating drag handle */
-  z-index: 6;
-}
 .slides-ng-speaker-panel:hover .slides-ng-speaker-panel-hide {
   opacity: 0.55;
 }
@@ -466,8 +455,8 @@
   opacity: 0.5;
 }
 /* Title-less panels get a small top-margin to make room for the
- * floating handle (so it doesn't overlap the first content row). */
-.slides-ng-speaker-panel:has(> .slides-ng-speaker-panel-handle--floating) {
+ * floating controls group (so it doesn't overlap the first row). */
+.slides-ng-speaker-panel:has(> .slides-ng-speaker-panel-controls--floating) {
   margin-top: 4px;
 }
 /* Floating drop-indicator line. Positioned absolutely inside the
@@ -636,9 +625,14 @@
   gap: 0.5rem;
 }
 .slides-ng-speaker-notes-header {
+  /* v0.11.16: replaced justify-content:space-between with
+   * `margin-left:auto` on the right-side controls (.slides-ng-
+   * speaker-panel-controls + .slides-ng-speaker-notes-edit) so
+   * the title takes the left, controls cluster on the right, and
+   * a NEW drag-handle + hide-button group can slot in between
+   * without confusing space-between distribution. */
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
 }
 .slides-ng-speaker-notes-edit {
@@ -677,9 +671,10 @@
   justify-content: flex-end;
 }
 .slides-ng-speaker-picker-header {
+  /* v0.11.16: same restructuring as notes-header — see comment there. */
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.5rem;
 }
 .slides-ng-speaker-picker {
   /* v0.10.3: single scrollable column of slide rows. Capped height

@@ -1403,9 +1403,16 @@ ${sectionsHtml}
               // thumbnails for the speaker view picker panel.
               // Hides reveal slide stage; tile clicks post
               // slides-ng-picker events back up.
+              // v0.11.16 fix: accept the canonical orientation set
+              // (vertical-1, vertical-2, horizontal, auto). Previously
+              // this branch coerced anything non-horizontal to the
+              // legacy 'vertical' value, which silently downgraded
+              // every 2-col / auto request back to 1-col.
               try {
-                var orient = (data && data.orientation === 'horizontal')
-                  ? 'horizontal' : 'vertical';
+                var allowed = ['vertical-1', 'vertical-2', 'horizontal', 'auto', 'vertical'];
+                var raw = (data && typeof data.orientation === 'string') ? data.orientation : '';
+                var orient = (allowed.indexOf(raw) !== -1) ? raw : 'vertical-1';
+                if (orient === 'vertical') orient = 'vertical-1';
                 var tileWidth = (data && typeof data.tileWidth === 'number')
                   ? data.tileWidth : 0;
                 var initialIdx = (data && typeof data.currentIdx === 'number')
@@ -1415,9 +1422,16 @@ ${sectionsHtml}
               break;
             }
             case 'setPickerOrientation': {
+              // v0.11.16 fix: accept the canonical orientation set
+              // (was: only 'horizontal' | 'vertical'). The runtime
+              // cycle button posts vertical-1 / vertical-2 / horizontal
+              // / auto — those used to be rejected silently.
               var stripEl = document.getElementById('slides-ng-picker-strip');
-              if (stripEl && data && (data.orientation === 'horizontal' || data.orientation === 'vertical')) {
-                stripEl.setAttribute('data-orientation', data.orientation);
+              var allowedSet = ['vertical-1', 'vertical-2', 'horizontal', 'auto', 'vertical'];
+              var rawOrient = (data && typeof data.orientation === 'string') ? data.orientation : '';
+              if (stripEl && allowedSet.indexOf(rawOrient) !== -1) {
+                var canonOrient = (rawOrient === 'vertical') ? 'vertical-1' : rawOrient;
+                stripEl.setAttribute('data-orientation', canonOrient);
                 applyPickerStripLayout(stripEl);
               }
               break;
