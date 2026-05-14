@@ -1582,12 +1582,12 @@ export class SlidesNGSpeakerView extends ItemView {
     const iconEl = this.pickerSizeBtn.createSpan({
       cls: "slides-ng-speaker-btn-icon",
     });
-    // v0.11.18: tooltips clarify that the preset = MINIMUM cell size
-    // and only meaningfully affects layout in "auto-fit" orientation.
-    // Fixed-column modes (1-col / 2-col) ignore it because tiles fill
-    // their cell; horizontal mode ignores it because tiles fill the
-    // strip height. Same persisted preset applies the next time the
-    // user switches to auto-fit.
+    // v0.11.22: tooltips updated for the new auto-fit semantics —
+    // the preset is the TILE WIDTH (clamped to strip width when
+    // narrower), not a minimum cell size. So comfortable / big
+    // now produce visibly different tile sizes at any strip width.
+    // Fixed-column modes (1-col / 2-col) still ignore the preset
+    // (tiles fill the column) — the size button has no effect there.
     const meta: Record<
       keyof typeof PICKER_TILE_PRESETS | "auto" | "custom",
       { icon: string; tip: string }
@@ -1595,32 +1595,32 @@ export class SlidesNGSpeakerView extends ItemView {
       auto: {
         icon: "zoom-in",
         tip:
-          "Tile min size: auto (~160 px). Click for compact. " +
-          "Only takes effect in auto-fit orientation.",
+          "Tile size: auto (~160 px). Click for compact. " +
+          "Active in auto-fit orientation.",
       },
       compact: {
         icon: "zoom-out",
         tip:
-          "Tile min size: compact (100 px). Click for comfortable. " +
-          "Only takes effect in auto-fit orientation.",
+          "Tile size: compact (100 px). Click for comfortable. " +
+          "Active in auto-fit orientation.",
       },
       comfortable: {
         icon: "search",
         tip:
-          "Tile min size: comfortable (180 px). Click for big. " +
-          "Only takes effect in auto-fit orientation.",
+          "Tile size: comfortable (180 px). Click for big. " +
+          "Active in auto-fit orientation.",
       },
       big: {
         icon: "zoom-in",
         tip:
-          "Tile min size: big (280 px). Click for compact. " +
-          "Only takes effect in auto-fit orientation.",
+          "Tile size: big (280 px). Click for compact. " +
+          "Active in auto-fit orientation.",
       },
       custom: {
         icon: "search",
         tip:
-          "Tile min size: custom (set in Settings or deck frontmatter). " +
-          "Click to enter preset cycle. Only takes effect in auto-fit.",
+          "Tile size: custom (set in Settings or deck frontmatter). " +
+          "Click to enter preset cycle. Active in auto-fit.",
       },
     };
     const m = meta[preset];

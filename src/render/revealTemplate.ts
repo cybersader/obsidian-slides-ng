@@ -854,7 +854,15 @@ ${sectionsHtml}
        */
       function buildPickerStrip(orientation, tileWidth, initialCurrentIdx) {
         var existing = document.getElementById('slides-ng-picker-strip');
-        if (existing) existing.remove();
+        if (existing) {
+          // v0.11.22d: disconnect the previous strip's RO before
+          // discarding so the old observer doesn't keep firing into
+          // a detached element.
+          if (existing.__slidesNgRo) {
+            try { existing.__slidesNgRo.disconnect(); } catch (_) {}
+          }
+          existing.remove();
+        }
         var revealEl = document.querySelector('.reveal');
         if (revealEl) revealEl.style.display = 'none';
         var revealConfig2 = (typeof Reveal.getConfig === 'function' ? Reveal.getConfig() : {}) || {};
@@ -865,6 +873,22 @@ ${sectionsHtml}
         strip.setAttribute('data-orientation', orientation);
         strip.setAttribute('data-tile-width', String(tileWidth || 0));
         document.body.appendChild(strip);
+        // v0.11.22d: dedicated ResizeObserver on the strip element
+        // itself. The general-purpose setupRelayoutGuard ResizeObserver
+        // (line 615+ in this file) watches document.documentElement
+        // but has a 2-px size-delta guard + rAF debounce that swallowed
+        // sub-perceptual width changes from speaker-pane resize. A
+        // per-strip RO with no guard makes the picker reflow on every
+        // pixel of viewport change — the user-reported "tiles change
+        // when you cycle modes but not on the fly" bug.
+        if (typeof window.ResizeObserver === 'function') {
+          var stripRo = new ResizeObserver(function () {
+            var live = document.getElementById('slides-ng-picker-strip');
+            if (live) applyPickerStripLayout(live);
+          });
+          stripRo.observe(strip);
+          strip.__slidesNgRo = stripRo;
+        }
         var meta = harvestSlideMeta();
         meta.forEach(function (s) {
           var tile = document.createElement('button');
@@ -1014,65 +1038,84 @@ ${sectionsHtml}
           'z-index:5;padding:8px;box-sizing:border-box;' +
           'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);';
         var minCellPx = tileWidthAttr > 0 ? tileWidthAttr : 160;
-        // v0.11.21: compute column count + tile pixel dimensions
-        // deterministically from strip width and magnifier preset.
-        // We previously tried width:100% + aspect-ratio + per-tile
-        // ResizeObserver for auto mode (v0.11.20) and width:100% +
-        // aspect-ratio + post-rAF measure (v0.11.18). Both had narrow
-        // race windows where the inner-content scale never landed.
-        // Pixel-pin is the only approach we have not seen fail.
+        // v0.11.22c: unified sizing model for all three vertical
+        // orientations (vertical-1, vertical-2, auto). The magnifier
+        // preset controls tile width in all three; orientation just
+        // caps the column count.
+        //
+        //   - vertical-1: forced to 1 column
+        //   - vertical-2: forced to 2 columns
+        //   - auto: as many columns as fit at preset size
+        //
+        // Tile width = min(preset, availableColumnWidth). When preset
+        // is smaller than available, tiles stay at preset size and
+        // leftover horizontal space centers (justify-content:center).
+        // When preset is bigger than available, tiles fill the column
+        // (so on narrow strips with 1-col mode they grow to strip
+        // width — same outcome as the old "fill" behavior).
+        //
+        // Solves three problems at once:
+        //   - vertical-1 tiles compressed to 4px tall by flex-shrink
+        //     (was display:flex with default flex:0 1 auto on items)
+        //   - vertical-2 tiles huge at wide strips (~567px each)
+        //   - auto with comfortable/big collapsing identically at
+        //     narrow strips
+        //
+        // All three now use display:grid + explicit column widths so
+        // the same pixel-pin guarantee applies and the same
+        // justify-content:center centers any horizontal leftover.
         var autoCols = 1;
         var autoTileW = 0;
-        if (orientation === 'auto') {
-          autoCols = Math.max(1, Math.floor(stripInnerW / Math.max(1, minCellPx)));
-          var autoGapTotal = (autoCols - 1) * 6;
-          autoTileW = Math.max(40, Math.floor((stripInnerW - autoGapTotal) / autoCols));
+        var isVerticalGrid =
+          orientation === 'auto' ||
+          orientation === 'vertical-1' ||
+          orientation === 'vertical-2';
+        if (isVerticalGrid) {
+          var targetCols;
+          if (orientation === 'vertical-1') {
+            targetCols = 1;
+          } else if (orientation === 'vertical-2') {
+            targetCols = 2;
+          } else {
+            // auto: as many cols as fit at preset size, min 1.
+            targetCols = Math.max(
+              1,
+              Math.floor((stripInnerW + 6) / (minCellPx + 6))
+            );
+          }
+          var totalGap = (targetCols - 1) * 6;
+          var availColW = Math.max(
+            40,
+            Math.floor((stripInnerW - totalGap) / targetCols)
+          );
+          autoTileW = Math.max(40, Math.min(minCellPx, availColW));
+          autoCols = targetCols;
         }
         if (orientation === 'horizontal') {
           strip.style.cssText = stripBase +
             'display:flex;gap:6px;align-items:center;' +
             'flex-direction:row;overflow-x:auto;overflow-y:hidden;';
-        } else if (orientation === 'vertical-2') {
-          strip.style.cssText = stripBase +
-            'display:grid;grid-template-columns:1fr 1fr;gap:6px;' +
-            'align-content:start;overflow-y:auto;overflow-x:hidden;';
-        } else if (orientation === 'auto') {
-          // Fixed column count chosen from strip width + magnifier
-          // preset. Each column gets a fixed pixel width matching
-          // autoTileW so tiles are pinned (no aspect-ratio gymnastics).
+        } else if (isVerticalGrid) {
           strip.style.cssText = stripBase +
             'display:grid;' +
             'grid-template-columns:repeat(' + autoCols + ', ' + autoTileW + 'px);' +
             'gap:6px;align-content:start;justify-content:center;' +
             'overflow-y:auto;overflow-x:hidden;';
-        } else {
-          // vertical-1 (default)
-          strip.style.cssText = stripBase +
-            'display:flex;gap:6px;align-items:center;' +
-            'flex-direction:column;overflow-y:auto;overflow-x:hidden;';
         }
 
         // Tile dimensions per orientation.
         var tileW, tileH;
         if (orientation === 'horizontal') {
-          // Fill the strip height; width derives from aspect. User's
-          // tile-width preset is ignored to avoid the v0.11.17
-          // empty-space bug.
+          // Fill the strip height; width derives from aspect. Magnifier
+          // preset still ignored here (changing tile height by user
+          // preset is a separate decision — film-strip pacing is
+          // dominated by container height in practice).
           tileH = stripInnerH > 0 ? stripInnerH - 8 : 80;
           tileW = Math.round(tileH / aspect);
-        } else if (orientation === 'vertical-2') {
-          // Each grid column = half strip width minus gap. Tile FILLS
-          // the column.
-          var colW = Math.floor((stripInnerW - 6) / 2);
-          tileW = colW > 0 ? colW : 100;
-          tileH = Math.round(tileW * aspect);
-        } else if (orientation === 'auto') {
-          // Pixel pin from the column math we did above.
-          tileW = autoTileW;
-          tileH = Math.round(tileW * aspect);
         } else {
-          // vertical-1: fill strip width. User pref ignored.
-          tileW = stripInnerW > 0 ? stripInnerW : 200;
+          // All three vertical orientations share the pixel-pinned
+          // autoTileW computed above.
+          tileW = autoTileW;
           tileH = Math.round(tileW * aspect);
         }
         // v0.11.18b: pixel-pin tile dimensions for ALL modes. The
@@ -1097,9 +1140,18 @@ ${sectionsHtml}
           // transform was applied, so content rendered unscaled.
           // We now compute autoTileW deterministically from strip
           // width and minCellPx, and tileW/tileH match it.
+          // v0.11.22b: flex:0 0 auto (no grow, no shrink) is
+          // essential for vertical-1 too. The strip flex container
+          // (display:flex; flex-direction:column; overflow-y:auto)
+          // applies default flex-shrink:1, which squashed each tile
+          // to just its border (4 px tall) when the deck had many
+          // slides — they got proportionally compressed to fit the
+          // strip's apparent height instead of overflowing into
+          // scroll. Was only set for horizontal previously; needs to
+          // apply to every flex mode. Grid modes ignore the rule.
           var sizeCss =
             'width:' + tileW + 'px;height:' + tileH + 'px;' +
-            (orientation === 'horizontal' ? 'flex:0 0 auto;' : '');
+            'flex:0 0 auto;';
           t.style.cssText =
             'position:relative;' + sizeCss +
             'background:' + stripBodyBg + ';border:2px solid rgba(255,255,255,0.18);' +

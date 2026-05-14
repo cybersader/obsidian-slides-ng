@@ -6,6 +6,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.22] — 2026-05-14
+
+Multiple fixes consolidated. v0.11.22a-d were intermediate
+builds that aren't tagged separately — this changelog covers the
+shipped 0.11.22.
+
+### Changed
+
+- **Magnifier now works in vertical-1, vertical-2, AND auto.**
+  Previously only auto-fit honoured the preset; the two
+  fixed-column modes ignored it (tiles always filled their
+  column, which at wide strips meant ~567 px tiles in 2-col).
+  Now all three vertical orientations share the same sizing
+  rule: tile width = `min(preset, availableColumnWidth)` per
+  column. Orientation just caps the column count (1 / 2 / many).
+  When preset is smaller than the available column, leftover
+  space centers via `justify-content: center`.
+- **Auto-fit magnifier preset is now TILE WIDTH, not MIN cell
+  size.** With the old "min cell size" semantics, at strip
+  widths narrower than the preset, `min(100%, preset)`
+  collapsed to `100%` and every preset >= strip produced the
+  same "1 column at strip width" layout (comfortable and big
+  looked identical in a half-screen Obsidian window). New
+  semantics: preset is the actual tile pixel width (clamped
+  to column width). Comfortable (180) and big (280) now
+  visibly differ at any strip width.
+
+### Fixed
+
+- **Vertical-1 tiles no longer get compressed to 4 px tall.**
+  The picker strip is a column-flex container; tiles without
+  an explicit `flex` declaration got default `flex-shrink: 1`
+  applied and were squashed to match the strip's apparent
+  height. Adding `flex: 0 0 auto` to every flex-mode tile
+  fixes it. (Grid-mode tiles ignored the rule, which is why
+  vertical-2 / auto were unaffected.)
+- **Picker reflows on viewport change without cycling modes.**
+  The user reported "tiles only resize if you cycle through
+  the modes, not on the fly". Cause: the in-iframe
+  `setupRelayoutGuard` ResizeObserver watches
+  `document.documentElement` and has a 2-px size-delta guard
+  + rAF debounce that swallowed sub-perceptual width changes.
+  Added a dedicated `ResizeObserver` on the strip element
+  itself (no guard, no debounce); fires on every pixel change.
+  Old observer disconnects on rebuild.
+
+### Technical
+
+- `src/render/revealTemplate.ts`:
+  - `applyPickerStripLayout` unified the auto / vertical-1 /
+    vertical-2 sizing model. All three use `display: grid`
+    with explicit `grid-template-columns: repeat(N, tileW px)`,
+    `justify-content: center`, and `autoTileW = min(preset,
+    availColW)`. Single code path, single source of truth.
+  - `buildPickerStrip` installs a per-strip ResizeObserver
+    that calls `applyPickerStripLayout(strip)` on every
+    resize. Cleans up the previous observer when the strip
+    is rebuilt.
+  - Tile cssText always includes `flex: 0 0 auto;` (was
+    only horizontal previously).
+- `src/SlidesNGSpeakerView.ts` — magnifier tooltips reword
+  "Tile min size" to "Tile size" and drop the "only takes
+  effect in auto-fit" caveat (it now applies to vertical-1
+  and vertical-2 too).
+- `test/e2e/picker-sizing.spec.ts`:
+  - Added aspect-ratio sanity check (catches the
+    "tile 4 px tall" bug class).
+  - Added `viewport-responsiveness` test that resizes the
+    picker container from 200 px to 700 px WITHOUT
+    re-issuing `enablePickerStrip` and asserts column count
+    changes — exercises the strip RO directly.
+  - Added `current-tile indicator stability` test that
+    installs a MutationObserver inside the picker iframe,
+    fires two rapid simulated tile clicks (idx 5 then idx
+    10), waits past the burst window, and asserts no
+    more than 4 `.current` class additions in the log.
+    Catches regressions in v0.11.21's burst-timer
+    cancellation. Healthy result: `[5, 10]`.
+
+18/18 tests passing on the final shipped 0.11.22.
+
 ## [0.11.21] — 2026-05-14
 
 ### Fixed
