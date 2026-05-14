@@ -1051,6 +1051,21 @@ ${sectionsHtml}
               clearScene();
               break;
             case 'requestState': postState(); break;
+            case 'relayout': {
+              // v0.10.4: parent posts this when the iframe element
+              // resizes. The in-iframe ResizeObserver guard observes
+              // document.documentElement, which doesn't reliably
+              // resize in Electron when the outer iframe element
+              // does — so the parent-side observer is the authoritative
+              // signal that "the viewport is real now, recompute".
+              try {
+                if (typeof Reveal !== 'undefined' && typeof Reveal.layout === 'function') {
+                  Reveal.layout();
+                  if (typeof Reveal.sync === 'function') Reveal.sync();
+                }
+              } catch (_) { /* swallow */ }
+              break;
+            }
           }
         } catch (e) {
           console.warn('[slides-ng] postMessage command failed', e);
@@ -1063,6 +1078,13 @@ ${sectionsHtml}
         }
         Reveal.on('ready', function () {
           postState();
+          // v0.10.4: Reveal initialised; recompute layout once now in
+          // case the iframe was at 0x0 dimensions when init ran (the
+          // ribbon-open-blank-pane bug). Cheap and idempotent — if
+          // dimensions were correct, this is a no-op visually.
+          try {
+            if (typeof Reveal.layout === 'function') Reveal.layout();
+          } catch (_) { /* swallow */ }
           // Pre-warm the Grid-overlay thumbnail cache in idle time so
           // the first Grid open is instant. Cloning N small DOM trees
           // off the main loop costs nothing while reveal is otherwise

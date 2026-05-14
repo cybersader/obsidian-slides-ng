@@ -6,6 +6,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.4] — 2026-05-14
+
+### Fixed
+
+- **Ribbon-click black-pane bug, take 3.** v0.10.2 added an
+  in-iframe `ResizeObserver` watching `document.documentElement`
+  — but Electron doesn't reliably emit a resize on the inner doc
+  when the OUTER iframe element resizes. Debug log from a v0.10.3
+  install confirmed `iframeClientW:0, iframeClientH:0` at render
+  time AND no later events that would have triggered the inner
+  observer. v0.10.4 moves the resize trigger to the parent
+  context (Obsidian renderer): `SlidesNGView` attaches a
+  ResizeObserver to its `iframeEl` and, on every non-zero size
+  change, posts `relayout` over the bridge in a burst (now + 60ms
+  + 180ms + 400ms + 900ms) to defeat any race with the iframe's
+  bridge-listener install. The iframe bridge handles the message
+  by calling `Reveal.layout()` + `Reveal.sync()`. Also added a
+  belt-and-suspenders `Reveal.layout()` call from inside the
+  iframe's `Reveal.on('ready')` hook, so even if every relayout
+  message is lost, layout still recomputes once on init.
+
+### Technical
+
+- `src/SlidesNGView.ts` — `iframeResizeObserver` field;
+  `postRelayoutBurst()` helper; `ro.observe(this.iframeEl)` in
+  `onOpen`; `ro.disconnect()` in `onClose`.
+- `src/render/revealTemplate.ts` — `case 'relayout'` in the
+  bridge switch; `Reveal.layout()` call inside the `ready` event
+  handler.
+
 ## [0.10.3] — 2026-05-14
 
 ### Changed

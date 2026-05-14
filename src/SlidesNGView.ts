@@ -50,6 +50,8 @@ export class SlidesNGView extends ItemView {
   private getSettings: SettingsAccessor;
   private resolveDeckFile: DeckFileAccessor;
   private debug?: DebugLog;
+  /** Parent-side ResizeObserver on the iframe element; posts `relayout` to the bridge. */
+  private iframeResizeObserver?: ResizeObserver;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -169,6 +171,36 @@ export class SlidesNGView extends ItemView {
       },
     });
 
+    // v0.10.4: parent-side ResizeObserver on the iframe element.
+    // The in-iframe ResizeObserver (added in v0.10.2) observes
+    // `document.documentElement`, which doesn't reliably emit a
+    // resize event when the OUTER iframe element resizes in
+    // Electron — this was the v0.10.x black-pane-on-ribbon-open
+    // bug. Watching the outer element from the parent context is
+    // authoritative.
+    if (typeof ResizeObserver === "function") {
+      const postRelayoutBurst = (): void => {
+        // Single-shot postMessage may land before the iframe's bridge
+        // listener is up (srcdoc just set, scripts still parsing).
+        // Burst: fire now + at a few short delays to cover the race.
+        this.postIframeCommand("relayout");
+        for (const delay of [60, 180, 400, 900]) {
+          window.setTimeout(() => this.postIframeCommand("relayout"), delay);
+        }
+      };
+      const ro = new ResizeObserver(() => {
+        if (!this.iframeEl) return;
+        if (this.iframeEl.clientWidth === 0 || this.iframeEl.clientHeight === 0) return;
+        postRelayoutBurst();
+        this.debug?.log("view/resize/post-relayout", {
+          clientW: this.iframeEl.clientWidth,
+          clientH: this.iframeEl.clientHeight,
+        });
+      });
+      ro.observe(this.iframeEl);
+      this.iframeResizeObserver = ro;
+    }
+
     // Save-watch: when the active deck file is modified anywhere in the
     // vault (editor save, external write, sync), re-render after a short
     // debounce. registerEvent ties the lifetime to this view, so the
@@ -228,6 +260,10 @@ export class SlidesNGView extends ItemView {
     if (this.cursorFollowTimer !== null) {
       window.clearTimeout(this.cursorFollowTimer);
       this.cursorFollowTimer = null;
+    }
+    if (this.iframeResizeObserver) {
+      this.iframeResizeObserver.disconnect();
+      this.iframeResizeObserver = undefined;
     }
     this.iframeEl = undefined;
     this.contentEl.empty();
