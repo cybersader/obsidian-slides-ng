@@ -444,11 +444,6 @@ export class SlidesNGSettingTab extends PluginSettingTab {
 
     const sections: Array<{ title: string; code: string }> = [
       {
-        title: "Required",
-        code:
-`slides-ng: true     # opt-in flag — Obsidian recognises this as a deck`,
-      },
-      {
         title: "Appearance",
         code:
 `slides-ng-theme: black                 # bundled theme names: black, white,

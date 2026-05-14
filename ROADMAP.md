@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.11.11** — removed the `slides-ng: true` frontmatter key (nothing read it; was documentation-only). Stripped from all example decks; removed the "Required" section from the Settings frontmatter-reference card. The "deck index / vault-wide deck list" feature that would have made it meaningful is now in the idea jar.
 - **0.11.10** — collapsible frontmatter-reference card at the bottom of Settings → Slides NG. Lists every deck-level + per-slide key with a brief description and example. Closes the discoverability gap: previously the only docs were in PROJECT_BRIEF / CHANGELOG.
 - **0.11.9** — per-deck frontmatter escape hatches. New `slides-ng-show-controls`, `slides-ng-show-menu`, `slides-ng-image-layout-split`, `slides-ng-line-step-dim`, `slides-ng-code-block-max-height`, `slides-ng-code-block-overflow-scroll`, `slides-ng-magic-move-duration`. Plus a power-user raw `slides-ng-reveal-config:` object that passes through to `Reveal.initialize()` for any reveal config the author wants (`autoSlide`, `loop`, `width`, `height`, etc.).
 - **0.11.8** — removed the Menu toolbar button. After multiple rounds of fixes (v0.10.2 / v0.11.3) it remained unreliable across users — Grid covers slide navigation with real thumbnails, and the reveal-menu plugin is still loaded so its `M` keyboard shortcut still works inside the preview iframe.
@@ -93,6 +94,7 @@ ballpark.
 | Idea | Priority | Effort |
 |---|---|---|
 | Auto-detect deck files via folder convention (e.g. `Decks/*.md` → auto-show Speaker icon in editor) | Low | 1 hr |
+| **Deck index / "all decks in vault" view** — a sidebar list or command palette enumeration of every `.md` file with `slides-ng: true` (or some other opt-in marker) in frontmatter. Lets users browse decks without remembering paths. Reserved key was previously documented as required; removed in v0.11.11 since nothing reads it yet. Implement this feature and the key becomes meaningful again. | Medium | 2-3 hr |
 | Export to PPTX | Future | Large (likely a separate tool) |
 
 ### Research / experiments

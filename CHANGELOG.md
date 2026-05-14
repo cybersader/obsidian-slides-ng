@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.11] — 2026-05-14
+
+### Removed
+
+- **`slides-ng: true` frontmatter key.** Was documented as an
+  "opt-in flag" but nothing in the code actually reads it.
+  Stripped from all example decks (both dev vault `Decks/`
+  and the test deck folder synced to the b&g vault) +
+  removed the "Required" section from the Frontmatter
+  Reference card in Settings. Decks render based on the
+  ribbon-button open command, NOT a frontmatter marker.
+
+### Idea jar
+
+- Promoted the "deck index" idea: a sidebar list or command-
+  palette enumeration of every `.md` file with `slides-ng:
+  true` (or some opt-in marker) in frontmatter, so users can
+  browse decks without remembering paths. If/when that ships,
+  the `slides-ng: true` key becomes meaningful again.
+
+### Technical
+
+- `src/SlidesNGSettingTab.ts` — removed the "Required" section
+  from `renderFrontmatterReference()`.
+- `Decks/*.md`, `e2e-vault/Decks/*.md`, `b&g_vault/.../*.md`
+  — stripped the line from all example decks.
+- `ROADMAP.md` — new entry under the idea jar.
+
 ## [0.11.10] — 2026-05-14
 
 ### Added

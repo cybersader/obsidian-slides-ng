@@ -1,5 +1,4 @@
 ---
-slides-ng: true
 slides-ng-theme: black
 slides-ng-transition: slide
 title: "Building Resilient Systems"

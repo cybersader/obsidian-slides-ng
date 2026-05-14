@@ -1,12 +1,8 @@
----
-slides-ng: true
----
-
 # Hello
 
 A minimal deck.
 
-Three slides. No frontmatter beyond `slides-ng: true`.
+Three slides. Zero frontmatter — slides-ng renders any markdown opened via the ribbon.
 
 ---
 

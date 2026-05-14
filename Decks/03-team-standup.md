@@ -1,5 +1,4 @@
 ---
-slides-ng: true
 slides-ng-theme: white
 slides-ng-transition: none
 title: "Weekly Sync — 2026-05-14"

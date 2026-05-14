@@ -1,5 +1,4 @@
 ---
-slides-ng: true
 slides-ng-theme: simple
 slides-ng-transition: slide
 slides-ng-code-theme: github-light

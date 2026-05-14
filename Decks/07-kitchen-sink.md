@@ -1,5 +1,4 @@
 ---
-slides-ng: true
 slides-ng-theme: black
 slides-ng-transition: slide
 slides-ng-code-theme: github-dark

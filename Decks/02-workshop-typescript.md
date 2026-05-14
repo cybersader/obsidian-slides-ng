@@ -1,5 +1,4 @@
 ---
-slides-ng: true
 slides-ng-theme: dracula
 slides-ng-transition: fade
 slides-ng-code-theme: dracula

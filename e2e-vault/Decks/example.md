@@ -1,5 +1,4 @@
 ---
-slides-ng: true
 theme: simple
 transition: fade
 ---
