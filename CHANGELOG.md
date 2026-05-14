@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.38] — 2026-05-14
+
+### Fixed
+
+- **Embedded preview going black** (user-reported after
+  v0.11.37). The v0.11.35 `?print-pdf` runtime detection
+  block ran for BOTH embedded and standalone exports —
+  it was wrapped in a try/catch but the location-search
+  read in `about:srcdoc` iframes had some interaction that
+  may have stalled init. v0.11.38 strictly gates that
+  block behind the render-time `!embedded` template
+  interpolation, so the entire print-pdf code path is
+  STRIPPED FROM EMBEDDED OUTPUT at render time. Any
+  future bug in print-pdf detection can no longer regress
+  the embedded preview.
+
 ## [0.11.37] — 2026-05-14
 
 ### Fixed

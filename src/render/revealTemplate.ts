@@ -681,35 +681,27 @@ ${sectionsHtml}
     (function () {
       try {
         var initOpts = ${initConfig};
-        /* v0.11.35/v0.11.37: when the URL has ?print-pdf, switch to
-         * reveal's print view (each slide → a page with proper card
-         * styling + optional notes layout). We hardcode
-         * view:'presentation' elsewhere to defeat reveal's
-         * small-viewport auto-scroll, but in print mode the explicit
-         * override was preventing print-pdf detection from working.
-         * Also manually add the html.print-pdf + html.reveal-print
-         * classes early — reveal v5 adds them during init but the
-         * CSS that styles each slide as a print page is gated on
-         * them, and adding them before Reveal.initialize means the
-         * print stylesheet applies immediately when the page paints.
-         */
+        ${!embedded ? `/* v0.11.35/v0.11.37/v0.11.38: print-pdf
+         * detection is now STRICTLY gated to standalone mode at
+         * render time. Embedded preview never sees this branch
+         * because the !embedded interpolation gate strips it from
+         * the template — so any future bug in the print-pdf
+         * detection cannot regress embedded preview rendering
+         * (the v0.11.37 user-reported "embedded preview goes
+         * black" regression motivated this defensive gating). */
         if (typeof location !== 'undefined' && /print-pdf/i.test(location.search)) {
           initOpts.view = 'print';
           try {
             document.documentElement.classList.add('print-pdf');
             document.documentElement.classList.add('reveal-print');
           } catch (_) {}
-          /* Match the showNotes URL param to the config option so
-           * reveal lays out speaker notes underneath each printed
-           * page. URL value is the layout string ('inline' is the
-           * common one) or boolean — both accepted. */
           var notesMatch = location.search.match(/[?&]showNotes(?:=([^&]+))?/i);
           if (notesMatch) {
             initOpts.showNotes = notesMatch[1] && notesMatch[1] !== 'true'
               ? decodeURIComponent(notesMatch[1])
               : true;
           }
-        }
+        }` : ""}
         ${showMenu ? `if (typeof RevealMenu !== 'undefined') {
           initOpts.plugins = (initOpts.plugins || []).concat([RevealMenu]);
         }` : ""}
