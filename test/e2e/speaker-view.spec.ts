@@ -207,57 +207,46 @@ describe("slides-ng speaker view drives the preview", function () {
     );
   });
 
-  it("Slide picker mode toggles between compact and list", async () => {
-    // Initial mode label is "compact".
-    const initialLabel = await browser.execute(() => {
-      const b = document.querySelector(".slides-ng-speaker-mode-toggle") as HTMLElement | null;
-      return b?.textContent?.trim() ?? "";
-    });
-    expect(initialLabel).toBe("Mode: compact");
-
-    // In compact mode, picker should contain a row marked "current"
-    // (v0.8.0+ redesign — was .slides-ng-speaker-compact-current).
-    const compactHasCurrent = await browser.execute(
-      () => !!document.querySelector(".slides-ng-speaker-compact-row.current")
+  it("Picker orientation toggle flips between vertical and horizontal", async () => {
+    // v0.10.3 removed the compact/list mode toggle. v0.11.0 introduced
+    // an orientation toggle for the new thumbnail picker (vertical ⇄
+    // horizontal). Verify the button is present and persists the new
+    // orientation to plugin settings.
+    const btnPresent = await browser.execute(() =>
+      !!document.querySelector(".slides-ng-speaker-picker-orient-btn")
     );
-    expect(compactHasCurrent).toBe(true);
+    expect(btnPresent).toBe(true);
 
-    // Click the toggle. Wait for the label to flip, then assert the DOM
-    // matches list mode.
+    const before = await browser.executeObsidian(({ app }) => {
+      // @ts-expect-error — plugins is internal
+      return app.plugins.plugins["slides-ng"]?.settings?.speakerPickerOrientation ?? null;
+    });
+
     await browser.execute(() => {
-      const b = document.querySelector(".slides-ng-speaker-mode-toggle") as HTMLButtonElement | null;
+      const b = document.querySelector(
+        ".slides-ng-speaker-picker-orient-btn"
+      ) as HTMLButtonElement | null;
       b?.click();
     });
 
     await browser.waitUntil(
       async () => {
-        const label = await browser.execute(() => {
-          const b = document.querySelector(".slides-ng-speaker-mode-toggle") as HTMLElement | null;
-          return b?.textContent?.trim() ?? "";
+        const cur = await browser.executeObsidian(({ app }) => {
+          // @ts-expect-error — plugins is internal
+          return app.plugins.plugins["slides-ng"]?.settings?.speakerPickerOrientation ?? null;
         });
-        return label === "Mode: list";
+        return cur !== before;
       },
-      { timeout: 5000, timeoutMsg: "mode-toggle label never flipped to 'Mode: list'" }
+      { timeout: 3000, timeoutMsg: "orientation didn't toggle in settings" }
     );
 
-    // After flip, list-item rows should exist (≥ totalSlides). Use a longer
-    // wait window because a state-tick from the iframe can re-render the
-    // picker after the click and the snapshot of children can briefly be
-    // empty during the re-render.
-    await browser.waitUntil(
-      async () => {
-        const items = await browser.execute(
-          () => document.querySelectorAll(".slides-ng-speaker-list-item").length
-        );
-        return items >= 2;
-      },
-      { timeout: 5000, timeoutMsg: "list mode never rendered list-item rows" }
-    );
-
-    const listCount = await browser.execute(
-      () => document.querySelectorAll(".slides-ng-speaker-list-item").length
-    );
-    expect(listCount).toBeGreaterThanOrEqual(2);
+    // Flip back so subsequent tests start from the default.
+    await browser.execute(() => {
+      const b = document.querySelector(
+        ".slides-ng-speaker-picker-orient-btn"
+      ) as HTMLButtonElement | null;
+      b?.click();
+    });
   });
 
   it("Start button label flips to 'Pause' and accent class added when running", async () => {
