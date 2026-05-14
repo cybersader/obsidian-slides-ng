@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.5] — 2026-05-14
+
+### Fixed
+
+- **Ribbon-click black-pane bug, take 4.** v0.10.4's parent-side
+  ResizeObserver fix posted `relayout` correctly when the iframe
+  resized from 0×0 to its real dimensions — but Reveal had
+  already initialised at 0×0 by then, baking 0×0 into its slide-
+  stage transform. Subsequent `Reveal.layout()` calls weren't
+  enough to fully recover. v0.10.5 attacks the problem at its
+  source: `refresh()` now `await`s a `waitForIframeSize()` helper
+  before setting `srcdoc`. The helper uses a ResizeObserver +
+  1500 ms timeout to wait until the iframe element has non-zero
+  `clientWidth` and `clientHeight`. Reveal then initialises into
+  a real-sized viewport from the start. Combined with v0.10.4's
+  parent-side relayout-on-resize, this should finally land the
+  fix.
+
+### Technical
+
+- `src/SlidesNGView.ts` — new `waitForIframeSize()` helper,
+  awaited in `refresh()` before `iframeEl.srcdoc = html`. Logs
+  `view/wait-for-size/{start,ready,timeout}` to the debug log
+  so it's clear when the await fires vs. fast-paths through.
+
 ## [0.10.4] — 2026-05-14
 
 ### Fixed

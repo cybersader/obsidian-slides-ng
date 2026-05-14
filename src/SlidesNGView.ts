@@ -425,6 +425,16 @@ export class SlidesNGView extends ItemView {
         magicMoveDurationMs: settings.magicMoveDurationMs,
         resolveImage: (raw) => this.resolveImageAttachment(raw, file.path),
       });
+      // v0.10.5: defer setting srcdoc until the iframe element has
+      // non-zero dimensions. Reveal.initialize() inside the iframe
+      // reads document.documentElement.clientWidth/Height and bakes
+      // those into the slide-stage transform — if it runs at 0x0,
+      // the slides are sized to nothing and the pane stays black,
+      // no amount of subsequent Reveal.layout() calls can fully
+      // recover. Waiting until the iframe is real-sized solves the
+      // problem at its source.
+      await this.waitForIframeSize();
+      if (!this.iframeEl) return; // view closed during wait
       this.iframeEl.srcdoc = html;
       this.debug?.log("view/refresh/rendered", {
         filePath: this.filePath,
@@ -438,6 +448,67 @@ export class SlidesNGView extends ItemView {
       this.showPlaceholder(`Render error: ${msg}`);
       new Notice(`slides-ng render error: ${msg}`);
     }
+  }
+
+  /**
+   * v0.10.5: wait (up to ~1.5s) until the iframe element has non-zero
+   * clientWidth and clientHeight before resolving. Used to defer
+   * setting `srcdoc` until Reveal.js can initialise into a real-sized
+   * viewport — initialising at 0x0 left the pane black even after
+   * later `Reveal.layout()` calls.
+   *
+   * Falls back after the timeout to set srcdoc anyway, so a pane
+   * that genuinely never gains size (e.g. collapsed sidebar) still
+   * gets some content. The user can drag the divider to reveal it
+   * and the v0.10.4 parent-side ResizeObserver will fire the
+   * relayout burst as before.
+   */
+  private async waitForIframeSize(timeoutMs = 1500): Promise<void> {
+    const iframe = this.iframeEl;
+    if (!iframe) return;
+    if (iframe.clientWidth > 0 && iframe.clientHeight > 0) return;
+    this.debug?.log("view/wait-for-size/start", {
+      clientW: iframe.clientWidth,
+      clientH: iframe.clientHeight,
+    });
+    await new Promise<void>((resolve) => {
+      let resolved = false;
+      const done = (): void => {
+        if (resolved) return;
+        resolved = true;
+        if (timer !== null) window.clearTimeout(timer);
+        if (ro) ro.disconnect();
+        resolve();
+      };
+      let ro: ResizeObserver | null = null;
+      const timer: number | null = window.setTimeout(() => {
+        this.debug?.log("view/wait-for-size/timeout", {
+          clientW: iframe.clientWidth,
+          clientH: iframe.clientHeight,
+        });
+        done();
+      }, timeoutMs);
+      if (typeof ResizeObserver === "function") {
+        ro = new ResizeObserver(() => {
+          if (iframe.clientWidth > 0 && iframe.clientHeight > 0) {
+            this.debug?.log("view/wait-for-size/ready", {
+              clientW: iframe.clientWidth,
+              clientH: iframe.clientHeight,
+            });
+            done();
+          }
+        });
+        ro.observe(iframe);
+      } else {
+        // No ResizeObserver — poll.
+        const poll = window.setInterval(() => {
+          if (iframe.clientWidth > 0 && iframe.clientHeight > 0) {
+            window.clearInterval(poll);
+            done();
+          }
+        }, 50);
+      }
+    });
   }
 
   private showPlaceholder(message: string): void {
