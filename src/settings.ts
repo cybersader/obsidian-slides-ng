@@ -203,6 +203,13 @@ export interface SlidesNGSettings {
   speakerPickerTileWidth: number;
 
   /**
+   * v0.11.25: user-set height of the picker panel (px). Persisted
+   * so the user's drag-resize sticks across sessions / vault sync.
+   * `null` (default) = use the CSS default (32 vh).
+   */
+  speakerPickerHeightPx: number | null;
+
+  /**
    * v0.11.5: when true, every top-level `#` heading auto-starts a
    * new slide — no `---` separator needed. Frontmatter override
    * `slides-ng-auto-h1-breaks: true|false` takes priority. Default
@@ -380,6 +387,7 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   speakerPickerStyle: "thumbnails",
   speakerPickerOrientation: "vertical-1",
   speakerPickerTileWidth: 0,
+  speakerPickerHeightPx: null,
   autoH1Breaks: false,
   sceneInheritThemeBg: true,
 };

@@ -584,6 +584,25 @@ export class SlidesNGSpeakerView extends ItemView {
         cls: "slides-ng-speaker-picker-iframe",
         attr: { sandbox: "allow-scripts" },
       });
+      // v0.11.25: custom vertical-resize handle below the iframe.
+      // Native CSS resize:vertical doesn't work on this container
+      // because the picker iframe captures pointer events (it needs
+      // them for tile clicks) and the browser's resize handle ends
+      // up under the iframe. The custom handle sits in the flow
+      // BELOW the iframe so it's always reachable. Restores any
+      // previously-persisted height.
+      if (settings?.speakerPickerHeightPx) {
+        this.pickerEl.style.height = `${settings.speakerPickerHeightPx}px`;
+      }
+      this.attachVerticalResizeHandle(this.pickerEl, {
+        minHeight: 80,
+        onResize: (h) => {
+          const live = this.getSettings?.();
+          if (!live) return;
+          live.speakerPickerHeightPx = h;
+          void this.saveSettings?.();
+        },
+      });
       // Re-render when the deck file changes (matches visual-next pattern).
       this.registerEvent(
         this.app.vault.on("modify", (file: TAbstractFile) => {
@@ -861,6 +880,77 @@ export class SlidesNGSpeakerView extends ItemView {
     } else {
       panel.insertBefore(controls, panel.firstChild);
     }
+  }
+
+  /**
+   * v0.11.25: append a subtle vertical-resize handle to `container`
+   * and wire pointer events that drag-resize the container's height.
+   * Uses Pointer Events with setPointerCapture so a stalling iframe
+   * inside the container can't eat the drag (was the v0.11.24-and-
+   * earlier picker bug). Drag handle is ~3 px tall, transparent at
+   * rest, faint accent on hover/drag.
+   */
+  private attachVerticalResizeHandle(
+    container: HTMLElement,
+    options?: {
+      minHeight?: number;
+      maxHeight?: number;
+      onResize?: (newHeight: number) => void;
+    }
+  ): HTMLElement {
+    const handle = container.createDiv({
+      cls: "slides-ng-speaker-resize-handle-v",
+    });
+    let startY = 0;
+    let startHeight = 0;
+    let dragging = false;
+    let pid = -1;
+    const minH = options?.minHeight ?? 40;
+    const maxH = options?.maxHeight;
+    const onMove = (e: PointerEvent): void => {
+      if (!dragging) return;
+      e.preventDefault();
+      const delta = e.clientY - startY;
+      let next = startHeight + delta;
+      next = Math.max(minH, next);
+      if (typeof maxH === "number") next = Math.min(maxH, next);
+      container.style.height = `${next}px`;
+      container.style.maxHeight = `${next}px`;
+      options?.onResize?.(next);
+    };
+    const onEnd = (e: PointerEvent): void => {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove("dragging");
+      try {
+        if (pid !== -1) handle.releasePointerCapture(pid);
+      } catch (_) {
+        /* pointer may have been released by the system */
+      }
+      pid = -1;
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onEnd);
+      handle.removeEventListener("pointercancel", onEnd);
+      document.body.style.userSelect = "";
+    };
+    handle.addEventListener("pointerdown", (e: PointerEvent) => {
+      e.preventDefault();
+      dragging = true;
+      pid = e.pointerId;
+      startY = e.clientY;
+      startHeight = container.getBoundingClientRect().height;
+      handle.classList.add("dragging");
+      try {
+        handle.setPointerCapture(pid);
+      } catch (_) {
+        /* fallback: window listeners */
+      }
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onEnd);
+      handle.addEventListener("pointercancel", onEnd);
+      document.body.style.userSelect = "none";
+    });
+    return handle;
   }
 
   /**

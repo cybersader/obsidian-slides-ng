@@ -6,6 +6,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.25] — 2026-05-14
+
+### Fixed
+
+- **Picker resize no longer stalls / leaves the cursor stuck.**
+  The picker container used CSS `resize: vertical` so users
+  could drag its bottom edge to make it taller. But the iframe
+  inside captures pointer events (needed for tile clicks), and
+  the browser's native resize handle ends up under the iframe.
+  When the mouse moved over the iframe mid-drag, the resize
+  state never got the `mousemove` / `mouseup` it needed —
+  drag stalled and the cursor stayed stuck in `ns-resize`
+  state. Replaced with a custom drag handle below the iframe
+  that uses Pointer Events + `setPointerCapture` so the iframe
+  can't interrupt the drag. Handle is intentionally subtle: 3
+  px transparent strip at rest, faint accent on hover. Visual-
+  next iframe keeps native `resize: vertical` because its
+  iframe has `pointer-events: none` (the bug didn't apply
+  there).
+
+### Added
+
+- `speakerPickerHeightPx` setting — persists the user's
+  drag-resize across sessions / vault sync. `null` (default)
+  uses the CSS default (32 vh).
+
+### Technical
+
+- `src/SlidesNGSpeakerView.ts` — new
+  `attachVerticalResizeHandle(container, options)` helper.
+  Pointer Events with `setPointerCapture(pointerId)` route
+  every move and up event back to the handle regardless of
+  what's underneath. Cleans up listeners on pointerup /
+  pointercancel.
+- `src/settings.ts` — added `speakerPickerHeightPx: number |
+  null`, default `null`.
+- `src/styles.css` — `.slides-ng-speaker-resize-handle-v`
+  rule (subtle), and `.slides-ng-speaker-picker-thumbs` now
+  uses `flex-direction: column` so handle sits below the
+  iframe inside the container.
+- `test/e2e/picker-sizing.spec.ts` — new
+  `picker resize handle` test dispatches synthetic pointer
+  events on the handle and asserts the container's height
+  changed by the expected delta.
+
 ## [0.11.24] — 2026-05-14
 
 ### Fixed

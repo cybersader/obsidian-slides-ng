@@ -300,6 +300,101 @@ describe("v0.11.20 picker sizing — every orientation × magnifier combo", func
     }
   }
 
+  // v0.11.25: picker custom drag handle. Verifies the handle exists
+  // (replaces the broken native CSS resize:vertical) and that
+  // pointerdown + pointermove + pointerup actually resizes the
+  // container. The cursor-stuck symptom the user reported is a
+  // consequence of native CSS resize getting interrupted by the
+  // iframe inside; our handle uses Pointer Events with
+  // setPointerCapture so it can't be interrupted by anything below.
+  describe("picker resize handle", function () {
+    it("dragging the handle resizes the picker container", async () => {
+      // Force a known starting height for determinism.
+      await browser.execute(() => {
+        const el = document.querySelector(
+          ".slides-ng-speaker-picker-thumbs"
+        ) as HTMLElement | null;
+        if (el) {
+          el.style.height = "240px";
+          el.style.maxHeight = "240px";
+        }
+      });
+      await new Promise((r) => setTimeout(r, 300));
+      const handleExists = await browser.execute(() => {
+        return !!document.querySelector(
+          ".slides-ng-speaker-picker-thumbs .slides-ng-speaker-resize-handle-v"
+        );
+      });
+      if (!handleExists) {
+        throw new Error(
+          "Custom resize handle (.slides-ng-speaker-resize-handle-v) " +
+            "missing inside .slides-ng-speaker-picker-thumbs."
+        );
+      }
+      // Simulate a 60 px downward drag on the handle. We dispatch
+      // pointer events directly (Actions API can't easily target
+      // elements inside the speaker view from the parent context
+      // without flaky coordinate math).
+      const newHeight = await browser.execute(() => {
+        const container = document.querySelector(
+          ".slides-ng-speaker-picker-thumbs"
+        ) as HTMLElement | null;
+        const handle = container?.querySelector(
+          ".slides-ng-speaker-resize-handle-v"
+        ) as HTMLElement | null;
+        if (!container || !handle) return -1;
+        const rect = handle.getBoundingClientRect();
+        const startY = rect.top + rect.height / 2;
+        const down = new PointerEvent("pointerdown", {
+          bubbles: true,
+          pointerId: 1,
+          clientX: rect.left + 5,
+          clientY: startY,
+          pointerType: "mouse",
+        });
+        handle.dispatchEvent(down);
+        const move = new PointerEvent("pointermove", {
+          bubbles: true,
+          pointerId: 1,
+          clientX: rect.left + 5,
+          clientY: startY + 60,
+          pointerType: "mouse",
+        });
+        handle.dispatchEvent(move);
+        const up = new PointerEvent("pointerup", {
+          bubbles: true,
+          pointerId: 1,
+          clientX: rect.left + 5,
+          clientY: startY + 60,
+          pointerType: "mouse",
+        });
+        handle.dispatchEvent(up);
+        return container.getBoundingClientRect().height;
+      });
+      if (!(newHeight > 280)) {
+        throw new Error(
+          `Resize handle drag did not change container height (got ` +
+            `${newHeight}, expected ~300 after a 60 px downward drag ` +
+            `from 240 starting height).`
+        );
+      }
+      // eslint-disable-next-line no-console
+      console.log(
+        `[picker-resize] drag 60 px → container height ${newHeight} px`
+      );
+      // Restore so other tests aren't affected.
+      await browser.execute(() => {
+        const el = document.querySelector(
+          ".slides-ng-speaker-picker-thumbs"
+        ) as HTMLElement | null;
+        if (el) {
+          el.style.height = "";
+          el.style.maxHeight = "";
+        }
+      });
+    });
+  });
+
   // v0.11.24: up-next iframe flicker check. Mirrors the picker
   // flicker test — installs a MutationObserver inside the up-next
   // iframe that records every time a slide section gains `.present`

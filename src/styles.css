@@ -500,16 +500,11 @@
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
-  /* Native vertical resize handle (CSS-only). Browser shows the
-   * drag-handle in the bottom-right corner.
-   *
-   * v0.11.14: dropped `min-height: 80px`. Was creating an asymmetric
-   * resize experience — the CSS min-height blocked initial downward
-   * drag, but once the user dragged bigger the JS-set inline `height`
-   * overrode the CSS rule and they could drag arbitrarily small.
-   * Now consistent from the start: the only floor is `min-height:
-   * 40px` (browser-default ish, prevents the iframe from vanishing
-   * entirely). max-height stays so it can't push other panels off. */
+  /* Native vertical resize works here because the iframe has
+   * pointer-events:none — mouse events pass through to the wrapping
+   * div so the browser's resize handle isn't blocked. Picker had to
+   * switch to a custom handle (v0.11.25) because its iframe needs
+   * pointer events for tile clicks. */
   resize: vertical;
   min-height: 40px;
   max-height: 80vh;
@@ -700,13 +695,22 @@
  * the picker box; orientation toggle button lives in the header. */
 .slides-ng-speaker-picker-thumbs {
   /* Override text-list overflow + flex column. The iframe sits
-   * full-bleed inside this container. */
+   * full-bleed inside this container.
+   * v0.11.25: native resize removed — see visual-next-frame-wrap
+   * note for the rationale. attachVerticalResizeHandle() appends a
+   * custom drag handle below the iframe. */
   padding: 0;
   overflow: hidden;
   min-height: 200px;
   max-height: 50vh;
   height: 32vh;
-  resize: vertical; /* user can drag picker height */
+  resize: none;
+  display: flex;
+  flex-direction: column;
+}
+.slides-ng-speaker-picker-thumbs .slides-ng-speaker-picker-iframe {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .slides-ng-speaker-picker-iframe {
   width: 100%;
@@ -715,6 +719,27 @@
   border-radius: 6px;
   display: block;
   background: #0a0a0a;
+}
+/* v0.11.25: subtle vertical resize handle. Replaces native CSS
+ * resize: vertical (which got eaten by the iframe inside). Default
+ * state: 3 px tall transparent strip — visually nearly invisible.
+ * Hover/active: 4 px tall, subtle accent. Cursor is ns-resize so
+ * the affordance is discoverable without being noisy. */
+.slides-ng-speaker-resize-handle-v {
+  flex: 0 0 auto;
+  height: 3px;
+  width: 100%;
+  cursor: ns-resize;
+  background: transparent;
+  transition: background 80ms ease, height 80ms ease;
+  z-index: 4;
+  position: relative;
+  touch-action: none;
+}
+.slides-ng-speaker-resize-handle-v:hover,
+.slides-ng-speaker-resize-handle-v.dragging {
+  background: var(--background-modifier-border-hover, var(--background-modifier-border));
+  height: 4px;
 }
 .slides-ng-speaker-picker-orient-btn,
 .slides-ng-speaker-picker-size-btn {
