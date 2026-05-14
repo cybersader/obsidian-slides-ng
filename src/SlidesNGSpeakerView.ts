@@ -782,25 +782,64 @@ export class SlidesNGSpeakerView extends ItemView {
     const ind = this.ensureDropIndicator();
     ind.style.display = "block";
     ind.style.width = `${rect.width}px`;
-    // Position the line so it visually sits BETWEEN panels — half
-    // above + half below the boundary, which makes "where will it
-    // drop" obvious at a glance.
-    // v0.11.4: account for contentEl.scrollTop. `rect.top` is in
-    // viewport coords; `containerRect.top` is too. Their difference
-    // gives the panel's offset from the TOP of the container's
-    // visible area — but the indicator is positioned absolutely
-    // inside contentEl, so its `top` must be in contentEl's
-    // INTERNAL coordinate space (which the absolute-positioning
-    // engine ignores scrollTop for). Without adding scrollTop, a
-    // scrolled-down container shows the indicator above where the
-    // cursor actually is. Same correction applies to `left` if the
-    // multi-column grid layout is active and horizontally scrolled.
+
+    // v0.11.6: position the indicator at the MIDPOINT of the gap
+    // between the hovered panel and its neighbour on the chosen
+    // side. Previously the indicator drew at the target panel's
+    // top OR bottom edge — with a 6 px gap between panels, that
+    // gave two different positions depending on which panel was
+    // hovered ("indicator jumps between top of one panel and
+    // bottom of another"). Midpoint positioning means the same
+    // visual line whether the user crosses the gap upward or
+    // downward.
     const scrollTop = this.contentEl.scrollTop || 0;
     const scrollLeft = this.contentEl.scrollLeft || 0;
-    ind.style.top = isAbove
-      ? `${rect.top - containerRect.top + scrollTop - 1}px`
-      : `${rect.bottom - containerRect.top + scrollTop - 1}px`;
+    const neighbour = isAbove
+      ? this.previousVisiblePanel(target)
+      : this.nextVisiblePanel(target);
+    let boundaryViewportY: number;
+    if (neighbour) {
+      const nRect = neighbour.getBoundingClientRect();
+      boundaryViewportY = isAbove
+        ? (nRect.bottom + rect.top) / 2
+        : (rect.bottom + nRect.top) / 2;
+    } else {
+      // Edge of the panel list (no neighbour above the first or
+      // below the last). Fall back to the panel's own edge.
+      boundaryViewportY = isAbove ? rect.top : rect.bottom;
+    }
+    ind.style.top = `${boundaryViewportY - containerRect.top + scrollTop - 1}px`;
     ind.style.left = `${rect.left - containerRect.left + scrollLeft}px`;
+  }
+
+  /** Walk the DOM siblings to find the next visible speaker panel. */
+  private nextVisiblePanel(from: HTMLElement): HTMLElement | null {
+    let n = from.nextElementSibling as HTMLElement | null;
+    while (n) {
+      if (
+        n.classList.contains("slides-ng-speaker-panel") &&
+        n.style.display !== "none"
+      ) {
+        return n;
+      }
+      n = n.nextElementSibling as HTMLElement | null;
+    }
+    return null;
+  }
+
+  /** Walk the DOM siblings to find the previous visible speaker panel. */
+  private previousVisiblePanel(from: HTMLElement): HTMLElement | null {
+    let n = from.previousElementSibling as HTMLElement | null;
+    while (n) {
+      if (
+        n.classList.contains("slides-ng-speaker-panel") &&
+        n.style.display !== "none"
+      ) {
+        return n;
+      }
+      n = n.previousElementSibling as HTMLElement | null;
+    }
+    return null;
   }
 
   private hideDropIndicator(): void {

@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.6] — 2026-05-14
+
+### Fixed
+
+- **DnD drop indicator showing two different positions near a
+  panel boundary.** Previously the indicator drew at the
+  hovered panel's top OR bottom edge — with the 6 px gap
+  between panels, that gave two different visual positions
+  depending on which panel was hovered (bottom edge of panel
+  A vs. top edge of panel B). The line appeared to "jump"
+  between them as the cursor crossed the boundary. v0.11.6
+  positions the indicator at the MIDPOINT of the gap, so the
+  same visual line shows whether you cross upward or downward.
+  At the top and bottom edges of the panel list (no neighbour
+  on one side) the indicator falls back to the panel's own
+  edge.
+
+### Technical
+
+- `src/SlidesNGSpeakerView.ts` — `updateDropIndicator()`
+  computes a midpoint between the hovered panel and its
+  neighbour (via two new helpers `nextVisiblePanel()` /
+  `previousVisiblePanel()`).
+
 ## [0.11.5] — 2026-05-14
 
 ### Added
