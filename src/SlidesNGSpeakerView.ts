@@ -1052,9 +1052,22 @@ export class SlidesNGSpeakerView extends ItemView {
         return;
       }
       this.exitNotesEditMode();
-      // The vault modify event triggers the preview re-render, which
-      // posts a new state with the updated notesHtml — applyState
-      // will repaint the notes panel automatically.
+      // v0.11.12: immediately repaint the notes panel with the newly-
+      // saved value rendered to HTML. Previously we only cleared the
+      // editing flag and waited for the iframe re-render's state
+      // event to repaint — but the textarea was still visible until
+      // that round-trip completed (~500ms after vault.modify), so it
+      // LOOKED like the save did nothing. Render synchronously via
+      // the same marked instance scenes use.
+      if (this.notesEl) {
+        const trimmed = newValue.trim();
+        const html =
+          trimmed.length === 0
+            ? "<em>No notes</em>"
+            : (sceneMd.parse(newValue, { async: false }) as string);
+        this.notesEl.innerHTML = html;
+      }
+      new Notice("Notes saved.");
     });
 
     cancel.addEventListener("click", () => {

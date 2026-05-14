@@ -6,6 +6,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.12] — 2026-05-14
+
+### Fixed
+
+- **Thumbnail tiles ignored the deck theme.** Both the Grid
+  overlay and the picker thumbnails hardcoded
+  `background: #000`. A white-themed deck (e.g. the
+  `03-team-update` example) rendered as BLACK tiles with
+  white-on-black slide content peeking through — totally
+  unrelated to the actual preview color. Fix: read
+  `getComputedStyle(document.body).backgroundColor` (reveal
+  applies the theme to body bg) and apply that to each tile.
+  Now white themes render in white tiles, beige in beige, etc.
+- **Grid overlay title duplication.** The Grid still had the
+  fade-gradient title overlay I removed from the picker
+  thumbnails in v0.11.1. Cloned slide content already contains
+  the slide's own `<h1>`, so the overlay was redundant. Now
+  removed; titles live on the tile's `aria-label` + `title`
+  attributes only.
+- **Grid slide-number badge upgraded** to match the picker's
+  v0.11.1 design: 28×28 px bordered square in the top-left,
+  bold tabular figures, white-translucent outline. Was a
+  smaller pill bottom-right.
+- **Speaker notes "Save" appeared to do nothing.** The save
+  WAS writing the file, but the notes panel kept showing the
+  textarea until the iframe re-render's state event arrived
+  (~500 ms). Now repaints the notes panel synchronously with
+  the new value rendered to HTML (via the same `marked`
+  instance scenes use), and fires a brief "Notes saved."
+  notice for confirmation.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — `bodyBg` /
+  `stripBodyBg` reads computed body background; Grid + picker
+  tile cssText use it; Grid title overlay creation block
+  replaced with attribute-only metadata; Grid slide-number
+  badge styling unified with picker.
+- `src/SlidesNGSpeakerView.ts` — notes save handler now
+  renders the new value via `sceneMd.parse(value, {async:
+  false})` and writes it into `notesEl.innerHTML`. New Notice
+  fires on successful save.
+
 ## [0.11.11] — 2026-05-14
 
 ### Removed

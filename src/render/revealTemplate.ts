@@ -926,6 +926,10 @@ ${sectionsHtml}
         var slideW = parseInt(strip.getAttribute('data-slide-w') || '960', 10) || 960;
         var slideH = parseInt(strip.getAttribute('data-slide-h') || '700', 10) || 700;
         var aspect = slideH / slideW;
+        // v0.11.12: read theme bg so non-black themes render with the
+        // correct tile color. Stored on the strip as a data-attr so
+        // setPickerOrientation can re-apply consistently.
+        var stripBodyBg = (window.getComputedStyle && getComputedStyle(document.body).backgroundColor) || '#000';
 
         // Base strip styles: fixed full-viewport, scrollable along
         // the appropriate axis, background dimmed.
@@ -975,7 +979,7 @@ ${sectionsHtml}
         tiles.forEach(function (t) {
           t.style.cssText =
             'position:relative;width:' + tileW + 'px;height:' + tileH + 'px;' +
-            'flex:0 0 auto;background:#000;border:2px solid rgba(255,255,255,0.18);' +
+            'flex:0 0 auto;background:' + stripBodyBg + ';border:2px solid rgba(255,255,255,0.18);' +
             'border-radius:6px;padding:0;cursor:pointer;overflow:hidden;color:#fff;' +
             'font:inherit;';
           var thumb = t.querySelector('.slides-ng-picker-thumb');
@@ -1116,6 +1120,10 @@ ${sectionsHtml}
               var revealConfig = (typeof Reveal.getConfig === 'function' ? Reveal.getConfig() : {}) || {};
               var SLIDE_W = typeof revealConfig.width === 'number' && revealConfig.width > 0 ? revealConfig.width : 960;
               var SLIDE_H = typeof revealConfig.height === 'number' && revealConfig.height > 0 ? revealConfig.height : 700;
+              // v0.11.12: read actual theme background color so non-
+              // black themes (white, simple, beige etc.) render tiles
+              // in the right color. Reveal applies theme to body bg.
+              var bodyBg = (window.getComputedStyle && getComputedStyle(document.body).backgroundColor) || '#000';
               // v0.11.3: bumped from 220 to 320 so text inside the
               // cloned slide thumbnails is legible. Picker tiles
               // (up to 240px) had the same issue and that fix
@@ -1140,7 +1148,7 @@ ${sectionsHtml}
                 tile.style.cssText =
                   'position:relative;width:' + TILE_W + 'px;' +
                   'height:' + Math.round(TILE_W * SLIDE_H / SLIDE_W) + 'px;' +
-                  'background:#000;border:2px solid ' +
+                  'background:' + bodyBg + ';border:2px solid ' +
                   (isCurrent ? 'var(--r-link-color, #42affa)' : 'rgba(255,255,255,0.18)') +
                   ';border-radius:6px;padding:0;cursor:pointer;' +
                   'overflow:hidden;font:inherit;color:#fff;' +
@@ -1172,27 +1180,31 @@ ${sectionsHtml}
                   tile.appendChild(thumb);
                 }
 
-                // Slide-number badge (bottom-right, on top of thumbnail).
+                // v0.11.12: square bordered badge in the top-left, same
+                // visual as the picker thumbnails (v0.11.1+). Larger
+                // and more legible than the old pill in the corner.
                 var num = document.createElement('div');
                 num.textContent = String(s.idx + 1);
                 num.style.cssText =
-                  'position:absolute;bottom:4px;right:6px;' +
-                  'background:rgba(0,0,0,0.85);color:#fff;padding:2px 8px;' +
-                  'border-radius:3px;font-size:12px;font-weight:600;' +
-                  'pointer-events:none;z-index:2;';
+                  'position:absolute;top:6px;left:6px;' +
+                  'width:28px;height:28px;box-sizing:border-box;' +
+                  'display:flex;align-items:center;justify-content:center;' +
+                  'background:rgba(0,0,0,0.78);' +
+                  'border:1.5px solid rgba(255,255,255,0.55);' +
+                  'color:#fff;border-radius:4px;' +
+                  'font-size:14px;font-weight:700;line-height:1;' +
+                  'pointer-events:none;z-index:3;' +
+                  'font-variant-numeric:tabular-nums;' +
+                  'text-shadow:0 1px 2px rgba(0,0,0,0.6);';
                 tile.appendChild(num);
 
-                // Title overlay (top-left, faded so it doesn't drown the thumbnail).
+                // v0.11.12: title-overlay removed (was duplicating the
+                // slide's own h1 visible in the cloned thumbnail). Same
+                // fix the picker thumbnails got in v0.11.1. Title is
+                // kept on the tile attributes for accessibility.
                 if (s.title) {
-                  var titleEl = document.createElement('div');
-                  titleEl.textContent = s.title;
-                  titleEl.style.cssText =
-                    'position:absolute;top:0;left:0;right:0;' +
-                    'background:linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);' +
-                    'color:#fff;padding:4px 8px 12px;font-size:11px;line-height:1.2;' +
-                    'overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;' +
-                    '-webkit-box-orient:vertical;text-align:left;pointer-events:none;z-index:2;';
-                  tile.appendChild(titleEl);
+                  tile.setAttribute('aria-label', String(s.idx + 1) + ': ' + s.title);
+                  tile.title = s.title;
                 }
 
                 tile.addEventListener('click', function () {
