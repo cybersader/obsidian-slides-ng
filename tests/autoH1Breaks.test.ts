@@ -6,9 +6,34 @@ import { test, expect, describe } from "bun:test";
 import {
   injectH1SlideBreaks,
   peekFrontmatterFlag,
+  peekFrontmatterRaw,
   parseDeck,
 } from "../src/parser/parseDeck";
 import { slideIndexFromCursor } from "../src/parser/slideIndexFromCursor";
+
+describe("peekFrontmatterRaw (v0.11.17)", () => {
+  test("returns the raw lowercased string value", () => {
+    const md = "---\nslides-ng-picker-tile-width: 220\n---\n\nbody";
+    expect(peekFrontmatterRaw(md, "slides-ng-picker-tile-width")).toBe("220");
+  });
+
+  test("strips wrapping quotes", () => {
+    const md = "---\nslides-ng-picker-tile-width: \"comfortable\"\n---\nbody";
+    expect(peekFrontmatterRaw(md, "slides-ng-picker-tile-width")).toBe(
+      "comfortable"
+    );
+  });
+
+  test("returns undefined when key absent", () => {
+    const md = "---\ntitle: foo\n---\nbody";
+    expect(peekFrontmatterRaw(md, "slides-ng-picker-tile-width")).toBeUndefined();
+  });
+
+  test("returns undefined when no frontmatter block", () => {
+    const md = "# No frontmatter\nbody";
+    expect(peekFrontmatterRaw(md, "any")).toBeUndefined();
+  });
+});
 
 describe("injectH1SlideBreaks", () => {
   test("leaves a single-H1 deck untouched", () => {

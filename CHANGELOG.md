@@ -6,6 +6,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.17] — 2026-05-14
+
+### Added
+
+- **Magnifier-cycle button on the picker header** — small icon
+  button (next to the orientation toggle) that cycles tile
+  size through three presets: **compact** (100 px),
+  **comfortable** (180 px), **big** (280 px). Picks the
+  preset that visually conveys the current state (zoom-out /
+  search / zoom-in) and the tooltip names the next preset
+  explicitly, so the cycle direction is never a guess. The
+  install default (`speakerPickerTileWidth: 0`, auto-fit)
+  isn't in the cycle — once you click in, you stay on a named
+  preset; you can return to auto via the Settings tab.
+- **Per-deck override** via `slides-ng-picker-tile-width`
+  frontmatter. Accepts either a positive integer (raw pixels,
+  e.g. `220`) or a preset alias (`compact` / `comfortable` /
+  `big`). Cached when the picker iframe builds, so it doesn't
+  re-peek on every retile.
+- New `peekFrontmatterRaw(markdown, key)` helper for
+  string-valued frontmatter peeks; `peekFrontmatterFlag` is now
+  a thin coercion shim on top. Adds 4 unit tests.
+
+### Technical
+
+- `src/settings.ts` — `PICKER_TILE_PRESETS` map +
+  `PickerTilePresetName` type. The persisted value remains a
+  `number` so existing setting files keep working.
+- `src/parser/parseDeck.ts` — `peekFrontmatterRaw` extracts the
+  raw lowercased/unquoted value; the boolean variant delegates
+  to it.
+- `src/SlidesNGSpeakerView.ts` — new `pickerSizeBtn` field,
+  `applyPickerSizeButton`, `resolvePickerTileSizePreset`,
+  `effectiveTileWidth`, `peekDeckTileWidth`. The cycle handler
+  re-issues `enablePickerStrip` to rebuild tiles with the new
+  width (the iframe's `buildPickerStrip` already removes the
+  old strip first, so this is a clean reset). `ensurePickerStrip`
+  caches `deckPickerTileWidth` from the deck's frontmatter and
+  the size button reflects it.
+- `src/SlidesNGSettingTab.ts` — frontmatter reference card adds
+  a "Picker tile size override" section.
+- `src/styles.css` — `.slides-ng-speaker-picker-size-btn` shares
+  styling with the orientation toggle.
+
 ## [0.11.16] — 2026-05-14
 
 ### Fixed

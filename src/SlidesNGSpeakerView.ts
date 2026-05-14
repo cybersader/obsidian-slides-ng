@@ -35,7 +35,9 @@ import type {
 import {
   DEFAULT_SPEAKER_PANEL_VISIBILITY,
   DEFAULT_SPEAKER_PANEL_ORDER,
+  PICKER_TILE_PRESETS,
 } from "./settings";
+import { peekFrontmatterRaw } from "./parser/parseDeck";
 
 // Lightweight markdown → HTML for scene content. Synchronous + fast +
 // no Obsidian-render-cycle hang risk. Scenes are presentational
@@ -111,6 +113,15 @@ export class SlidesNGSpeakerView extends ItemView {
   private lastPickerRenderedMtime?: number;
   /** Orientation toggle button in the picker header (v0.11.0). */
   private pickerOrientationBtn?: HTMLButtonElement;
+  /** Magnifier-cycle button in the picker header (v0.11.17). */
+  private pickerSizeBtn?: HTMLButtonElement;
+  /**
+   * Per-deck override read from `slides-ng-picker-tile-width` in
+   * frontmatter; cached so we don't re-peek on every tile re-render.
+   * `undefined` = no override, fall back to settings; `0` = explicit
+   * "auto" override. v0.11.17.
+   */
+  private deckPickerTileWidth: number | undefined;
   private sceneButtons = new Map<string, HTMLButtonElement>();
   /** Visual next-slide preview mini-iframe (v0.7.0). */
   private nextSlideIframe?: HTMLIFrameElement;
@@ -139,7 +150,7 @@ export class SlidesNGSpeakerView extends ItemView {
           type: "slides-ng-cmd",
           cmd: "enablePickerStrip",
           orientation: this.normalizeOrientation(s?.speakerPickerOrientation),
-          tileWidth: s?.speakerPickerTileWidth ?? 0,
+          tileWidth: this.effectiveTileWidth(),
           currentIdx: this.state?.currentIdx ?? 0,
         });
         if (typeof this.state?.currentIdx === "number") {
@@ -505,6 +516,49 @@ export class SlidesNGSpeakerView extends ItemView {
           type: "slides-ng-cmd",
           cmd: "setPickerOrientation",
           orientation: next,
+        });
+      });
+
+      // v0.11.17: magnifier-cycle button. Cycles tile size between
+      // 3 presets (compact / comfortable / big). Auto (the install
+      // default) is not part of the cycle — once you click in, you
+      // stay on a named preset. The Settings tab still accepts any
+      // positive integer or 0 (auto) for power users; per-deck
+      // `slides-ng-picker-tile-width` overrides both.
+      this.pickerSizeBtn = pickerHeader.createEl("button", {
+        cls: "slides-ng-speaker-btn slides-ng-speaker-picker-size-btn",
+        attr: { type: "button" },
+      });
+      this.applyPickerSizeButton(
+        this.resolvePickerTileSizePreset(settings?.speakerPickerTileWidth ?? 0)
+      );
+      this.pickerSizeBtn.addEventListener("click", () => {
+        const s = this.getSettings?.();
+        if (!s) return;
+        const cycle: Array<keyof typeof PICKER_TILE_PRESETS> = [
+          "compact",
+          "comfortable",
+          "big",
+        ];
+        const current = this.resolvePickerTileSizePreset(s.speakerPickerTileWidth ?? 0);
+        // If user is on 'auto' or a custom value, START at compact.
+        const startIdx = current === "auto" || current === "custom"
+          ? -1
+          : cycle.indexOf(current);
+        const next = cycle[(startIdx + 1) % cycle.length];
+        s.speakerPickerTileWidth = PICKER_TILE_PRESETS[next];
+        void this.saveSettings?.();
+        this.applyPickerSizeButton(next);
+        // Re-issue enablePickerStrip so buildPickerStrip rebuilds
+        // tiles with the new tile-width attribute. The iframe's
+        // buildPickerStrip helper clears the existing strip first
+        // so this is a clean reset (no orphan tiles).
+        this.postToPicker({
+          type: "slides-ng-cmd",
+          cmd: "enablePickerStrip",
+          orientation: this.normalizeOrientation(s.speakerPickerOrientation),
+          tileWidth: this.effectiveTileWidth(),
+          currentIdx: this.state?.currentIdx ?? 0,
         });
       });
 
@@ -1391,10 +1445,18 @@ export class SlidesNGSpeakerView extends ItemView {
       this.pickerStripIframe.srcdoc = html;
       this.lastPickerRenderedPath = deckPath;
       this.lastPickerRenderedMtime = mtime;
+      // v0.11.17: peek per-deck `slides-ng-picker-tile-width` and
+      // cache it so the magnifier button's effectiveTileWidth() also
+      // sees the override. Accepts a number (pixels), `0` (auto), or
+      // a named preset ("compact" | "comfortable" | "big").
+      this.deckPickerTileWidth = this.peekDeckTileWidth(markdown);
       // After the iframe loads, post enablePickerStrip. Use a short
       // retry burst because the bridge listener may not be up yet.
       const orient = this.normalizeOrientation(settings?.speakerPickerOrientation);
-      const tileWidth = settings?.speakerPickerTileWidth ?? 0;
+      const tileWidth = this.effectiveTileWidth();
+      // Refresh the size button icon to reflect any per-deck override
+      // (so the inline UI matches what's actually applied).
+      this.applyPickerSizeButton(this.resolvePickerTileSizePreset(tileWidth));
       const post = (): void => {
         this.postToPicker({
           type: "slides-ng-cmd",
@@ -1469,6 +1531,105 @@ export class SlidesNGSpeakerView extends ItemView {
   ): PickerOrientation {
     if (raw === "vertical" || raw === undefined) return "vertical-1";
     return raw as PickerOrientation;
+  }
+
+  /**
+   * v0.11.17: resolve the current picker tile width to one of:
+   *   - a named preset ("compact" | "comfortable" | "big") when the
+   *     value exactly matches `PICKER_TILE_PRESETS`
+   *   - "auto" when the value is 0
+   *   - "custom" when the value is a positive integer that isn't a
+   *     preset (set manually in Settings or via frontmatter)
+   * Used to pick the right icon + tooltip for the magnifier button.
+   */
+  private resolvePickerTileSizePreset(
+    width: number
+  ): keyof typeof PICKER_TILE_PRESETS | "auto" | "custom" {
+    if (!width || width === 0) return "auto";
+    for (const [name, px] of Object.entries(PICKER_TILE_PRESETS) as Array<
+      [keyof typeof PICKER_TILE_PRESETS, number]
+    >) {
+      if (px === width) return name;
+    }
+    return "custom";
+  }
+
+  /**
+   * v0.11.17: update the magnifier-cycle button icon + tooltip
+   * based on the CURRENT tile-size preset. Each state advertises
+   * what the NEXT click does so the user doesn't have to guess.
+   */
+  private applyPickerSizeButton(
+    preset: keyof typeof PICKER_TILE_PRESETS | "auto" | "custom"
+  ): void {
+    if (!this.pickerSizeBtn) return;
+    this.pickerSizeBtn.empty();
+    const iconEl = this.pickerSizeBtn.createSpan({
+      cls: "slides-ng-speaker-btn-icon",
+    });
+    const meta: Record<
+      keyof typeof PICKER_TILE_PRESETS | "auto" | "custom",
+      { icon: string; tip: string }
+    > = {
+      auto: {
+        icon: "zoom-in",
+        tip: "Picker tiles: auto. Click for compact.",
+      },
+      compact: {
+        icon: "zoom-out",
+        tip: "Picker tiles: compact. Click for comfortable.",
+      },
+      comfortable: {
+        icon: "search",
+        tip: "Picker tiles: comfortable. Click for big.",
+      },
+      big: {
+        icon: "zoom-in",
+        tip: "Picker tiles: big. Click for compact.",
+      },
+      custom: {
+        icon: "search",
+        tip:
+          "Picker tiles: custom (set in Settings or deck frontmatter). " +
+          "Click to enter preset cycle.",
+      },
+    };
+    const m = meta[preset];
+    setIcon(iconEl, m.icon);
+    setTooltip(this.pickerSizeBtn, m.tip);
+  }
+
+  /**
+   * v0.11.17: compute the picker tile width to send to the iframe.
+   * Precedence: per-deck frontmatter > persisted setting > 0 (auto).
+   */
+  private effectiveTileWidth(): number {
+    if (typeof this.deckPickerTileWidth === "number") {
+      return this.deckPickerTileWidth;
+    }
+    const s = this.getSettings?.();
+    return s?.speakerPickerTileWidth ?? 0;
+  }
+
+  /**
+   * v0.11.17: read the per-deck `slides-ng-picker-tile-width`
+   * frontmatter override from the deck's source markdown. Accepts:
+   *   - a positive integer ("220")
+   *   - `0` (explicit auto override)
+   *   - a named preset alias ("compact" | "comfortable" | "big")
+   * Returns undefined if the key is absent or the value is
+   * unparseable. The caller caches this so the picker re-render
+   * pipeline doesn't pay the regex cost per tile.
+   */
+  private peekDeckTileWidth(markdown: string): number | undefined {
+    const raw = peekFrontmatterRaw(markdown, "slides-ng-picker-tile-width");
+    if (raw === undefined) return undefined;
+    if (raw in PICKER_TILE_PRESETS) {
+      return PICKER_TILE_PRESETS[raw as keyof typeof PICKER_TILE_PRESETS];
+    }
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 0) return n;
+    return undefined;
   }
 
   /** Image-attachment resolver — mirrors SlidesNGView.resolveImageAttachment. */

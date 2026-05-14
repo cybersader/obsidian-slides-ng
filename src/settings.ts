@@ -299,6 +299,22 @@ export const PICKER_MODES = ["compact", "list"] as const;
 export const TRANSITION_SPEEDS = ["default", "fast", "slow"] as const;
 
 /**
+ * v0.11.17: preset tile sizes for the picker magnifier-cycle button.
+ * Three named presets keep the inline UI overwhelmproof; the
+ * Settings tab still accepts any positive integer for power users.
+ * `0` (auto) is the implicit fourth state — fresh installs start
+ * there; the cycle button moves through compact → comfortable → big
+ * → compact (auto is not part of the cycle, only reachable via
+ * Settings or by deleting the frontmatter override).
+ */
+export const PICKER_TILE_PRESETS = {
+  compact: 100,
+  comfortable: 180,
+  big: 280,
+} as const;
+export type PickerTilePresetName = keyof typeof PICKER_TILE_PRESETS;
+
+/**
  * Shiki themes bundled into main.js. Adding a theme = importing it in
  * `src/render/shiki.ts` + adding the name here. Stay frugal — each theme
  * adds ~25 KB to the bundle.

@@ -47,24 +47,36 @@ export function peekFrontmatterFlag(
   markdown: string,
   key: string
 ): boolean | undefined {
+  const raw = peekFrontmatterRaw(markdown, key);
+  if (raw === undefined) return undefined;
+  const val = raw.toLowerCase();
+  if (val === "true" || val === "yes" || val === "1") return true;
+  if (val === "false" || val === "no" || val === "0") return false;
+  return undefined;
+}
+
+/**
+ * v0.11.17: lower-level peek that returns the raw frontmatter value
+ * (lowercased, unquoted, trimmed) without coercing to bool. Returns
+ * undefined when the key is absent or there's no frontmatter block.
+ */
+export function peekFrontmatterRaw(
+  markdown: string,
+  key: string
+): string | undefined {
   if (!(markdown.startsWith("---\n") || markdown.startsWith("---\r\n"))) {
     return undefined;
   }
   const end = markdown.indexOf("\n---", 4);
   if (end === -1) return undefined;
   const fm = markdown.slice(0, end);
-  // Match key: value at the start of a line. Boolean truthy/falsy
-  // values + quoted/unquoted strings handled.
   const re = new RegExp(
     `^${key.replace(/[-/\\^$*+?.()|[\\]{}]/g, "\\$&")}\\s*:\\s*(.*)$`,
     "m"
   );
   const m = re.exec(fm);
   if (!m) return undefined;
-  const val = m[1].trim().toLowerCase().replace(/^["']|["']$/g, "");
-  if (val === "true" || val === "yes" || val === "1") return true;
-  if (val === "false" || val === "no" || val === "0") return false;
-  return undefined;
+  return m[1].trim().toLowerCase().replace(/^["']|["']$/g, "");
 }
 
 function reclassifyNote(slide: SourceSlideInfo): {

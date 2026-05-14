@@ -716,12 +716,14 @@
   display: block;
   background: #0a0a0a;
 }
-.slides-ng-speaker-picker-orient-btn {
-  /* Small icon button in the picker header. */
+.slides-ng-speaker-picker-orient-btn,
+.slides-ng-speaker-picker-size-btn {
+  /* Small icon buttons in the picker header. */
   padding: 0.25rem 0.5rem;
   font-size: 0.85em;
 }
-.slides-ng-speaker-picker-orient-btn .svg-icon {
+.slides-ng-speaker-picker-orient-btn .svg-icon,
+.slides-ng-speaker-picker-size-btn .svg-icon {
   width: 14px;
   height: 14px;
 }

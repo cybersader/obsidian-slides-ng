@@ -527,6 +527,14 @@ slides-ng-hide-panels: [picker, scenes]   # hide these panels while
 body — when active, picker + scenes panels are hidden`,
       },
       {
+        title: "Picker tile size override (v0.11.17)",
+        code:
+`slides-ng-picker-tile-width: comfortable   # preset alias: compact (100),
+                                           #   comfortable (180), big (280)
+# Or a raw pixel value:
+slides-ng-picker-tile-width: 220           # any positive integer; 0 = auto`,
+      },
+      {
         title: "Power-user passthrough",
         code:
 `slides-ng-reveal-config:               # any object — passed to Reveal.initialize()
