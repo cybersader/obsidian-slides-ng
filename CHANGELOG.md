@@ -6,6 +6,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.7] — 2026-05-14
+
+### Added
+
+- **Prev / Next buttons in the preview toolbar.** Users asked
+  for visible nav arrows. Reveal's stock corner controls stay
+  off by default (they clutter slide content), so explicit
+  toolbar buttons fill the gap. Located right after "Use
+  current", before "Menu" / "Grid". Bridge `prev` / `next`
+  commands already existed.
+
+### Fixed
+
+- **Cursor-follow didn't work with auto-h1-breaks decks.**
+  `slideIndexFromCursor` counted only `---` separators in the
+  raw markdown to map cursor line → slide index. With
+  auto-h1-breaks the deck is split by `#` headings (via
+  `injectH1SlideBreaks`), so the cursor on slide 3 was still
+  reporting "slide 0" to the preview iframe — the preview
+  stayed on slide 1 regardless of where the cursor went in
+  the editor. Fix: `slideIndexFromCursor` now accepts an
+  `autoH1Breaks` option AND peeks the frontmatter override
+  flag (same precedence as `parseDeck`). When enabled, each
+  `#` heading after the first bumps the slide index, with
+  proper handling for explicit `---` separators that already
+  precede an `#` (no double-bump) and fenced code blocks
+  (`#` inside ``` is ignored).
+
+### Technical
+
+- `src/parser/slideIndexFromCursor.ts` — new `options` param;
+  reads `peekFrontmatterFlag` for the override; per-line
+  bookkeeping for `prevNonBlankWasSeparator` and `seenFirstH1`.
+- `src/SlidesNGView.ts` — toolbar Prev/Next buttons added;
+  `applyCursorFollow()` passes `autoH1Breaks: settings.autoH1Breaks`
+  to `slideIndexFromCursor`.
+- `tests/autoH1Breaks.test.ts` — 6 new slideIndexFromCursor
+  unit tests (cursor mapping, frontmatter override, no-double-
+  bump near explicit `---`, code-fence ignored).
+
 ## [0.11.6] — 2026-05-14
 
 ### Fixed

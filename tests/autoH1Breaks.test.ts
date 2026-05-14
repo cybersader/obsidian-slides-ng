@@ -8,6 +8,7 @@ import {
   peekFrontmatterFlag,
   parseDeck,
 } from "../src/parser/parseDeck";
+import { slideIndexFromCursor } from "../src/parser/slideIndexFromCursor";
 
 describe("injectH1SlideBreaks", () => {
   test("leaves a single-H1 deck untouched", () => {
@@ -110,5 +111,39 @@ describe("parseDeck with autoH1Breaks", () => {
     const md = "---\nslides-ng-auto-h1-breaks: false\n---\n\n# A\n\n# B";
     const deck = parseDeck(md, "deck.md", { autoH1Breaks: true });
     expect(deck.slides.length).toBe(1);
+  });
+});
+
+describe("slideIndexFromCursor with autoH1Breaks", () => {
+  test("cursor on first H1 line → slide 0 (default off)", () => {
+    const md = "# A\nbody\n# B\nbody";
+    expect(slideIndexFromCursor(md, 0)).toBe(0);
+  });
+
+  test("cursor on second H1 → slide 0 by default (no auto-break)", () => {
+    const md = "# A\nbody\n# B\nbody";
+    expect(slideIndexFromCursor(md, 2)).toBe(0);
+  });
+
+  test("cursor on second H1 → slide 1 with autoH1Breaks=true", () => {
+    const md = "# A\nbody\n# B\nbody";
+    expect(slideIndexFromCursor(md, 2, { autoH1Breaks: true })).toBe(1);
+  });
+
+  test("frontmatter flag override → second H1 is slide 1", () => {
+    const md = "---\nslides-ng-auto-h1-breaks: true\n---\n# A\nbody\n# B";
+    expect(slideIndexFromCursor(md, 5)).toBe(1);
+  });
+
+  test("explicit `---` already preceding `#` doesn't double-bump", () => {
+    const md = "# A\nbody\n\n---\n\n# B\nbody";
+    // Cursor on the # B line. Should be slide 1, not slide 2.
+    expect(slideIndexFromCursor(md, 5, { autoH1Breaks: true })).toBe(1);
+  });
+
+  test("`#` inside a code fence is ignored", () => {
+    const md = "# A\n```\n# Not a heading\n```\n# B";
+    // Cursor on the `# B` line. Should be slide 1.
+    expect(slideIndexFromCursor(md, 4, { autoH1Breaks: true })).toBe(1);
   });
 });

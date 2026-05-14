@@ -136,6 +136,23 @@ export class SlidesNGView extends ItemView {
       onClick: () => void this.useCurrentFile(),
     });
 
+    // v0.11.7: Prev / Next nav buttons in the preview toolbar.
+    // Users asked for nav arrows visible somewhere — reveal's stock
+    // controls are off by default to keep slides uncluttered, so
+    // toolbar buttons fill that gap.
+    this.addToolbarButton(leftGroup, {
+      icon: "chevron-left",
+      label: "Prev",
+      tooltip: "Previous slide",
+      onClick: () => this.postIframeCommand("prev"),
+    });
+    this.addToolbarButton(leftGroup, {
+      icon: "chevron-right",
+      label: "Next",
+      tooltip: "Next slide",
+      onClick: () => this.postIframeCommand("next"),
+    });
+
     this.addToolbarButton(leftGroup, {
       icon: "list",
       label: "Menu",
@@ -393,7 +410,9 @@ export class SlidesNGView extends ItemView {
     if (!mdView?.file || mdView.file.path !== this.filePath) return;
     const cursor = mdView.editor.getCursor();
     const md = mdView.editor.getValue();
-    const idx = slideIndexFromCursor(md, cursor.line);
+    const idx = slideIndexFromCursor(md, cursor.line, {
+      autoH1Breaks: this.getSettings().autoH1Breaks,
+    });
     if (idx === this.lastSentSlideIdx) return;
     this.lastSentSlideIdx = idx;
     this.iframeEl.contentWindow.postMessage(
