@@ -6,6 +6,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.9] — 2026-05-14
+
+### Added
+
+- **Per-deck frontmatter escape hatches** for the view-affecting
+  plugin settings. Lets a deck author override globals without
+  touching settings. New keys (all optional, all prefixed
+  `slides-ng-` to avoid colliding with other vault plugins;
+  legacy unprefixed forms work too):
+  - `slides-ng-show-controls: true` — show reveal's stock corner
+    chevron arrows in the embedded iframe.
+  - `slides-ng-show-menu: false` — disable the reveal-menu
+    plugin for this deck (drops its ~45 KB CSS+JS from the
+    iframe srcdoc).
+  - `slides-ng-image-layout-split: 60/40` — column ratio for
+    image-left / image-right layouts (50/50, 60/40, or 40/60).
+  - `slides-ng-line-step-dim: 0.5` — dim opacity (0–1) for
+    non-active code-block line-step lines.
+  - `slides-ng-code-block-max-height: "40vh"` — CSS length cap
+    for long code blocks. `"none"` disables.
+  - `slides-ng-code-block-overflow-scroll: false` — clip instead
+    of scrolling.
+  - `slides-ng-magic-move-duration: 800` — Magic Move animation
+    length in ms.
+- **Power-user escape hatch**: `slides-ng-reveal-config:` accepts
+  any object of keys and passes them straight to
+  `Reveal.initialize()`. Useful for: `autoSlide`, `loop`,
+  `width`, `height`, `disableLayout`, etc. Use with care —
+  invalid keys can break the slide stage.
+
+### Technical
+
+- `src/render/renderDeck.ts` — `headmatterToOptions` extended
+  with 7 new mappings + 1 raw passthrough. New helper
+  `readNumberFrontmatter()` for numeric values.
+- `tests/frontmatterOverrides.test.ts` — 9 new unit tests
+  covering each new key + the raw config passthrough.
+
 ## [0.11.8] — 2026-05-14
 
 ### Removed

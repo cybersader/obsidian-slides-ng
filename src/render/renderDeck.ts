@@ -344,6 +344,25 @@ function readRawFrontmatter(
   return matter[legacyKey];
 }
 
+/**
+ * Read a number frontmatter value across prefixed/legacy keys.
+ * Accepts integer-or-float YAML values OR numeric strings ("5", "1.5").
+ * Returns undefined if absent / not parseable.
+ */
+function readNumberFrontmatter(
+  matter: Record<string, unknown>,
+  prefixedKey: string,
+  legacyKey: string
+): number | undefined {
+  const raw = readRawFrontmatter(matter, prefixedKey, legacyKey);
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string") {
+    const n = parseFloat(raw);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
 function headmatterToOptions(
   headmatter: Record<string, unknown>
 ): Partial<DeckRenderOptions> {
@@ -398,5 +417,95 @@ function headmatterToOptions(
     }
     if (clean.length > 0) out.customCSS = clean.join("\n");
   }
+
+  // v0.11.9: per-deck frontmatter overrides for the rest of the
+  // view-affecting plugin settings. Lets a deck author flip
+  // reveal arrows on, switch the Shiki code theme, tweak Magic
+  // Move timing, etc., without touching global settings. All
+  // optional — absence means "fall through to plugin defaults."
+
+  // `slides-ng-show-controls: true` — show reveal's stock corner
+  // chevron arrows in the embedded iframe.
+  const showControls = readBoolFrontmatter(
+    headmatter,
+    "slides-ng-show-controls",
+    "showControlsEmbedded"
+  );
+  if (showControls !== undefined) out.showRevealControlsEmbedded = showControls;
+
+  // `slides-ng-show-menu: false` — disable the reveal-menu plugin
+  // for this deck.
+  const showMenu = readBoolFrontmatter(
+    headmatter,
+    "slides-ng-show-menu",
+    "showMenuEmbedded"
+  );
+  if (showMenu !== undefined) out.showRevealMenuEmbedded = showMenu;
+
+  // `slides-ng-image-layout-split: 60/40` — column ratio override
+  // for the image-left / image-right layouts.
+  const split = readStringFrontmatter(
+    headmatter,
+    "slides-ng-image-layout-split",
+    "imageLayoutSplit"
+  );
+  if (split === "50/50" || split === "60/40" || split === "40/60") {
+    out.imageLayoutSplit = split;
+  }
+
+  // `slides-ng-line-step-dim: 0.5` — dim opacity for non-active
+  // code-block line-step lines.
+  const dim = readNumberFrontmatter(
+    headmatter,
+    "slides-ng-line-step-dim",
+    "lineStepDimOpacity"
+  );
+  if (dim !== undefined && dim >= 0 && dim <= 1) {
+    out.lineStepDimOpacity = dim;
+  }
+
+  // `slides-ng-code-block-max-height: 40vh` — CSS length cap for
+  // long code blocks. `"none"` disables the cap.
+  const cbMax = readStringFrontmatter(
+    headmatter,
+    "slides-ng-code-block-max-height",
+    "codeBlockMaxHeight"
+  );
+  if (cbMax) out.codeBlockMaxHeight = cbMax;
+
+  // `slides-ng-code-block-overflow-scroll: false` — clip overflow
+  // instead of scrolling.
+  const cbScroll = readBoolFrontmatter(
+    headmatter,
+    "slides-ng-code-block-overflow-scroll",
+    "codeBlockOverflowScroll"
+  );
+  if (cbScroll !== undefined) out.codeBlockOverflowScroll = cbScroll;
+
+  // `slides-ng-magic-move-duration: 800` — Magic Move animation
+  // length in ms.
+  const mmDur = readNumberFrontmatter(
+    headmatter,
+    "slides-ng-magic-move-duration",
+    "magicMoveDurationMs"
+  );
+  if (mmDur !== undefined && mmDur > 0) {
+    out.magicMoveDurationMs = mmDur;
+  }
+
+  // Power-user escape hatch: `slides-ng-reveal-config:` accepts
+  // an object whose keys are passed straight through to
+  // Reveal.initialize(). Use with caution — invalid keys can
+  // break the slide stage. Examples: `width`, `height`,
+  // `autoSlide`, `loop`, `disableLayout`.
+  const revealCfg = readRawFrontmatter(
+    headmatter,
+    "slides-ng-reveal-config",
+    "revealConfig"
+  );
+  if (revealCfg && typeof revealCfg === "object" && !Array.isArray(revealCfg)) {
+    out.revealOptions = revealCfg as Record<string, unknown>;
+  }
+
   return out;
 }
