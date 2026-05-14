@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.10.8** — ROOT-CAUSE fix for the ribbon-black-pane saga. The real bug was that refresh() fires 3–4 times in quick succession on a single ribbon click (onOpen → setState chain), each reassigning srcdoc, browser mid-cancelling each load. Replaced direct-srcdoc-set with a `pendingHtml` queue drained by the ResizeObserver when the iframe is real-sized. Reveal initialises exactly once per refresh.
 - **0.10.7** — patch: dropped the 3s wait-for-size that made opens feel laggy (the v0.10.6 re-render-on-resize path covers the 0×0 case without blocking); explicit `setActiveLeaf({focus:true})` after revealLeaf so the preview pane actually gets focused on open.
 - **0.10.6** — patch: intermittent black-pane fix. `waitForIframeSize` timeout 1.5s → 3s; when it times out at 0×0, view marks itself `renderedAtZeroSize` and the parent-side ResizeObserver re-triggers `refresh()` on the first non-zero resize so Reveal initialises fresh into the real viewport.
 - **0.10.5** — defer srcdoc until iframe has non-zero dimensions (waitForIframeSize helper).

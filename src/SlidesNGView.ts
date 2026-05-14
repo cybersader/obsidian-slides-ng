@@ -53,11 +53,16 @@ export class SlidesNGView extends ItemView {
   /** Parent-side ResizeObserver on the iframe element; posts `relayout` to the bridge. */
   private iframeResizeObserver?: ResizeObserver;
   /**
-   * True iff the last `refresh()` set srcdoc while the iframe was still
-   * at 0x0 (wait-for-size timed out). Cleared when a subsequent resize
-   * re-triggers refresh. v0.10.6+.
+   * Rendered HTML waiting to be applied to `iframeEl.srcdoc`. Set by
+   * `refresh()`; consumed by `applyPendingIfReady()` once the iframe
+   * has non-zero dimensions. Eliminates the v0.10.5/.6/.7 issue where
+   * srcdoc was being set 3-4 times in quick succession (once per
+   * refresh trigger) — the browser would mid-cancel each load, leaving
+   * the iframe stuck in a broken intermediate state until something
+   * outside our control (collapse+reopen sidebar) forced a relayout.
+   * v0.10.8+.
    */
-  private renderedAtZeroSize = false;
+  private pendingHtml: string | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -197,18 +202,21 @@ export class SlidesNGView extends ItemView {
       const ro = new ResizeObserver(() => {
         if (!this.iframeEl) return;
         if (this.iframeEl.clientWidth === 0 || this.iframeEl.clientHeight === 0) return;
-        // v0.10.6: if the last refresh happened while the iframe was
-        // still at 0x0 (wait-for-size timeout fallback), reveal's
-        // slide-stage was baked at 0x0 and can't fully recover via
-        // layout(). Re-trigger refresh() so Reveal initialises fresh
-        // into the now-real viewport.
-        if (this.renderedAtZeroSize) {
-          this.renderedAtZeroSize = false;
-          this.debug?.log("view/resize/re-render-at-real-size", {
+        // v0.10.8: two cases —
+        //   (1) pendingHtml is queued: apply now that the iframe is
+        //       real-sized. Reveal initialises ONCE into a proper
+        //       viewport. Old v0.10.7's "re-render at real size"
+        //       race issue (srcdoc set 3-4 times in quick succession,
+        //       browser mid-cancelling each load) is gone — there's
+        //       only ever one srcdoc assignment per refresh now.
+        //   (2) pendingHtml empty: just post the relayout burst so
+        //       the in-iframe reveal recomputes for the new size.
+        if (this.pendingHtml !== null) {
+          this.applyPendingIfReady();
+          this.debug?.log("view/resize/apply-pending", {
             clientW: this.iframeEl.clientWidth,
             clientH: this.iframeEl.clientHeight,
           });
-          void this.refresh();
           return;
         }
         postRelayoutBurst();
@@ -445,28 +453,21 @@ export class SlidesNGView extends ItemView {
         magicMoveDurationMs: settings.magicMoveDurationMs,
         resolveImage: (raw) => this.resolveImageAttachment(raw, file.path),
       });
-      // v0.10.7: set srcdoc immediately (no more wait-for-size
-      // blocking). If the iframe is currently 0x0, Reveal will
-      // initialise into 0x0 and bake that into its slide-stage
-      // transform — but we mark `renderedAtZeroSize` so the
-      // parent-side ResizeObserver re-triggers `refresh()` on the
-      // first non-zero resize. Reveal then initialises fresh.
-      //
-      // Why drop the wait: the v0.10.5 wait-for-size helper added
-      // up to 3s of perceived latency on opens where the iframe
-      // started 0x0 (any sidebar/tab-not-yet-visible path). With
-      // the re-render-on-resize path proven in v0.10.6, the wait
-      // is redundant — and it was making opens feel laggy.
-      const stillZero =
-        this.iframeEl.clientWidth === 0 || this.iframeEl.clientHeight === 0;
-      this.renderedAtZeroSize = stillZero;
-      this.iframeEl.srcdoc = html;
+      // v0.10.8: queue the HTML as pending instead of setting srcdoc
+      // immediately. `applyPendingIfReady()` consumes the pending
+      // HTML once the iframe has non-zero dimensions. This way
+      // multiple refresh() calls in quick succession (e.g. onOpen +
+      // setState firing back-to-back) collapse into a single srcdoc
+      // assignment with the latest HTML — Reveal then initialises
+      // once, cleanly, into a real-sized viewport.
+      this.pendingHtml = html;
+      this.applyPendingIfReady();
       this.debug?.log("view/refresh/rendered", {
         filePath: this.filePath,
         htmlLength: html.length,
         iframeClientW: this.iframeEl.clientWidth,
         iframeClientH: this.iframeEl.clientHeight,
-        renderedAtZeroSize: stillZero,
+        applied: this.pendingHtml === null,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -474,6 +475,29 @@ export class SlidesNGView extends ItemView {
       this.showPlaceholder(`Render error: ${msg}`);
       new Notice(`slides-ng render error: ${msg}`);
     }
+  }
+
+  /**
+   * Apply `pendingHtml` to the iframe's srcdoc, but only if the
+   * iframe is real-sized. Called from `refresh()` (after rendering
+   * the HTML) and from the iframe's ResizeObserver (when the
+   * iframe transitions to non-zero size). Idempotent — sets srcdoc
+   * once and clears the pending field.
+   */
+  private applyPendingIfReady(): void {
+    if (!this.iframeEl || this.pendingHtml === null) return;
+    if (this.iframeEl.clientWidth === 0 || this.iframeEl.clientHeight === 0) {
+      this.debug?.log("view/apply-pending/skip-zero-size");
+      return;
+    }
+    const html = this.pendingHtml;
+    this.pendingHtml = null;
+    this.iframeEl.srcdoc = html;
+    this.debug?.log("view/apply-pending/applied", {
+      htmlLength: html.length,
+      clientW: this.iframeEl.clientWidth,
+      clientH: this.iframeEl.clientHeight,
+    });
   }
 
   private showPlaceholder(message: string): void {

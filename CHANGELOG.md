@@ -6,6 +6,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.8] — 2026-05-14
+
+### Fixed
+
+- **Root-cause fix for the ribbon-black-pane saga.** The
+  v0.10.5/.6/.7 attempts were chasing symptoms. User's debug log
+  revealed the real issue: `refresh()` was being called **3–4
+  times in quick succession** on a single ribbon click (onOpen,
+  setState, more setState — each calling refresh). Each refresh
+  reassigned `iframeEl.srcdoc`. Three of those reassignments
+  happened while the iframe was still at 0×0. The browser
+  mid-cancelled each load attempt and the iframe ended up stuck
+  in a confused intermediate state — black, requiring a
+  collapse+reopen of the sidebar to force a clean relayout.
+  - The fix: `refresh()` no longer sets `srcdoc` directly. It
+    renders the HTML and stores it as `pendingHtml`. A new
+    `applyPendingIfReady()` helper consumes the pending HTML
+    only when the iframe has non-zero dimensions. Multiple
+    refreshes in a row collapse into one srcdoc assignment.
+  - The parent-side `ResizeObserver` now drains the pending
+    HTML when the iframe transitions to real-sized — replacing
+    the v0.10.6/.7 `renderedAtZeroSize` re-render hack with a
+    cleaner pending-application model.
+  - Net effect: Reveal initialises exactly ONCE per refresh,
+    into a real-sized viewport, with no racing srcdoc
+    reassignments.
+
+### Removed
+
+- `renderedAtZeroSize` field + the `view/resize/re-render-at-real-size`
+  log tag (replaced by `view/resize/apply-pending` +
+  `view/apply-pending/{applied,skip-zero-size}`).
+
+### Technical
+
+- `src/SlidesNGView.ts` — new `pendingHtml: string | null` field;
+  new `applyPendingIfReady()` method; `refresh()` writes
+  `pendingHtml` and calls `applyPendingIfReady()`; iframe
+  ResizeObserver branches on `pendingHtml !== null` to drain it
+  before falling through to the `postRelayoutBurst` path.
+
 ## [0.10.7] — 2026-05-14
 
 ### Fixed
