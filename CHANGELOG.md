@@ -6,6 +6,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.37] — 2026-05-14
+
+### Fixed
+
+- **Speaker-popup sync was never landing.** Cause:
+  `window.opener` reference can be stripped on some browser
+  configs (Cross-Origin-Opener-Policy, popup blockers,
+  certain Chrome flags) — the popup's poke message never
+  reached the opener and notes stayed at `(waiting for
+  sync…)`. Switched sync to a **localStorage-based
+  primary channel** (opener writes state on `slidechanged`
+  + initially on Reveal ready; popup reads on load + listens
+  for `storage` events). postMessage is kept as a secondary
+  path.
+- **Scene buttons stayed empty in the popup** for the same
+  `window.opener` reason. The opener now writes
+  `__slidesNgScenes` to BOTH `window` and localStorage; the
+  popup tries `window.opener` first then falls back to
+  localStorage.
+- **PDF print mode wasn't activating slide-card layout.**
+  Reveal v5 sets `html.reveal-print` + `html.print-pdf`
+  classes when it detects `?print-pdf`, but our hardcoded
+  `view: "presentation"` was short-circuiting that
+  detection AND the timing of class addition meant our
+  custom slides-ng CSS never saw the print state. Now: at
+  runtime, when `?print-pdf` is in the URL, we manually add
+  both classes to `<html>` immediately AND set
+  `initOpts.view = 'print'`. Added our own
+  `html.print-pdf` CSS rules that:
+  - Hide hamburger + Grid button + reveal controls/progress
+    during print (they were leaking into the PDF)
+  - Style each `section` as a page-sized card with
+    `page-break-after: always`
+  - Render `<aside class="notes">` underneath each card
+    with a soft background separator (when showNotes is
+    enabled)
+
+### Technical
+
+- `src/render/revealTemplate.ts`:
+  - `setupStandaloneEnhancements` now writes scenes to
+    localStorage in addition to `window`.
+  - `postStateToSpeaker` writes the speaker payload to
+    `localStorage["slides-ng-speaker-state"]` then falls
+    back to postMessage. Initial state pushed once Reveal
+    is ready (so the popup has something to read on open).
+  - Popup template's state listener has THREE sources now:
+    direct postMessage, immediate localStorage read on load,
+    and a `storage` event listener for subsequent updates.
+  - In-template `<style>` block adds the print-pdf rules.
+
 ## [0.11.36] — 2026-05-14
 
 ### Changed

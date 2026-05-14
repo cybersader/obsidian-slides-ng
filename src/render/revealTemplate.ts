@@ -575,6 +575,70 @@ export function buildIframeHtml(
       line-height: 1;
       color: white;
     }
+    /* v0.11.37: print-pdf mode — hide the standalone-export UI
+     * chrome (hamburger, Grid button) when the user prints. They're
+     * useful interactively but pollute the PDF output. */
+    html.print-pdf .reveal .slide-menu-button,
+    html.print-pdf #slides-ng-grid-btn,
+    html.print-pdf .reveal .controls,
+    html.print-pdf .reveal .progress {
+      display: none !important;
+    }
+    /* v0.11.37: in print-pdf mode, force each slide section to be
+     * a page-shaped card with its own page break. Reveal v5's
+     * built-in print-pdf CSS already does this for its primary
+     * elements, but we layer extra rules here for our custom
+     * .slides-ng-layout content to make sure the layout is
+     * preserved per-page. */
+    html.print-pdf .reveal .slides {
+      position: static !important;
+      width: 100% !important;
+      height: auto !important;
+      display: block !important;
+      overflow: visible !important;
+      transform: none !important;
+      left: 0 !important;
+      top: 0 !important;
+    }
+    html.print-pdf .reveal .slides > section {
+      position: relative !important;
+      width: 100% !important;
+      height: 100vh !important;
+      min-height: 0;
+      margin: 0 !important;
+      padding: 4rem 3rem !important;
+      box-sizing: border-box !important;
+      overflow: hidden;
+      display: block !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      transform: none !important;
+      page-break-after: always !important;
+      page-break-inside: avoid !important;
+      break-after: page !important;
+      break-inside: avoid !important;
+    }
+    html.print-pdf .reveal .slides > section:last-of-type {
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
+    html.print-pdf .reveal aside.notes {
+      position: relative !important;
+      display: block !important;
+      visibility: visible !important;
+      background: #f7f7f7;
+      color: #333;
+      padding: 1rem 1.5rem;
+      margin-top: 1rem;
+      border-top: 1px solid #ccc;
+      font-size: 0.85em;
+      page-break-inside: avoid !important;
+    }
+    /* When the print-pdf URL flag is set AND showNotes is on, notes
+     * appear below the slide content (default reveal layout). */
+    html.print-pdf.show-notes .reveal .slides > section {
+      height: 70vh !important;
+    }
     /* v0.11.34: hamburger button contrast. The default reveal-menu
      * button is too transparent and disappears against light slide
      * backgrounds (user-reported). Give it a solid translucent
@@ -617,14 +681,24 @@ ${sectionsHtml}
     (function () {
       try {
         var initOpts = ${initConfig};
-        /* v0.11.35: when the URL has ?print-pdf, switch to reveal's
-         * print view (each slide → a page with proper card styling +
-         * optional notes layout). We hardcode view:'presentation'
-         * elsewhere to defeat reveal's small-viewport auto-scroll,
-         * but in print mode the explicit override was preventing
-         * print-pdf detection from working. */
+        /* v0.11.35/v0.11.37: when the URL has ?print-pdf, switch to
+         * reveal's print view (each slide → a page with proper card
+         * styling + optional notes layout). We hardcode
+         * view:'presentation' elsewhere to defeat reveal's
+         * small-viewport auto-scroll, but in print mode the explicit
+         * override was preventing print-pdf detection from working.
+         * Also manually add the html.print-pdf + html.reveal-print
+         * classes early — reveal v5 adds them during init but the
+         * CSS that styles each slide as a print page is gated on
+         * them, and adding them before Reveal.initialize means the
+         * print stylesheet applies immediately when the page paints.
+         */
         if (typeof location !== 'undefined' && /print-pdf/i.test(location.search)) {
           initOpts.view = 'print';
+          try {
+            document.documentElement.classList.add('print-pdf');
+            document.documentElement.classList.add('reveal-print');
+          } catch (_) {}
           /* Match the showNotes URL param to the config option so
            * reveal lays out speaker notes underneath each printed
            * page. URL value is the layout string ('inline' is the
@@ -673,11 +747,14 @@ ${sectionsHtml}
             setTimeout(callInit, 200);
           }
         })();` : ""}
-        ${!embedded ? `/* v0.11.36: expose configured scenes on window
-         * so the speaker-view popup can build its toolbar buttons
-         * dynamically from whatever the user has in plugin settings
-         * (rather than the hardcoded 4 defaults from v0.11.35). */
+        ${!embedded ? `/* v0.11.36/v0.11.37: expose configured scenes
+         * on BOTH window (window.opener path) and localStorage (more
+         * reliable cross-window for same-origin file:// pages —
+         * window.opener can be stripped in some browser configs). */
         try { window.__slidesNgScenes = ${scenesJson}; } catch (_) {}
+        try {
+          localStorage.setItem('slides-ng-scenes', JSON.stringify(${scenesJson}));
+        } catch (_) {}
         /* v0.11.33: standalone-only enhancements —
          * (a) Grid button in the top-right corner that opens the
          *     thumbnail-grid overlay (same as the embedded preview's
@@ -833,14 +910,21 @@ ${sectionsHtml}
                   '  var bar = document.getElementById("scenes-bar");',
                   '  if (!bar) return;',
                   '  var clearBtn = document.getElementById("scene-clear");',
-                  '  /* Read scenes from opener at runtime so customized',
-                  '   * scenes from plugin settings reflect immediately. */',
+                  '  /* v0.11.37: try window.opener first, fall back to',
+                  '   * localStorage. opener can be stripped by browser',
+                  '   * cross-origin-opener-policy in some configs. */',
                   '  var scenes = [];',
                   '  try {',
                   '    if (window.opener && window.opener.__slidesNgScenes) {',
                   '      scenes = window.opener.__slidesNgScenes;',
                   '    }',
                   '  } catch (_) {}',
+                  '  if (!Array.isArray(scenes) || scenes.length === 0) {',
+                  '    try {',
+                  '      var raw = localStorage.getItem("slides-ng-scenes");',
+                  '      if (raw) scenes = JSON.parse(raw);',
+                  '    } catch (_) {}',
+                  '  }',
                   '  /* Strip any previously-built scene buttons (skip the',
                   '   * label span + Clear). */',
                   '  Array.from(bar.querySelectorAll(".scene-btn:not(.clear)")).forEach(function (b) { b.remove(); });',
@@ -912,9 +996,11 @@ ${sectionsHtml}
                   '  setTimeout(post, 300);',
                   '  setTimeout(post, 700);',
                   '}',
-                  '/* Receive state from the opener (main deck window). */',
-                  'window.addEventListener("message", function (e) {',
-                  '  var d = e.data;',
+                  '/* v0.11.37: receive state from EITHER channel —',
+                  ' * postMessage (primary if opener is reachable) OR',
+                  ' * localStorage (works even when opener was stripped). */',
+                  'var SPEAKER_STATE_KEY = "slides-ng-speaker-state";',
+                  'function applyState(d) {',
                   '  if (!d || d.type !== "slides-ng-speaker-update") return;',
                   '  var notesEl = document.getElementById("notes");',
                   '  if (notesEl) {',
@@ -926,6 +1012,29 @@ ${sectionsHtml}
                   '  if (nxt) nxt.textContent = d.idx + 2 > d.totalSlides ? "end" : ((d.idx + 2) + " / " + d.totalSlides);',
                   '  pendingState = d;',
                   '  applyPending();',
+                  '}',
+                  'window.addEventListener("message", function (e) {',
+                  '  applyState(e.data);',
+                  '});',
+                  '/* localStorage primary read. Try immediately + retry',
+                  ' * a couple times in case the opener hasn\\'t pushed',
+                  ' * state yet at popup load. */',
+                  'function tryLocalStorageState() {',
+                  '  try {',
+                  '    var raw = localStorage.getItem(SPEAKER_STATE_KEY);',
+                  '    if (raw) applyState(JSON.parse(raw));',
+                  '  } catch (_) {}',
+                  '}',
+                  'tryLocalStorageState();',
+                  'setTimeout(tryLocalStorageState, 400);',
+                  'setTimeout(tryLocalStorageState, 1200);',
+                  '/* Storage events fire on OTHER windows of the same',
+                  ' * origin when localStorage changes — so when the',
+                  ' * opener writes new state on slidechanged, we get',
+                  ' * notified without any postMessage. */',
+                  'window.addEventListener("storage", function (e) {',
+                  '  if (e.key !== SPEAKER_STATE_KEY || !e.newValue) return;',
+                  '  try { applyState(JSON.parse(e.newValue)); } catch (_) {}',
                   '});',
                   '/* Mark iframes as loaded so applyPending can fire. */',
                   'function markLoaded(id, key) {',
@@ -953,24 +1062,53 @@ ${sectionsHtml}
                   '</body></html>',
                 ].join('\\n');
               }
-              function postStateToSpeaker() {
-                if (!speakerWin || speakerWin.closed) return;
+              /* v0.11.37: localStorage-based sync is the primary
+               * channel (works cross-window for same-origin file://
+               * pages even when popup's window.opener is null or
+               * Cross-Origin-Opener-Policy strips the reference).
+               * postMessage is kept as a secondary path. */
+              var SPEAKER_STATE_KEY = 'slides-ng-speaker-state';
+              function buildStatePayload() {
                 try {
                   var idx = Reveal.getIndices().h;
                   var sections = document.querySelectorAll('.reveal .slides > section');
                   var section = sections[idx];
                   var noteEl = section ? section.querySelector('aside.notes') : null;
-                  speakerWin.postMessage({
+                  return {
                     type: 'slides-ng-speaker-update',
                     idx: idx,
                     totalSlides: Reveal.getTotalSlides(),
                     notesHtml: noteEl ? noteEl.innerHTML : '',
-                  }, '*');
-                } catch (err) {
-                  console.warn('[slides-ng] postStateToSpeaker', err);
+                    ts: Date.now(),
+                  };
+                } catch (_) {
+                  return null;
+                }
+              }
+              function postStateToSpeaker() {
+                var payload = buildStatePayload();
+                if (!payload) return;
+                /* Write to localStorage first — every popup window
+                 * at the same origin can read it. Use a timestamp
+                 * key so storage events fire even when idx is
+                 * unchanged. */
+                try {
+                  localStorage.setItem(SPEAKER_STATE_KEY, JSON.stringify(payload));
+                } catch (_) {}
+                /* postMessage fallback. */
+                if (speakerWin && !speakerWin.closed) {
+                  try { speakerWin.postMessage(payload, '*'); } catch (_) {}
                 }
               }
               Reveal.on('slidechanged', postStateToSpeaker);
+              /* Push an initial state so the popup has something to
+               * read immediately on open (not just after the user
+               * navigates). Wait for Reveal ready first. */
+              if (revealInit && typeof revealInit.then === 'function') {
+                revealInit.then(postStateToSpeaker);
+              } else {
+                setTimeout(postStateToSpeaker, 500);
+              }
               window.addEventListener('message', function (e) {
                 if (e.data && e.data.type === 'slides-ng-speaker-poke') {
                   postStateToSpeaker();
