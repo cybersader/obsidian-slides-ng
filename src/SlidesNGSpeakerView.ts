@@ -1146,6 +1146,7 @@ export class SlidesNGSpeakerView extends ItemView {
         transitionSpeed: settings?.transitionSpeed,
         magicMoveDurationMs: settings?.magicMoveDurationMs,
         autoH1Breaks: settings?.autoH1Breaks,
+        sceneInheritThemeBg: settings?.sceneInheritThemeBg,
         // The mini-iframe is a preview, not interactive — controls + menu off.
         showRevealControlsEmbedded: false,
         showRevealMenuEmbedded: false,
@@ -1226,6 +1227,7 @@ export class SlidesNGSpeakerView extends ItemView {
         transitionSpeed: settings?.transitionSpeed,
         magicMoveDurationMs: settings?.magicMoveDurationMs,
         autoH1Breaks: settings?.autoH1Breaks,
+        sceneInheritThemeBg: settings?.sceneInheritThemeBg,
         showRevealControlsEmbedded: false,
         showRevealMenuEmbedded: false,
         resolveImage: (raw) => this.resolveDeckImage(raw, file.path),

@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.11.13** — thumbnail fidelity + scene theme inheritance. Picker + Grid tiles now wrap cloned sections in a fresh `.reveal > .slides` scope so theme CSS applies — fixes "dots on left" / wrong text alignment / wrong fonts. Scene overlays (Blackout, BRB, etc.) inherit the deck theme bg + text color by default; override via `slides-ng-scene-inherit-theme-bg: false` per-deck or via the matching global setting.
 - **0.11.12** — Grid + picker thumbnails read the actual theme body background instead of hardcoding black (fixes white-themed decks showing as black tiles); Grid title-overlay duplication removed (had been wrong since v0.11.1 was applied only to picker); Grid slide-number badge upgraded to match picker design; speaker notes Save repaints the panel synchronously with the new content so it doesn't APPEAR to fail.
 - **0.11.11** — removed the `slides-ng: true` frontmatter key (nothing read it; was documentation-only). Stripped from all example decks; removed the "Required" section from the Settings frontmatter-reference card. The "deck index / vault-wide deck list" feature that would have made it meaningful is now in the idea jar.
 - **0.11.10** — collapsible frontmatter-reference card at the bottom of Settings → Slides NG. Lists every deck-level + per-slide key with a brief description and example. Closes the discoverability gap: previously the only docs were in PROJECT_BRIEF / CHANGELOG.

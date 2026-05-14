@@ -6,6 +6,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.13] — 2026-05-14
+
+### Changed
+
+- **Thumbnail rendering fidelity.** The picker thumbnails and
+  Grid overlay tiles now look like the actual slide preview.
+  Previously the clone-and-scale pipeline only cloned the inner
+  `.slides-ng-layout` div and placed it outside any `.reveal`
+  ancestor, which meant theme-scoped CSS rules
+  (`.reveal section { text-align: center; ... }`, font sizes,
+  colour, etc.) all dropped out. Result: bullets at the left
+  edge ("dots on the left"), text in the wrong alignment,
+  headings the wrong size — tiles that bore little resemblance
+  to the actual slide.
+  - Fix: clone the **entire `<section>`** element instead, and
+    wrap each tile's content in a fresh
+    `<div class="reveal"><div class="slides">…</div></div>`
+    scope. Theme CSS now applies. The visual identity between
+    "what the preview shows" and "what the thumbnail shows" is
+    now consistent.
+- **Scene overlays inherit the deck theme background by default.**
+  Previously Blackout / BRB / Q & A / Stand by etc. were
+  hardcoded black-on-white. New behaviour: scene overlay reads
+  the body's computed background + colour and uses those, so a
+  white-themed deck shows a white scene, a black-themed deck
+  shows a black scene, etc. Override:
+  - Global: `Settings → Slides NG → Scenes inherit deck theme
+    background`.
+  - Per-deck frontmatter:
+    `slides-ng-scene-inherit-theme-bg: false` for the legacy
+    hardcoded black overlay.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — `warmThumbnailCache()` and
+  the Grid live-clone path both call `section.cloneNode(true)`
+  (was `section.querySelector('.slides-ng-layout').cloneNode`);
+  Grid + picker tile rendering wraps the clone in a `.reveal >
+  .slides` scope before scaling. `ensureSceneEl()` reads body
+  bg + colour via `getComputedStyle()` gated on a new
+  `SCENE_INHERIT_THEME_BG` flag injected at template build
+  time.
+- `src/render/renderDeck.ts` — new `RenderDefaults.sceneInheritThemeBg`;
+  threaded into `defaultLayer`; new frontmatter mapping for
+  `slides-ng-scene-inherit-theme-bg`.
+- `src/settings.ts` — new `sceneInheritThemeBg` (default true).
+- `src/SlidesNGSettingTab.ts` — new toggle row; reference card
+  gains a "Scenes" section.
+- `src/SlidesNGView.ts` + `SlidesNGSpeakerView.ts` — pass
+  `settings.sceneInheritThemeBg` into every `renderDeck()` call.
+
 ## [0.11.12] — 2026-05-14
 
 ### Fixed

@@ -194,6 +194,14 @@ export interface SlidesNGSettings {
    * `false` (Slidev compat — explicit separators only).
    */
   autoH1Breaks: boolean;
+
+  /**
+   * v0.11.13: scene overlays (Blackout, BRB, Q&A, etc.) inherit
+   * the deck theme's body bg + text color when true (default).
+   * Set false to force the v0.7-era hardcoded black overlay.
+   * Frontmatter override: `slides-ng-scene-inherit-theme-bg`.
+   */
+  sceneInheritThemeBg: boolean;
 }
 
 /** All draggable/toggleable speaker-view panels. */
@@ -342,4 +350,5 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   speakerPickerOrientation: "vertical",
   speakerPickerTileWidth: 0,
   autoH1Breaks: false,
+  sceneInheritThemeBg: true,
 };

@@ -342,6 +342,20 @@ export class SlidesNGSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("Scenes inherit deck theme background")
+      .setDesc(
+        "When on (default), scene overlays (Blackout, BRB, Q & A, etc.) use the deck theme's body bg + text color so they visually match the slide. When off, they fall back to a hardcoded black overlay (the v0.7 default). Per-deck override: `slides-ng-scene-inherit-theme-bg: true|false` in frontmatter."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.sceneInheritThemeBg !== false).onChange(
+          async (v) => {
+            this.plugin.settings.sceneInheritThemeBg = v;
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
+    new Setting(containerEl)
       .setName("Multi-column panels at wide widths")
       .setDesc(
         "When the speaker pane is at least 900 pixels wide, flow panels into a 2-column grid instead of stacking them all vertically."
@@ -486,6 +500,14 @@ slides-ng-code-block-overflow-scroll: false  # clip instead of scrolling`,
         title: "Animations",
         code:
 `slides-ng-magic-move-duration: 800     # Magic Move animation duration in ms`,
+      },
+      {
+        title: "Scenes (overlay slides)",
+        code:
+`slides-ng-scene-inherit-theme-bg: true  # scene overlay inherits deck
+                                        #   theme bg + text color
+                                        # set to false to force a black
+                                        #   overlay (v0.7-era default)`,
       },
       {
         title: "Power-user passthrough",

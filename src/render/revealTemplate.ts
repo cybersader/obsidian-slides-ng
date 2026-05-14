@@ -54,6 +54,13 @@ export interface DeckRenderOptions {
   pdfAspectHeight?: number;
   /** Custom CSS rules to inject as the last <style> block. */
   customCSS?: string;
+  /**
+   * When true (default), scene overlays (Blackout, BRB, Q&A, etc.)
+   * inherit the deck theme's body background + text color so the
+   * scene visually matches the slide. When false, they fall back
+   * to the v0.7-era hardcoded black-on-white. v0.11.13+.
+   */
+  sceneInheritThemeBg?: boolean;
   // Pass-through reveal.js Reveal.initialize() options if the caller
   // wants to override anything specific.
   revealOptions?: Record<string, unknown>;
@@ -84,6 +91,12 @@ export function buildIframeHtml(
   const pdfAspectWidth = options.pdfAspectWidth;
   const pdfAspectHeight = options.pdfAspectHeight;
   const customCss = options.customCSS ?? "";
+  // v0.11.13: scenes inherit the theme's body bg + text color by
+  // default. Override per-deck via frontmatter
+  // `slides-ng-scene-inherit-theme-bg: false`, or globally via the
+  // matching plugin setting, to force a black overlay (the v0.7-era
+  // default).
+  const sceneInheritThemeBg = options.sceneInheritThemeBg ?? true;
   // Reveal's controls + progress bar visibility. Standalone mode always
   // shows them (helps presenters drive in a browser); embedded mode hides
   // by default but the user can opt in via setting.
@@ -785,9 +798,16 @@ ${sectionsHtml}
         var sections = Array.from(
           document.querySelectorAll('.reveal > .slides > section')
         );
+        // v0.11.13: clone the entire section element, not just its
+        // inner slides-ng-layout child. Theme CSS is scoped to
+        // .reveal section { ... } — cloning only the inner layout
+        // placed it OUTSIDE any .reveal ancestor, so text-align,
+        // font-size, color etc. all dropped out. Tiles looked
+        // nothing like the actual preview. Cloning the section +
+        // wrapping each tile in a fresh .reveal > .slides scope
+        // restores theme fidelity.
         slidesNgThumbCache = sections.map(function (section) {
-          var content = section.querySelector('.slides-ng-layout');
-          return content ? content.cloneNode(true) : null;
+          return section.cloneNode(true);
         });
       }
       function scheduleThumbnailWarmup() {
@@ -836,10 +856,24 @@ ${sectionsHtml}
           var thumb = document.createElement('div');
           thumb.className = 'slides-ng-picker-thumb';
           tile.appendChild(thumb);
+          // v0.11.13: wrap the cloned section in a fresh
+          // .reveal > .slides scope so theme CSS rules apply (see
+          // matching change in the Grid overlay). The picker tile's
+          // applyPickerStripLayout later sets the scale + dimensions
+          // on this wrapper.
           var content = getCachedSlideClone(s.idx);
           if (content) {
-            content.className = (content.className || '') + ' slides-ng-picker-thumb-content';
-            thumb.appendChild(content);
+            var picRevealScope = document.createElement('div');
+            picRevealScope.className = 'reveal slides-ng-picker-thumb-content';
+            var picSlidesScope = document.createElement('div');
+            picSlidesScope.className = 'slides';
+            picSlidesScope.style.cssText = 'width:100%;height:100%;';
+            content.style.cssText =
+              'position:relative;display:block;visibility:visible;opacity:1;' +
+              'top:0;left:0;width:100%;height:100%;transform:none;';
+            picSlidesScope.appendChild(content);
+            picRevealScope.appendChild(picSlidesScope);
+            thumb.appendChild(picRevealScope);
           }
           var num = document.createElement('div');
           num.className = 'slides-ng-picker-tile-num';
@@ -1019,20 +1053,31 @@ ${sectionsHtml}
         });
       }
 
+      // v0.11.13: when true (default), scenes inherit the theme's
+      // body background + text color so they match the deck.
+      var SCENE_INHERIT_THEME_BG = ${sceneInheritThemeBg};
+
       function ensureSceneEl() {
         var el = document.getElementById('slides-ng-scene');
         if (el) return el;
         el = document.createElement('div');
         el.id = 'slides-ng-scene';
+        // Default visuals — v0.11.13: read theme body bg + text color
+        // when SCENE_INHERIT_THEME_BG is true. Falls back to the
+        // v0.7-era hardcoded black overlay when false (override via
+        // frontmatter or setting).
+        var bg = '#000';
+        var color = '#fff';
+        if (SCENE_INHERIT_THEME_BG && window.getComputedStyle) {
+          var cs = getComputedStyle(document.body);
+          if (cs.backgroundColor) bg = cs.backgroundColor;
+          if (cs.color) color = cs.color;
+        }
         // Full-viewport overlay; flex-column so multiple block-level
-        // markdown children (h1 + p, lists, etc.) stack VERTICALLY
-        // rather than laying out horizontally as a single row (which
-        // was the v0.7.0/0.7.1 bug — newlines appeared collapsed).
-        // Background is solid black by default — for "blackout" the
-        // empty content + dark background is the blackout effect.
+        // markdown children (h1 + p, lists, etc.) stack VERTICALLY.
         el.style.cssText =
-          'position:fixed;inset:0;background:#000;color:#fff;z-index:9999;' +
-          'display:none;flex-direction:column;align-items:center;' +
+          'position:fixed;inset:0;background:' + bg + ';color:' + color + ';' +
+          'z-index:9999;display:none;flex-direction:column;align-items:center;' +
           'justify-content:center;text-align:center;padding:5%;overflow:auto;' +
           'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);' +
           'font-size:2em;line-height:1.4;gap:0.5em;';
@@ -1138,10 +1183,7 @@ ${sectionsHtml}
                 var sourceContent = getCachedSlideClone(s.idx);
                 if (!sourceContent) {
                   var section = sections[s.idx];
-                  sourceContent = section
-                    ? section.querySelector('.slides-ng-layout')
-                    : null;
-                  if (sourceContent) sourceContent = sourceContent.cloneNode(true);
+                  sourceContent = section ? section.cloneNode(true) : null;
                 }
                 var isCurrent = s.idx === currentIdx;
                 var tile = document.createElement('button');
@@ -1162,21 +1204,37 @@ ${sectionsHtml}
                   tile.style.boxShadow = '';
                 });
 
-                // Append the cached (or live-cloned) slide content into
-                // the tile, scaled. The clone inherits all document CSS
-                // so it renders with theme + layouts + Shiki + image
-                // attachment paths intact — a true miniature.
+                // v0.11.13: wrap the cloned section in a fresh
+                // .reveal > .slides scope so theme CSS rules apply.
+                // Previously we cloned only the inner layout, so the
+                // section was outside any .reveal ancestor and theme
+                // styles dropped out. Tiles are now faithful to the
+                // actual preview rendering.
                 if (sourceContent) {
                   var thumb = document.createElement('div');
                   thumb.style.cssText =
                     'position:absolute;top:0;left:0;width:100%;height:100%;' +
                     'overflow:hidden;pointer-events:none;';
-                  sourceContent.style.cssText =
+                  var revealScope = document.createElement('div');
+                  revealScope.className = 'reveal';
+                  revealScope.style.cssText =
                     'position:absolute;top:0;left:0;' +
                     'width:' + SLIDE_W + 'px;height:' + SLIDE_H + 'px;' +
                     'transform:scale(' + THUMB_SCALE + ');transform-origin:0 0;' +
                     'pointer-events:none;';
-                  thumb.appendChild(sourceContent);
+                  var slidesScope = document.createElement('div');
+                  slidesScope.className = 'slides';
+                  slidesScope.style.cssText = 'width:100%;height:100%;';
+                  // Reset section's own positioning/transform so it
+                  // fills the slides scope at its natural place
+                  // (reveal's runtime sets transform + position
+                  // on the live section; we don't want those baked in).
+                  sourceContent.style.cssText =
+                    'position:relative;display:block;visibility:visible;opacity:1;' +
+                    'top:0;left:0;width:100%;height:100%;transform:none;';
+                  slidesScope.appendChild(sourceContent);
+                  revealScope.appendChild(slidesScope);
+                  thumb.appendChild(revealScope);
                   tile.appendChild(thumb);
                 }
 

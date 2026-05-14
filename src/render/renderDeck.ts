@@ -99,6 +99,12 @@ export interface RenderDefaults {
    */
   autoH1Breaks?: boolean;
   /**
+   * v0.11.13: scenes inherit the deck theme's body bg + text color.
+   * Default true. Frontmatter override:
+   * `slides-ng-scene-inherit-theme-bg: false`.
+   */
+  sceneInheritThemeBg?: boolean;
+  /**
    * Optional image-attachment resolver. Called with the raw `image:`
    * frontmatter value; returns a fully-qualified URL (data: URI,
    * file://, https://, etc.) or null if the resolver couldn't find
@@ -182,6 +188,9 @@ export function renderDeckFromAst(
   }
   if (typeof defaults.pdfAspectHeight === "number") {
     defaultLayer.pdfAspectHeight = defaults.pdfAspectHeight;
+  }
+  if (typeof defaults.sceneInheritThemeBg === "boolean") {
+    defaultLayer.sceneInheritThemeBg = defaults.sceneInheritThemeBg;
   }
 
   const opts: DeckRenderOptions = {
@@ -498,6 +507,17 @@ function headmatterToOptions(
   if (mmDur !== undefined && mmDur > 0) {
     out.magicMoveDurationMs = mmDur;
   }
+
+  // `slides-ng-scene-inherit-theme-bg: false` — disable theme-bg
+  // inheritance for scene overlays (Blackout, BRB, Q&A, etc.).
+  // When omitted, scenes inherit the deck theme's body bg + text
+  // color (the v0.11.13 default).
+  const sceneInherit = readBoolFrontmatter(
+    headmatter,
+    "slides-ng-scene-inherit-theme-bg",
+    "sceneInheritThemeBg"
+  );
+  if (sceneInherit !== undefined) out.sceneInheritThemeBg = sceneInherit;
 
   // Power-user escape hatch: `slides-ng-reveal-config:` accepts
   // an object whose keys are passed straight through to
