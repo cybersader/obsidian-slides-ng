@@ -232,6 +232,10 @@ export default class SlidesNGPlugin extends Plugin {
   async loadSettings(): Promise<void> {
     const stored = await this.loadData();
     this.settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+    // v0.11.15 migration: legacy "vertical" → "vertical-1".
+    if (this.settings.speakerPickerOrientation === ("vertical" as unknown)) {
+      this.settings.speakerPickerOrientation = "vertical-1";
+    }
   }
 
   async saveSettings(): Promise<void> {

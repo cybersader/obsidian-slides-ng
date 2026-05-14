@@ -177,7 +177,22 @@ export interface SlidesNGSettings {
    * via a button in the picker header. Default `"vertical"`.
    * v0.11.0+.
    */
-  speakerPickerOrientation: "vertical" | "horizontal";
+  /**
+   * Picker layout. v0.11.15 expanded the union:
+   * - `"vertical-1"` — single column of tiles (PowerPoint default)
+   * - `"vertical-2"` — two columns (good for medium-wide panels)
+   * - `"horizontal"` — film-strip row
+   * - `"auto"` — chosen at build time from the strip's container
+   *    dimensions: wide enough for 2 horizontal slides → horizontal;
+   *    wider than tall → vertical-2; otherwise vertical-1.
+   * - `"vertical"` (legacy) is read as "vertical-1" on load.
+   */
+  speakerPickerOrientation:
+    | "vertical-1"
+    | "vertical-2"
+    | "horizontal"
+    | "auto"
+    | "vertical";
 
   /**
    * Override tile width in pixels. `0` = auto-fit (tile width
@@ -347,7 +362,7 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   speakerPanelsMultiColumn: true,
   debugLogging: true,
   speakerPickerStyle: "thumbnails",
-  speakerPickerOrientation: "vertical",
+  speakerPickerOrientation: "vertical-1",
   speakerPickerTileWidth: 0,
   autoH1Breaks: false,
   sceneInheritThemeBg: true,

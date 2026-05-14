@@ -57,6 +57,14 @@ interface PreviewState {
   notesHtml: string;
   nextTitle: string;
   slides: { idx: number; title: string }[];
+  /**
+   * v0.11.15: panel ids the current slide has flagged for hiding
+   * via `slides-ng-hide-panels:` frontmatter. The speaker view
+   * temporarily hides matching panels while this slide is current
+   * and restores them when navigating to a slide without the
+   * override.
+   */
+  hidePanels?: string[];
 }
 
 type SpeakerCommand =
@@ -74,6 +82,9 @@ type SpeakerCommand =
 
 export type SpeakerSettingsAccessor = () => SlidesNGSettings;
 export type SpeakerSettingsPersist = () => Promise<void>;
+
+/** v0.11.15: canonical orientation values (excludes the legacy "vertical" alias). */
+type PickerOrientation = "vertical-1" | "vertical-2" | "horizontal" | "auto";
 
 export class SlidesNGSpeakerView extends ItemView {
   private state: PreviewState | null = null;
@@ -127,7 +138,7 @@ export class SlidesNGSpeakerView extends ItemView {
         this.postToPicker({
           type: "slides-ng-cmd",
           cmd: "enablePickerStrip",
-          orientation: s?.speakerPickerOrientation ?? "vertical",
+          orientation: this.normalizeOrientation(s?.speakerPickerOrientation),
           tileWidth: s?.speakerPickerTileWidth ?? 0,
           currentIdx: this.state?.currentIdx ?? 0,
         });
@@ -470,17 +481,26 @@ export class SlidesNGSpeakerView extends ItemView {
         cls: "slides-ng-speaker-btn slides-ng-speaker-picker-orient-btn",
         attr: { type: "button" },
       });
-      const initialOrient = settings?.speakerPickerOrientation ?? "vertical";
+      const initialOrient = this.normalizeOrientation(
+        settings?.speakerPickerOrientation
+      );
       this.applyPickerOrientButton(initialOrient);
       this.pickerOrientationBtn.addEventListener("click", () => {
         const s = this.getSettings?.();
         if (!s) return;
-        const next = (s.speakerPickerOrientation ?? "vertical") === "vertical"
-          ? "horizontal" : "vertical";
+        // v0.11.15: cycle 1-col → 2-col → horizontal → auto → 1-col.
+        const cycle: Array<PickerOrientation> = [
+          "vertical-1",
+          "vertical-2",
+          "horizontal",
+          "auto",
+        ];
+        const current = this.normalizeOrientation(s.speakerPickerOrientation);
+        const idx = cycle.indexOf(current);
+        const next = cycle[(idx + 1) % cycle.length];
         s.speakerPickerOrientation = next;
         void this.saveSettings?.();
         this.applyPickerOrientButton(next);
-        // Post live update to the iframe (no re-render needed).
         this.postToPicker({
           type: "slides-ng-cmd",
           cmd: "setPickerOrientation",
@@ -549,6 +569,8 @@ export class SlidesNGSpeakerView extends ItemView {
     // inline next to it. Panels without a title get a top-left
     // floating handle instead.
     this.attachAllDragHandles();
+    // v0.11.15: render the "Show all panels" affordance if any are hidden.
+    this.updateShowAllPanelsButton();
 
     // Wire postMessage listener for state from the preview iframe.
     window.addEventListener("message", this.messageHandler);
@@ -621,6 +643,29 @@ export class SlidesNGSpeakerView extends ItemView {
     handle.title = "Drag to reorder this panel";
     handle.draggable = true;
     setIcon(handle, "grip-vertical");
+
+    // v0.11.15: inline hide button — sibling to the drag handle.
+    // Click to hide this panel for the session (persists in settings).
+    // Restore via the "Show all panels" button in the speaker-view
+    // top right OR by reopening the Settings → Speaker Panels.
+    const hideBtn = document.createElement("button");
+    hideBtn.type = "button";
+    hideBtn.className = "slides-ng-speaker-panel-hide";
+    hideBtn.title = "Hide this panel";
+    setIcon(hideBtn, "eye-off");
+    hideBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const s = this.getSettings?.();
+      if (!s) return;
+      s.speakerPanelVisibility = {
+        ...s.speakerPanelVisibility,
+        [id]: false,
+      };
+      void this.saveSettings?.();
+      panel.style.display = "none";
+      // Re-render the show-all button visibility check.
+      this.updateShowAllPanelsButton();
+    });
     handle.addEventListener("dragstart", (e) => {
       if (!e.dataTransfer) return;
       e.dataTransfer.effectAllowed = "move";
@@ -699,6 +744,8 @@ export class SlidesNGSpeakerView extends ItemView {
     );
     if (!title) {
       handle.classList.add("slides-ng-speaker-panel-handle--floating");
+      hideBtn.classList.add("slides-ng-speaker-panel-hide--floating");
+      panel.insertBefore(hideBtn, panel.firstChild);
       panel.insertBefore(handle, panel.firstChild);
       return;
     }
@@ -709,27 +756,97 @@ export class SlidesNGSpeakerView extends ItemView {
       // The existing header (notesHeader, pickerHeader) uses
       // `justify-content: space-between` to push the title to the
       // left and a trailing action button (Edit / Mode toggle) to
-      // the right. Inserting the handle as a third sibling would
-      // trigger space-between's start/center/end distribution —
-      // the v0.10.0 release shipped this bug, with the title ending
-      // up in the visual centre. Fix: wrap handle+title in a
-      // sub-group so the header still sees two children and
-      // distributes correctly.
+      // the right. Wrap handle + hide + title in a sub-group so
+      // the header still sees two children and distributes correctly.
       const group = document.createElement("div");
       group.className = "slides-ng-speaker-panel-header-group";
       titleParent!.insertBefore(group, title);
       group.appendChild(handle);
+      group.appendChild(hideBtn);
       group.appendChild(title);
     } else if (titleParent) {
-      // Wrap title in a new header div so the handle + title sit on a
-      // row without forcing row-direction on the panel itself.
+      // Wrap title in a new header div so the handle + hide + title
+      // sit on a row without forcing row-direction on the panel.
       const header = document.createElement("div");
       header.className = "slides-ng-speaker-panel-header";
       titleParent.insertBefore(header, title);
       header.appendChild(handle);
+      header.appendChild(hideBtn);
       header.appendChild(title);
     } else {
+      panel.insertBefore(hideBtn, panel.firstChild);
       panel.insertBefore(handle, panel.firstChild);
+    }
+  }
+
+  /**
+   * v0.11.15: apply the current slide's per-slide hide-panels
+   * override. Hides panels whose ids appear in `hideList`; restores
+   * the user's persisted visibility for any others that may have
+   * been hidden by a previous slide's override. Doesn't mutate
+   * `settings.speakerPanelVisibility` — purely DOM-level.
+   */
+  private applyPerSlideHidePanels(hideList: string[]): void {
+    const settings = this.getSettings?.();
+    if (!settings) return;
+    const hideSet = new Set(hideList);
+    const persistent = settings.speakerPanelVisibility ?? {};
+    this.contentEl
+      .querySelectorAll<HTMLElement>("[data-speaker-panel]")
+      .forEach((panel) => {
+        const id = panel.dataset.speakerPanel as SpeakerPanelId | undefined;
+        if (!id) return;
+        const persistentlyVisible = persistent[id] !== false;
+        const slideHidden = hideSet.has(id);
+        // Visible iff persistent setting allows AND not slide-hidden.
+        panel.style.display =
+          persistentlyVisible && !slideHidden ? "" : "none";
+      });
+  }
+
+  /**
+   * v0.11.15: render the "show all panels" button in the speaker
+   * view's top-right area only when at least one panel is hidden.
+   * Idempotent — creates the button if missing, removes when no
+   * panels are hidden, or just updates visibility.
+   */
+  private updateShowAllPanelsButton(): void {
+    const s = this.getSettings?.();
+    if (!s) return;
+    const visibility = s.speakerPanelVisibility ?? {};
+    const anyHidden = Object.values(visibility).some((v) => v === false);
+    let btn = this.contentEl.querySelector<HTMLButtonElement>(
+      ".slides-ng-speaker-show-all-panels"
+    );
+    if (!anyHidden) {
+      btn?.remove();
+      return;
+    }
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.className = "slides-ng-speaker-btn slides-ng-speaker-show-all-panels";
+      btn.type = "button";
+      setTooltip(btn, "Show all hidden panels");
+      const iconEl = btn.createSpan({ cls: "slides-ng-speaker-btn-icon" });
+      setIcon(iconEl, "eye");
+      btn.createSpan({ cls: "slides-ng-speaker-btn-label", text: "Show all" });
+      btn.addEventListener("click", () => {
+        const settings = this.getSettings?.();
+        if (!settings) return;
+        for (const id of Object.keys(settings.speakerPanelVisibility ?? {})) {
+          settings.speakerPanelVisibility[id as SpeakerPanelId] = true;
+        }
+        void this.saveSettings?.();
+        // Un-hide every panel inline.
+        this.contentEl
+          .querySelectorAll<HTMLElement>("[data-speaker-panel]")
+          .forEach((p) => {
+            p.style.display = "";
+          });
+        this.updateShowAllPanelsButton();
+      });
+      // Insert as the first child of contentEl so it floats at top.
+      this.contentEl.insertBefore(btn, this.contentEl.firstChild);
     }
   }
 
@@ -1263,7 +1380,7 @@ export class SlidesNGSpeakerView extends ItemView {
       this.lastPickerRenderedMtime = mtime;
       // After the iframe loads, post enablePickerStrip. Use a short
       // retry burst because the bridge listener may not be up yet.
-      const orient = settings?.speakerPickerOrientation ?? "vertical";
+      const orient = this.normalizeOrientation(settings?.speakerPickerOrientation);
       const tileWidth = settings?.speakerPickerTileWidth ?? 0;
       const post = (): void => {
         this.postToPicker({
@@ -1300,19 +1417,45 @@ export class SlidesNGSpeakerView extends ItemView {
    * Update the orientation-toggle button's icon + tooltip based on
    * the CURRENT orientation. Called on view init + on click.
    */
-  private applyPickerOrientButton(orientation: "vertical" | "horizontal"): void {
+  private applyPickerOrientButton(orientation: PickerOrientation): void {
     if (!this.pickerOrientationBtn) return;
     this.pickerOrientationBtn.empty();
     const iconEl = this.pickerOrientationBtn.createSpan({
       cls: "slides-ng-speaker-btn-icon",
     });
-    setIcon(iconEl, orientation === "vertical" ? "panel-bottom" : "panel-right");
-    setTooltip(
-      this.pickerOrientationBtn,
-      orientation === "vertical"
-        ? "Switch picker to horizontal (film-strip) layout"
-        : "Switch picker to vertical layout"
-    );
+    // v0.11.15: per-mode icon + tooltip; click cycles to the next.
+    const meta: Record<PickerOrientation, { icon: string; tip: string }> = {
+      "vertical-1": {
+        icon: "rows",
+        tip: "Picker: 1-column. Click for 2-column.",
+      },
+      "vertical-2": {
+        icon: "columns-2",
+        tip: "Picker: 2-column. Click for horizontal.",
+      },
+      horizontal: {
+        icon: "panel-right",
+        tip: "Picker: horizontal strip. Click for auto-fit.",
+      },
+      auto: {
+        icon: "monitor",
+        tip: "Picker: auto-fit (chosen by panel size). Click for 1-column.",
+      },
+    };
+    const m = meta[orientation];
+    setIcon(iconEl, m.icon);
+    setTooltip(this.pickerOrientationBtn, m.tip);
+  }
+
+  /**
+   * v0.11.15: collapse the union — legacy "vertical" maps to
+   * "vertical-1"; everything else passes through.
+   */
+  private normalizeOrientation(
+    raw: SlidesNGSettings["speakerPickerOrientation"] | undefined
+  ): PickerOrientation {
+    if (raw === "vertical" || raw === undefined) return "vertical-1";
+    return raw as PickerOrientation;
   }
 
   /** Image-attachment resolver — mirrors SlidesNGView.resolveImageAttachment. */
@@ -1371,6 +1514,14 @@ export class SlidesNGSpeakerView extends ItemView {
         `Slide ${this.state.currentIdx + 1} of ${this.state.totalSlides}`
       );
     }
+    // v0.11.15: apply per-slide panel-visibility override. The
+    // current slide's `slides-ng-hide-panels:` frontmatter list
+    // (delivered via state.hidePanels) temporarily overrides the
+    // user's settings. Restored when navigating to a slide without
+    // the override OR with a different list. Doesn't touch the
+    // user's actual `settings.speakerPanelVisibility` — purely a
+    // per-slide override applied at the DOM level.
+    this.applyPerSlideHidePanels(this.state.hidePanels ?? []);
     if (this.notesEl && !this.notesEditing) {
       this.notesEl.innerHTML = this.state.notesHtml || "<em>No notes</em>";
     }

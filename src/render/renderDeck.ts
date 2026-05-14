@@ -300,6 +300,30 @@ function slideToHtml(
 
   const noteHtml = slide.note ? (md.parse(slide.note, { async: false }) as string) : undefined;
 
+  // v0.11.15: per-slide panel-visibility override. Emit a
+  // `data-hide-panels="picker,scenes"` attribute on the section
+  // when the slide's frontmatter sets `slides-ng-hide-panels:
+  // [picker, scenes]`. The iframe's `postState` reads this
+  // attribute from `Reveal.getCurrentSlide()` and posts it up;
+  // the speaker view hides those panels while the slide is
+  // active, restoring them when navigating to a slide without
+  // the override.
+  const hidePanelsRaw = slide.frontmatter["slides-ng-hide-panels"];
+  if (hidePanelsRaw) {
+    let list: string[] = [];
+    if (Array.isArray(hidePanelsRaw)) {
+      list = hidePanelsRaw.filter((p): p is string => typeof p === "string");
+    } else if (typeof hidePanelsRaw === "string") {
+      list = hidePanelsRaw
+        .split(/[,\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    if (list.length > 0) {
+      slideAttrs["data-hide-panels"] = list.join(",");
+    }
+  }
+
   // 4. Slide-level annotations land on the `<section>` tag itself.
   const sectionAttrs =
     Object.keys(slideAttrs).length > 0 ? renderAttrs(slideAttrs) : undefined;

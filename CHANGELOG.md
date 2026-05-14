@@ -6,6 +6,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.15] — 2026-05-14
+
+### Added
+
+- **Picker layout: 4 modes** instead of 2. The
+  `speakerPickerOrientation` setting now accepts:
+  - `vertical-1` — single column (PowerPoint default)
+  - `vertical-2` — two columns side by side (NEW)
+  - `horizontal` — film-strip row
+  - `auto` — chosen at build time from the strip container
+    shape: wide enough for two horizontal slides →
+    `horizontal`; otherwise tries `vertical-2` if there's room
+    for two tiles side by side; falls back to `vertical-1`.
+  Legacy `"vertical"` is migrated to `vertical-1` on load.
+  Picker-header toggle button cycles
+  1-col → 2-col → horizontal → auto → 1-col.
+- **Inline panel-hide button** — small eye-off icon revealed
+  on panel hover, sibling to the drag handle. Click to hide
+  that panel for the session (persists in
+  `speakerPanelVisibility`). A new **Show all** button appears
+  at the top of the speaker view when at least one panel is
+  hidden — click to restore everything.
+- **Per-slide panel-visibility override** via
+  `slides-ng-hide-panels:` per-slide frontmatter. Accepts an
+  array (`[picker, scenes]`) or a comma/space-separated string
+  (`"picker, scenes"` or `"picker scenes"`). The speaker view
+  applies the override temporarily while that slide is current;
+  navigating to a slide WITHOUT the override restores the
+  user's persistent visibility settings. Implementation: the
+  list is emitted as `data-hide-panels` on the section in
+  `renderDeck`, harvested into the state-event payload by the
+  iframe bridge, and applied at the DOM level by
+  `applyPerSlideHidePanels()` in the speaker view.
+- New test deck `11-per-slide-hide-panels.md` in the b&g vault
+  demonstrating the override.
+
+### Technical
+
+- `src/settings.ts` — `speakerPickerOrientation` union expanded;
+  legacy "vertical" kept in the type for back-compat read.
+- `src/main.ts` — `loadSettings` migrates legacy "vertical" to
+  "vertical-1".
+- `src/render/revealTemplate.ts` — `applyPickerStripLayout`
+  handles `vertical-2` (CSS grid `1fr 1fr`) and `auto`
+  (resolved at apply time from container dimensions). Bridge
+  `currentState` emits `hidePanels` from the current section's
+  `data-hide-panels` attribute.
+- `src/render/renderDeck.ts` — `slideToHtml` reads
+  `slides-ng-hide-panels` frontmatter and emits
+  `data-hide-panels=…` on the section.
+- `src/SlidesNGSpeakerView.ts` — new `PickerOrientation` type
+  alias + `normalizeOrientation` helper; orientation toggle
+  cycles 4 modes with per-mode icon + tooltip; inline
+  `slides-ng-speaker-panel-hide` button on every panel;
+  `updateShowAllPanelsButton()` renders the global restore
+  button; `applyPerSlideHidePanels()` applies + restores
+  per-slide DOM-level visibility on every state event.
+- `src/SlidesNGSettingTab.ts` — orientation dropdown extended
+  to 4 options; frontmatter reference card gains a
+  "Per-slide panel visibility" section.
+- `src/styles.css` — `.slides-ng-speaker-panel-hide` (inline)
+  + `--floating` variant + `slides-ng-speaker-show-all-panels`
+  styles.
+
 ## [0.11.14] — 2026-05-14
 
 ### Fixed

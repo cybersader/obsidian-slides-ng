@@ -415,6 +415,53 @@
   width: 12px;
   height: 12px;
 }
+/* v0.11.15: inline hide button — sibling to the drag handle.
+ * Same visual treatment (hover-revealed, small icon-only). */
+.slides-ng-speaker-panel-hide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 60ms ease, background 60ms ease;
+}
+.slides-ng-speaker-panel-hide--floating {
+  position: absolute;
+  top: 4px;
+  left: 22px; /* sit just right of the floating drag handle */
+  z-index: 6;
+}
+.slides-ng-speaker-panel:hover .slides-ng-speaker-panel-hide {
+  opacity: 0.55;
+}
+.slides-ng-speaker-panel-hide:hover {
+  opacity: 1 !important;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.slides-ng-speaker-panel-hide .svg-icon {
+  width: 12px;
+  height: 12px;
+}
+/* "Show all hidden panels" button at the top of the speaker view. */
+.slides-ng-speaker-show-all-panels {
+  align-self: flex-end;
+  margin: 0.2rem 0 0.3rem auto;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.82em;
+}
+.slides-ng-speaker-show-all-panels .svg-icon {
+  width: 12px;
+  height: 12px;
+}
 .slides-ng-speaker-panel.dragging {
   opacity: 0.5;
 }

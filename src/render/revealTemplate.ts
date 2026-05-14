@@ -762,6 +762,13 @@ ${sectionsHtml}
         var activeSceneId = (sceneEl && sceneEl.classList.contains('on'))
           ? (sceneEl.getAttribute('data-scene-id') || null)
           : null;
+        // v0.11.15: harvest per-slide panel-visibility override
+        // (slides-ng-hide-panels frontmatter, emitted as
+        // data-hide-panels on the section by slideToHtml).
+        var hidePanelsAttr = current ? current.getAttribute('data-hide-panels') : null;
+        var hidePanels = hidePanelsAttr
+          ? hidePanelsAttr.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+          : [];
         return {
           type: 'slides-ng-state',
           currentIdx: indices.h,
@@ -774,7 +781,8 @@ ${sectionsHtml}
           activeSceneId: activeSceneId,
           notesHtml: notesEl ? notesEl.innerHTML : '',
           nextTitle: nextTitleEl ? nextTitleEl.innerText.trim().slice(0, 80) : '',
-          slides: harvestSlideMeta()
+          slides: harvestSlideMeta(),
+          hidePanels: hidePanels
         };
       }
       function postState() {
@@ -955,50 +963,68 @@ ${sectionsHtml}
        * on initial build and on every setPickerOrientation command.
        */
       function applyPickerStripLayout(strip) {
-        var orientation = strip.getAttribute('data-orientation') || 'vertical';
+        var orientation = strip.getAttribute('data-orientation') || 'vertical-1';
         var tileWidthAttr = parseInt(strip.getAttribute('data-tile-width') || '0', 10);
         var slideW = parseInt(strip.getAttribute('data-slide-w') || '960', 10) || 960;
         var slideH = parseInt(strip.getAttribute('data-slide-h') || '700', 10) || 700;
         var aspect = slideH / slideW;
-        // v0.11.12: read theme bg so non-black themes render with the
-        // correct tile color. Stored on the strip as a data-attr so
-        // setPickerOrientation can re-apply consistently.
         var stripBodyBg = (window.getComputedStyle && getComputedStyle(document.body).backgroundColor) || '#000';
+        // v0.11.15: legacy "vertical" → "vertical-1"
+        if (orientation === 'vertical') orientation = 'vertical-1';
 
-        // Base strip styles: fixed full-viewport, scrollable along
-        // the appropriate axis, background dimmed.
-        // v0.11.1: align-items:center so capped-width tiles in
-        // vertical mode are centered in the strip (not flush left
-        // looking awkwardly off-balance).
-        strip.style.cssText =
-          'position:fixed;inset:0;background:#0a0a0a;color:#fff;' +
-          'z-index:5;padding:8px;box-sizing:border-box;' +
-          'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);' +
-          'display:flex;gap:6px;align-items:center;' +
-          (orientation === 'horizontal'
-            ? 'flex-direction:row;overflow-x:auto;overflow-y:hidden;'
-            : 'flex-direction:column;overflow-y:auto;overflow-x:hidden;');
-
-        // Tile dimensions. Auto-fit: in vertical, tile width = strip
-        // inner width; in horizontal, tile height = strip inner height.
-        // Manual: tileWidthAttr sets tile width; height is derived
-        // from aspect ratio.
         var stripInnerW = strip.clientWidth - 16;
         var stripInnerH = strip.clientHeight - 16;
+
+        // v0.11.15: "auto" picks based on container shape.
+        // - wide enough for 2 horizontal slides → 'horizontal'
+        // - wider than tall by 1.2x+ AND fits 2 tiles → 'vertical-2'
+        // - otherwise → 'vertical-1'
+        if (orientation === 'auto') {
+          var preferTileW = tileWidthAttr > 0 ? tileWidthAttr : 200;
+          var canFit2 = stripInnerW > preferTileW * 2 + 6;
+          var wideEnoughForHorizontal = stripInnerW > stripInnerH * 1.8;
+          orientation = wideEnoughForHorizontal
+            ? 'horizontal'
+            : (canFit2 ? 'vertical-2' : 'vertical-1');
+        }
+
+        // Base strip styles per orientation.
+        var stripBase =
+          'position:fixed;inset:0;background:#0a0a0a;color:#fff;' +
+          'z-index:5;padding:8px;box-sizing:border-box;' +
+          'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);';
+        if (orientation === 'horizontal') {
+          strip.style.cssText = stripBase +
+            'display:flex;gap:6px;align-items:center;' +
+            'flex-direction:row;overflow-x:auto;overflow-y:hidden;';
+        } else if (orientation === 'vertical-2') {
+          // Two-column grid; rows auto-flow.
+          strip.style.cssText = stripBase +
+            'display:grid;grid-template-columns:1fr 1fr;gap:6px;' +
+            'align-content:start;overflow-y:auto;overflow-x:hidden;';
+        } else {
+          // vertical-1 (default)
+          strip.style.cssText = stripBase +
+            'display:flex;gap:6px;align-items:center;' +
+            'flex-direction:column;overflow-y:auto;overflow-x:hidden;';
+        }
+
+        // Tile dimensions per orientation.
         var tileW, tileH;
         if (orientation === 'horizontal') {
           tileH = stripInnerH > 0 ? stripInnerH - 8 : 80;
           tileW = Math.round(tileH / aspect);
-          // Override with explicit width if user set one
           if (tileWidthAttr > 0) {
             tileW = tileWidthAttr;
             tileH = Math.round(tileW * aspect);
           }
+        } else if (orientation === 'vertical-2') {
+          // Each grid column is half the strip width (minus gap).
+          var colW = Math.floor((stripInnerW - 6) / 2);
+          tileW = tileWidthAttr > 0 ? Math.min(tileWidthAttr, colW) : colW;
+          tileH = Math.round(tileW * aspect);
         } else {
-          // v0.11.1: cap auto-fit width at 240px so we get roughly
-          // PowerPoint-like density (multiple tiles visible at once)
-          // instead of one huge tile filling the panel. User can
-          // still override with a positive tileWidthAttr.
+          // vertical-1
           if (tileWidthAttr > 0) {
             tileW = tileWidthAttr;
           } else if (stripInnerW > 0) {

@@ -241,15 +241,19 @@ export class SlidesNGSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Picker orientation")
       .setDesc(
-        "Layout direction for the thumbnail picker. `Vertical` stacks tiles in a column (PowerPoint default); `horizontal` flows them in a row (film-strip view)."
+        "Layout for the thumbnail picker. `1-column` stacks tiles in a single column (PowerPoint default); `2-column` shows two side by side; `Horizontal` flows them in a row (film-strip); `Auto` picks one based on the panel's shape at build time."
       )
       .addDropdown((d) => {
-        d.addOption("vertical", "Vertical");
-        d.addOption("horizontal", "Horizontal");
-        d.setValue(this.plugin.settings.speakerPickerOrientation ?? "vertical").onChange(
+        d.addOption("vertical-1", "1-column (vertical)");
+        d.addOption("vertical-2", "2-column (vertical)");
+        d.addOption("horizontal", "Horizontal (film-strip)");
+        d.addOption("auto", "Auto");
+        // v0.11.15: legacy "vertical" displayed as "vertical-1".
+        const cur = this.plugin.settings.speakerPickerOrientation;
+        d.setValue(cur === "vertical" ? "vertical-1" : (cur ?? "vertical-1")).onChange(
           async (v) => {
             this.plugin.settings.speakerPickerOrientation =
-              v as "vertical" | "horizontal";
+              v as "vertical-1" | "vertical-2" | "horizontal" | "auto";
             await this.plugin.saveSettings();
           }
         );
@@ -508,6 +512,19 @@ slides-ng-code-block-overflow-scroll: false  # clip instead of scrolling`,
                                         #   theme bg + text color
                                         # set to false to force a black
                                         #   overlay (v0.7-era default)`,
+      },
+      {
+        title: "Per-slide panel visibility (v0.11.15)",
+        code:
+`---
+slides-ng-hide-panels: [picker, scenes]   # hide these panels while
+                                          #   this slide is current
+                                          # panel ids: status, controls,
+                                          #   timer, visualNext, scenes,
+                                          #   notes, picker
+---
+# This slide
+body — when active, picker + scenes panels are hidden`,
       },
       {
         title: "Power-user passthrough",
