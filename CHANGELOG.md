@@ -6,6 +6,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.26] — 2026-05-14
+
+### Changed
+
+- **Panel header buttons redesigned as a minimal icon toolbar.**
+  The picker's orientation toggle + magnifier, the per-panel
+  drag handle + hide button, and the notes Edit button all
+  shared the same nav-bar-sized `.slides-ng-speaker-btn`
+  treatment (32-px min-height, full border at rest) which
+  felt visually loud crammed into compact panel headers next
+  to the section title. New `.slides-ng-icon-tool` modifier
+  collapses icon-only header buttons to 24 px square,
+  transparent at rest with muted color, subtle
+  `--background-modifier-hover` background on hover. The
+  notes Edit button uses a paired `.slides-ng-compact-pill`
+  modifier — smaller padding + font, but the "Edit" label
+  stays visible at every pane width (the container query
+  that hides labels at < 480 px is suppressed for this
+  modifier). Drag handle and hide button retain their
+  hover-reveal behaviour. Net effect: all header chrome
+  reads as secondary to the section title and to the panel
+  contents below, freeing the title to anchor the eye.
+
+### Technical
+
+- `src/styles.css` — added `.slides-ng-speaker-btn
+  .slides-ng-icon-tool` and `.slides-ng-speaker-btn
+  .slides-ng-compact-pill` rules. The latter's container-
+  query override keeps its label visible regardless of pane
+  width.
+- `src/SlidesNGSpeakerView.ts` — `.slides-ng-icon-tool`
+  applied to `pickerOrientationBtn` and `pickerSizeBtn`;
+  `.slides-ng-compact-pill` applied to the notes `editBtn`.
+
 ## [0.11.25] — 2026-05-14
 
 ### Fixed

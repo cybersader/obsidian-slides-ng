@@ -480,7 +480,7 @@ export class SlidesNGSpeakerView extends ItemView {
       text: "Speaker notes",
     });
     const editBtn = notesHeader.createEl("button", {
-      cls: "slides-ng-speaker-btn slides-ng-speaker-notes-edit",
+      cls: "slides-ng-speaker-btn slides-ng-compact-pill slides-ng-speaker-notes-edit",
       attr: { type: "button" },
     });
     const editIcon = editBtn.createSpan({ cls: "slides-ng-speaker-btn-icon" });
@@ -506,7 +506,7 @@ export class SlidesNGSpeakerView extends ItemView {
       // Orientation toggle button: rotate-3d-2d-like icon. Click
       // flips vertical ⇄ horizontal and persists the setting.
       this.pickerOrientationBtn = pickerHeader.createEl("button", {
-        cls: "slides-ng-speaker-btn slides-ng-speaker-picker-orient-btn",
+        cls: "slides-ng-speaker-btn slides-ng-icon-tool slides-ng-speaker-picker-orient-btn",
         attr: { type: "button" },
       });
       const initialOrient = this.normalizeOrientation(
@@ -543,7 +543,7 @@ export class SlidesNGSpeakerView extends ItemView {
       // positive integer or 0 (auto) for power users; per-deck
       // `slides-ng-picker-tile-width` overrides both.
       this.pickerSizeBtn = pickerHeader.createEl("button", {
-        cls: "slides-ng-speaker-btn slides-ng-speaker-picker-size-btn",
+        cls: "slides-ng-speaker-btn slides-ng-icon-tool slides-ng-speaker-picker-size-btn",
         attr: { type: "button" },
       });
       this.applyPickerSizeButton(

@@ -741,16 +741,78 @@
   background: var(--background-modifier-border-hover, var(--background-modifier-border));
   height: 4px;
 }
-.slides-ng-speaker-picker-orient-btn,
-.slides-ng-speaker-picker-size-btn {
-  /* Small icon buttons in the picker header. */
-  padding: 0.25rem 0.5rem;
-  font-size: 0.85em;
+/* v0.11.26: minimal icon-toolbar style for panel-header buttons.
+ * The default `.slides-ng-speaker-btn` is sized for the navigation
+ * row (32 px min-height, full border, padding 0.4 / 0.7 rem). That
+ * felt visually loud in compact panel headers next to the section
+ * title. The `.slides-ng-icon-tool` modifier collapses to a 24-px
+ * borderless icon button: transparent at rest with muted color,
+ * subtle background-modifier-hover background on hover, full color
+ * on focus. Pairs well with the hover-revealed drag handle + hide
+ * button so all four icon-only controls in a header look the same. */
+.slides-ng-speaker-btn.slides-ng-icon-tool {
+  min-height: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+  gap: 0;
 }
-.slides-ng-speaker-picker-orient-btn .svg-icon,
-.slides-ng-speaker-picker-size-btn .svg-icon {
+.slides-ng-speaker-btn.slides-ng-icon-tool:hover {
+  background: var(--background-modifier-hover);
+  border-color: transparent;
+  color: var(--text-normal);
+}
+.slides-ng-speaker-btn.slides-ng-icon-tool .svg-icon {
   width: 14px;
   height: 14px;
+}
+.slides-ng-speaker-btn.slides-ng-icon-tool .slides-ng-speaker-btn-icon {
+  width: 14px;
+  height: 14px;
+}
+/* v0.11.26: compact-pill modifier for icon+label buttons inside
+ * panel headers. Smaller than the default nav button but keeps the
+ * label visible. Subtle border (matches the icon-tool hover state)
+ * so it reads as actionable. */
+.slides-ng-speaker-btn.slides-ng-compact-pill {
+  min-height: 24px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8em;
+  gap: 0.3rem;
+  background: transparent;
+  border-color: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+.slides-ng-speaker-btn.slides-ng-compact-pill:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.slides-ng-speaker-btn.slides-ng-compact-pill .svg-icon,
+.slides-ng-speaker-btn.slides-ng-compact-pill .slides-ng-speaker-btn-icon {
+  width: 12px;
+  height: 12px;
+}
+/* Suppress the container-query label collapse for compact-pill —
+ * we want the label always visible regardless of pane width. */
+@container (max-width: 480px) {
+  .slides-ng-speaker-btn.slides-ng-compact-pill
+    .slides-ng-speaker-btn-label {
+    display: inline;
+  }
+  .slides-ng-speaker-btn.slides-ng-compact-pill {
+    padding: 0.15rem 0.5rem;
+  }
+}
+.slides-ng-speaker-picker-orient-btn,
+.slides-ng-speaker-picker-size-btn {
+  /* Picker-header icon buttons inherit the .slides-ng-icon-tool
+   * modifier via the speaker view; these per-class rules are kept
+   * just for any consumer that doesn't set the modifier yet. */
+  padding: 0;
+  font-size: 0.85em;
 }
 /* v0.10.3: compact-row + compact-all CSS rules deleted along with
  * the picker's compact/list mode toggle and "Show all N slides →"
