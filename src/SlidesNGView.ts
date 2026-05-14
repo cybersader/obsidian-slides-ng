@@ -153,12 +153,14 @@ export class SlidesNGView extends ItemView {
       onClick: () => this.postIframeCommand("next"),
     });
 
-    this.addToolbarButton(leftGroup, {
-      icon: "list",
-      label: "Menu",
-      tooltip: "Toggle the in-iframe menu (heading outline + slide list)",
-      onClick: () => this.postIframeCommand("toggleMenu"),
-    });
+    // v0.11.8: Menu toolbar button removed. After several rounds of
+    // fixes (v0.10.2 via Reveal.getPlugin('menu').toggle(), v0.11.3
+    // via .slide-menu-button.click()), the reveal-menu plugin's
+    // toggle remained unreliable in the embedded iframe context for
+    // some users. The Grid button already covers slide navigation
+    // (and shows real thumbnails). The reveal-menu plugin is still
+    // loaded so its keyboard shortcut (M) works inside the iframe
+    // for anyone who wants the side-panel experience.
 
     this.addToolbarButton(leftGroup, {
       // v0.10.2: switched from `grid-3x3` to `layout-grid` — the

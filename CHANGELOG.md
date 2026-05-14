@@ -6,6 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.8] — 2026-05-14
+
+### Removed
+
+- **Menu toolbar button.** The reveal-menu plugin's toggle was
+  unreliable in the embedded iframe context across multiple
+  rounds of fixes (v0.10.2 tried `Reveal.getPlugin('menu').toggle()`,
+  v0.11.3 reverted to `.slide-menu-button.click()` — neither
+  worked consistently for users). The button is gone. The
+  reveal-menu plugin is STILL loaded for users who press the
+  `M` key inside the preview iframe to invoke its side-panel.
+  For slide navigation specifically, the Grid button (real
+  thumbnails) is a stronger affordance.
+
+### Technical
+
+- `src/SlidesNGView.ts` — Menu toolbar button removed.
+- `test/e2e/speaker-070.spec.ts` — old "Menu present" test
+  replaced with one that asserts Menu is NOT in the toolbar
+  and Grid is.
+
 ## [0.11.7] — 2026-05-14
 
 ### Added

@@ -97,14 +97,17 @@ describe("v0.7.0 — speaker UX overhaul + scenes", function () {
     expect(hasAccent).toBe(true);
   });
 
-  it("Menu toolbar button is present in the preview toolbar", async () => {
+  it("preview toolbar has the expected navigation buttons (v0.11.8: Menu removed)", async () => {
     const labels = await browser.execute(() => {
       const btns = Array.from(
         document.querySelectorAll(".slides-ng-toolbar .slides-ng-toolbar-btn")
       ) as HTMLButtonElement[];
       return btns.map((b) => (b.textContent ?? "").trim());
     });
-    expect(labels).toContain("Menu");
+    // Menu was removed in v0.11.8 (reveal-menu toggle was unreliable
+    // across plugin versions; Grid covers slide navigation).
+    expect(labels).toContain("Grid");
+    expect(labels).not.toContain("Menu");
   });
 
   it("Grid button opens the custom slides-picker overlay with one tile per slide", async () => {
