@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.4] — 2026-05-14
+
+### Fixed
+
+- **DnD drop-indicator misaligned when speaker view is scrolled.**
+  The indicator is positioned absolutely inside `contentEl`. Its
+  `top` value was computed as `rect.top - containerRect.top`,
+  both viewport-relative — but absolute positioning inside a
+  scrolled container uses the container's INTERNAL coordinate
+  space, which ignores `scrollTop`. Result: if you'd scrolled
+  the speaker view at all, the indicator appeared above the
+  cursor by exactly the scroll offset, and dragging a panel
+  felt like it would "drop at the wrong place." Fix: add
+  `contentEl.scrollTop` to the indicator's `top` (and
+  `scrollLeft` to its `left` for the v0.10.0 2-column grid
+  case). Now the indicator follows the cursor accurately even
+  in a scrolled or wide-laid-out container.
+
+### Technical
+
+- `src/SlidesNGSpeakerView.ts` — `updateDropIndicator()`
+  reads `contentEl.scrollTop/scrollLeft` and offsets the
+  indicator's top/left by those amounts.
+
 ## [0.11.3] — 2026-05-14
 
 ### Changed

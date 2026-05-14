@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.11.4** — DnD drop-indicator misalignment when the speaker view is scrolled. The indicator's absolute `top` was using viewport-relative deltas without adding `contentEl.scrollTop`, so a scrolled container showed the line above the cursor. Adding the scroll offset fixes it.
 - **0.11.3** — Grid overlay tile size bumped 220→320 px so thumbnail text is legible (matches picker thumbnail density). Menu toolbar button: try DOM `.slide-menu-button.click()` FIRST (v0.7.0 strategy that was working), fall back to `Reveal.getPlugin('menu')` API; v0.10.2 had reversed this and `.toggle()` was silently no-op'ing for some users. Diagnostic console.log helps when it still doesn't work.
 - **0.11.2** — picker current-tile highlight fix (E2E-caught regression). enablePickerStrip carries currentIdx for initial highlight; setPickerCurrent posts burst (5x) on every state change; applyCurrentTileStyle/clearCurrentTileStyle helpers ensure the .current visual treatment is consistent across buildPickerStrip / applyPickerStripLayout / setPickerCurrent paths.
 - **0.11.1** — picker polish: title overlay removed (tile content already shows the slide heading), slide-number badge redesigned as a bordered square in the top-left, current slide tints the badge to accent + adds a halo, vertical auto-fit tile width capped at 240 px for PowerPoint-like density.

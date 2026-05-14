@@ -781,14 +781,26 @@ export class SlidesNGSpeakerView extends ItemView {
 
     const ind = this.ensureDropIndicator();
     ind.style.display = "block";
-    ind.style.left = `${rect.left - containerRect.left}px`;
     ind.style.width = `${rect.width}px`;
     // Position the line so it visually sits BETWEEN panels — half
     // above + half below the boundary, which makes "where will it
     // drop" obvious at a glance.
+    // v0.11.4: account for contentEl.scrollTop. `rect.top` is in
+    // viewport coords; `containerRect.top` is too. Their difference
+    // gives the panel's offset from the TOP of the container's
+    // visible area — but the indicator is positioned absolutely
+    // inside contentEl, so its `top` must be in contentEl's
+    // INTERNAL coordinate space (which the absolute-positioning
+    // engine ignores scrollTop for). Without adding scrollTop, a
+    // scrolled-down container shows the indicator above where the
+    // cursor actually is. Same correction applies to `left` if the
+    // multi-column grid layout is active and horizontally scrolled.
+    const scrollTop = this.contentEl.scrollTop || 0;
+    const scrollLeft = this.contentEl.scrollLeft || 0;
     ind.style.top = isAbove
-      ? `${rect.top - containerRect.top - 1}px`
-      : `${rect.bottom - containerRect.top - 1}px`;
+      ? `${rect.top - containerRect.top + scrollTop - 1}px`
+      : `${rect.bottom - containerRect.top + scrollTop - 1}px`;
+    ind.style.left = `${rect.left - containerRect.left + scrollLeft}px`;
   }
 
   private hideDropIndicator(): void {
