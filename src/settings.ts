@@ -224,6 +224,25 @@ export interface SlidesNGSettings {
    * Frontmatter override: `slides-ng-scene-inherit-theme-bg`.
    */
   sceneInheritThemeBg: boolean;
+
+  /**
+   * v0.11.32: EXPERIMENTAL — modular grid speaker view layout.
+   * Default `false`. When `true` (and the implementation lands),
+   * the speaker view's panels become a draggable + resizable grid
+   * instead of the current vertical-stack-with-DnD-reorder. Right
+   * now the toggle is a placeholder so we can validate the
+   * settings UI and a per-vault opt-in without bundling the grid-
+   * layout engine. If users opt in before the impl is ready they
+   * get a "Experimental: not implemented yet" notice and fall back
+   * to the standard layout.
+   *
+   * Bundle-size note: the toggle adds 0 KB. The grid engine itself
+   * (when implemented) is anticipated at ~15-25 KB and would only
+   * ship when this setting compiles in. If the engine adds more
+   * than 50 KB we'll leave it out of `main.js` entirely and gate
+   * it behind a lazy-loaded module.
+   */
+  experimentalGridSpeakerView: boolean;
 }
 
 /** All draggable/toggleable speaker-view panels. */
@@ -390,4 +409,5 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   speakerPickerHeightPx: null,
   autoH1Breaks: false,
   sceneInheritThemeBg: true,
+  experimentalGridSpeakerView: false,
 };

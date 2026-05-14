@@ -373,6 +373,35 @@ export class SlidesNGSettingTab extends PluginSettingTab {
         );
       });
 
+    // v0.11.32: experimental modular grid speaker view (stub).
+    // Toggle exists so the user-facing flow + persisted state are
+    // validated; the actual grid-layout engine isn't shipped yet.
+    // When the user enables it we show a Notice + revert to false
+    // so the speaker view stays stable. If the engine ever lands,
+    // this block becomes the live opt-in.
+    new Setting(containerEl)
+      .setName("Experimental: modular grid speaker view")
+      .setDesc(
+        "When enabled, the speaker view's panels become a draggable + resizable grid instead of a vertical stack. Currently a stub — toggling on shows a 'not implemented yet' notice and stays off. The engine will land in a future version once layout + collision rules are settled."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.experimentalGridSpeakerView).onChange(
+          async (v) => {
+            if (v) {
+              new Notice(
+                "Experimental grid speaker view is not implemented yet. Setting stays off."
+              );
+              // Reset the toggle UI so it doesn't look stuck on.
+              t.setValue(false);
+              this.plugin.settings.experimentalGridSpeakerView = false;
+            } else {
+              this.plugin.settings.experimentalGridSpeakerView = false;
+            }
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
     // ---------- Speaker panels ----------
     new Setting(containerEl).setName("Speaker panels").setHeading();
     new Setting(containerEl)

@@ -48,8 +48,16 @@ describe("slides-ng PDF print export", function () {
     await expect(modal.isDisplayed()).resolves.toBe(true);
 
     // Sanity: the three knobs should all be present.
-    const labels = await browser.$$(".slides-ng-export-pdf-modal .setting-item-name");
-    const texts = await Promise.all(labels.map((l) => l.getText()));
+    // WDIO v9 changed ElementArray's iteration — `.map()` no longer
+    // exists. Read via browser.execute so we stay decoupled from the
+    // exact element-array API shape.
+    const texts = await browser.execute(() => {
+      return Array.from(
+        document.querySelectorAll(
+          ".slides-ng-export-pdf-modal .setting-item-name"
+        )
+      ).map((el) => (el as HTMLElement).textContent?.trim() ?? "");
+    });
     expect(texts.join("|").toLowerCase()).toContain("speaker notes");
     expect(texts.join("|").toLowerCase()).toContain("aspect ratio");
     expect(texts.join("|").toLowerCase()).toContain("theme override");
@@ -113,5 +121,87 @@ describe("slides-ng PDF print export", function () {
     expect(html).toContain("<!doctype html>");
     expect(html).toContain('"embedded":false');
     expect(html).toContain('class="reveal"');
+  });
+
+  // v0.11.32: spy on electron.shell.openExternal so we can verify
+  // the exact URL that would have launched the user's browser. This
+  // is the missing piece v0.11.31's unit test couldn't cover —
+  // proves the FULL pipeline (modal → exportAndOpenForPdf →
+  // pathToFileUrl → shell.openExternal) emits a clean
+  // `file:///...?print-pdf&showNotes=true` URL.
+  describe("PDF export URL pipeline (E2E)", function () {
+    it("emits a well-formed file:// URL with print-pdf + showNotes when notes are enabled", async () => {
+      await loadDeck();
+      // Install the spy inside Obsidian's renderer process. Replaces
+      // electron.shell.openExternal with a recorder; restores at the
+      // end. We use `require` because Obsidian's renderer is a
+      // CommonJS-ish environment.
+      const opened: string | null = await browser.executeObsidian(
+        async ({ app }) => {
+          // @ts-expect-error — Node require is available in the renderer
+          const electron = require("electron");
+          const original = electron.shell.openExternal;
+          let captured: string | null = null;
+          electron.shell.openExternal = async (url: string) => {
+            captured = url;
+            return true;
+          };
+          try {
+            // @ts-expect-error — internal API
+            await app.commands.executeCommandById("slides-ng:export-for-pdf");
+            // Wait for modal, flip "Show speaker notes" ON, then Export.
+            for (let i = 0; i < 30; i++) {
+              const m = document.querySelector(".slides-ng-export-pdf-modal");
+              if (m) break;
+              await new Promise((r) => setTimeout(r, 100));
+            }
+            // Toggle the notes checkbox. The modal renders Obsidian's
+            // <Setting> rows; the toggle is an input[type=checkbox]
+            // inside a row whose label matches /speaker notes/i.
+            const settings = Array.from(
+              document.querySelectorAll(
+                ".slides-ng-export-pdf-modal .setting-item"
+              )
+            );
+            for (const row of settings) {
+              const name = row
+                .querySelector(".setting-item-name")
+                ?.textContent?.toLowerCase();
+              if (name && /speaker notes/i.test(name)) {
+                const toggle = row.querySelector(
+                  ".checkbox-container, input[type=checkbox]"
+                ) as HTMLElement | null;
+                toggle?.click();
+                break;
+              }
+            }
+            // Click Export.
+            const exportBtn = document.querySelector(
+              ".slides-ng-export-pdf-modal button.mod-cta"
+            ) as HTMLButtonElement | null;
+            exportBtn?.click();
+            // Poll for the spied URL.
+            for (let i = 0; i < 50; i++) {
+              if (captured) break;
+              await new Promise((r) => setTimeout(r, 100));
+            }
+            return captured;
+          } finally {
+            electron.shell.openExternal = original;
+          }
+        }
+      );
+      expect(opened).not.toBeNull();
+      // eslint-disable-next-line no-console
+      console.log(`[pdf-pipeline] electron.shell.openExternal got: ${opened}`);
+      // Required pieces of the URL:
+      expect(opened).toMatch(/^file:\/\//);
+      expect(opened).toContain("?print-pdf");
+      expect(opened).toContain("showNotes=true");
+      // RFC-compliant: should parse via the URL constructor.
+      const parsed = new URL(opened as string);
+      expect(parsed.searchParams.get("print-pdf")).toBe("");
+      expect(parsed.searchParams.get("showNotes")).toBe("true");
+    });
   });
 });

@@ -587,7 +587,40 @@ ${sectionsHtml}
         ${showMenu ? `if (typeof RevealMenu !== 'undefined') {
           initOpts.plugins = (initOpts.plugins || []).concat([RevealMenu]);
         }` : ""}
-        Reveal.initialize(initOpts);
+        var revealInit = Reveal.initialize(initOpts);
+        ${showMenu ? `/* v0.11.32: reveal-menu's init() blocks on loading
+         * menu.css via the network — its DOM-construction callback
+         * only fires inside the stylesheet load handler. We bundle
+         * the CSS inline (revealMenuCss is injected into the
+         * document head above), so the network load 404s and the
+         * callback never runs → no hamburger button. Call
+         * initialiseMenu() explicitly once Reveal is ready to
+         * bypass the network wait. */
+        (function () {
+          var callInit = function () {
+            try {
+              if (typeof Reveal.getPlugin !== 'function') return;
+              var menuPlugin = Reveal.getPlugin('menu');
+              if (!menuPlugin) return;
+              if (typeof menuPlugin.isMenuInitialised === 'function' &&
+                  menuPlugin.isMenuInitialised()) {
+                return;
+              }
+              if (typeof menuPlugin.initialiseMenu === 'function') {
+                menuPlugin.initialiseMenu();
+              }
+            } catch (err) {
+              console.warn('[slides-ng] menu init failed', err);
+            }
+          };
+          if (revealInit && typeof revealInit.then === 'function') {
+            revealInit.then(callInit);
+          } else if (typeof Reveal.on === 'function') {
+            Reveal.on('ready', callInit);
+          } else {
+            setTimeout(callInit, 200);
+          }
+        })();` : ""}
       } catch (err) {
         document.body.innerHTML = '<pre style="color:#f99;padding:1em;font-family:monospace;white-space:pre-wrap">slides-ng: reveal.js failed to initialize\\n' + (err && err.stack ? String(err.stack) : String(err)) + '</pre>';
       }

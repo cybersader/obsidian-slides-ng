@@ -131,4 +131,398 @@ describe("slides-ng open-in-browser", function () {
   it("captures a screenshot of the M6 toolbar + exported deck", async () => {
     await browser.saveScreenshot(`${SCREENSHOT_DIR}/m6-frame.png`);
   });
+
+  // v0.11.32: end-to-end hamburger menu test. Reads the latest
+  // export, injects it into a hidden iframe inside the WDIO browser
+  // session, waits for reveal + menu plugin to boot, clicks the
+  // hamburger, asserts the drawer opens. This is the "does the menu
+  // actually work when someone opens the export in a real browser"
+  // assertion. (We can't observe the OS shell launch from CDP, but
+  // the iframe runs the SAME exported HTML through the SAME script
+  // execution path — if it works here, it works there.)
+  describe("hamburger menu in the exported HTML", function () {
+    it("the menu opens when the hamburger button is clicked", async () => {
+      // Get the latest export's content from the vault.
+      const exportContent = await browser.executeObsidian(async ({ app }) => {
+        // @ts-expect-error — adapter.list is internal API
+        const all = (await app.vault.adapter.list("/")).files as string[];
+        const exports = all.filter((p) => p.includes(".slides-ng-export-"));
+        if (exports.length === 0) return null;
+        exports.sort();
+        const latest = exports[exports.length - 1];
+        // @ts-expect-error — adapter.read is internal API
+        return (await app.vault.adapter.read(latest)) as string;
+      });
+      expect(exportContent).not.toBeNull();
+      // Inject the exported HTML into a fresh iframe and wait for
+      // reveal + the menu plugin to finish booting. We use srcdoc so
+      // we don't need a server. Sandbox is intentionally omitted so
+      // the menu plugin's UMD attaches to its iframe window without
+      // CORS/sandbox-script restrictions.
+      //
+      // Tack on a small <script> at the END of the body that
+      // captures uncaught errors during reveal-menu init and exposes
+      // them on window for the test to inspect.
+      await browser.execute((html: string) => {
+        const existing = document.getElementById("slides-ng-hamburger-probe");
+        if (existing) existing.remove();
+        const errorCapture = `<script>
+          window.__slidesNgErrors = [];
+          window.addEventListener('error', function (e) {
+            window.__slidesNgErrors.push({
+              msg: e.message,
+              src: e.filename,
+              line: e.lineno,
+              stack: e.error && e.error.stack ? String(e.error.stack) : null,
+            });
+          });
+          window.addEventListener('unhandledrejection', function (e) {
+            window.__slidesNgErrors.push({
+              msg: 'unhandled-rejection: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)),
+              stack: e.reason && e.reason.stack ? String(e.reason.stack) : null,
+            });
+          });
+        </script>`;
+        const augmented = html.replace("</body>", errorCapture + "</body>");
+        const iframe = document.createElement("iframe");
+        iframe.id = "slides-ng-hamburger-probe";
+        iframe.style.cssText =
+          "position:fixed;bottom:0;right:0;width:800px;height:600px;" +
+          "border:1px solid #888;z-index:9999;";
+        iframe.srcdoc = augmented;
+        document.body.appendChild(iframe);
+      }, exportContent);
+      // Wait for the menu plugin to be ready inside the iframe.
+      const probeIframe = await $("#slides-ng-hamburger-probe");
+      await probeIframe.waitForExist({ timeout: 8000 });
+      // Reveal init is async — poll for .slide-menu-button to exist
+      // (the menu plugin appends it after Reveal.initialize fires).
+      let menuReady = false;
+      for (let i = 0; i < 40; i++) {
+        await browser.switchFrame(probeIframe);
+        try {
+          menuReady = await browser.execute(() => {
+            return !!document.querySelector(".slide-menu-button");
+          });
+        } finally {
+          await browser.switchFrame(null);
+        }
+        if (menuReady) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (!menuReady) {
+        // Diagnostic: dump what IS in the iframe so we can see why
+        // the menu plugin didn't render a button.
+        await browser.switchFrame(probeIframe);
+        let diag: {
+          hasReveal: boolean;
+          hasRevealMenu: boolean;
+          revealReady: boolean;
+          allButtons: string[];
+          plugins: string[];
+        } = {
+          hasReveal: false,
+          hasRevealMenu: false,
+          revealReady: false,
+          allButtons: [],
+          plugins: [],
+        };
+        try {
+          diag = await browser.execute(() => {
+            const w = window as unknown as {
+              Reveal?: {
+                isReady?: () => boolean;
+                getPlugins?: () => Record<string, unknown>;
+                getConfig?: () => Record<string, unknown>;
+                getPlugin?: (id: string) => unknown;
+              };
+              RevealMenu?: unknown;
+              __slidesNgErrors?: unknown[];
+            };
+            const plugins =
+              w.Reveal && typeof w.Reveal.getPlugins === "function"
+                ? Object.keys(w.Reveal.getPlugins())
+                : [];
+            const btns = Array.from(
+              document.querySelectorAll<HTMLElement>("button")
+            ).map((b) => b.className || b.id || "(no class/id)");
+            const menuCfg =
+              w.Reveal && typeof w.Reveal.getConfig === "function"
+                ? w.Reveal.getConfig().menu
+                : null;
+            const slideMenuEl = !!document.querySelector(".slide-menu");
+            const slideMenuWrapper = !!document.querySelector(
+              ".slide-menu-wrapper"
+            );
+            const errors = w.__slidesNgErrors ?? [];
+            // The menu plugin's init may need to be called manually
+            // if reveal didn't see it as a plugin object.
+            const pluginRef =
+              w.Reveal && typeof w.Reveal.getPlugin === "function"
+                ? w.Reveal.getPlugin("menu")
+                : null;
+            const pluginShape: Record<string, string> = {};
+            if (pluginRef && typeof pluginRef === "object") {
+              for (const k of Object.keys(pluginRef)) {
+                pluginShape[k] = typeof (pluginRef as Record<string, unknown>)[k];
+              }
+            }
+            return {
+              hasReveal: typeof w.Reveal !== "undefined",
+              hasRevealMenu: typeof w.RevealMenu !== "undefined",
+              revealReady:
+                !!w.Reveal &&
+                typeof w.Reveal.isReady === "function" &&
+                w.Reveal.isReady(),
+              allButtons: btns,
+              plugins,
+              menuCfg,
+              slideMenuEl,
+              slideMenuWrapper,
+              errors,
+              pluginShape,
+            } as unknown as typeof diag;
+          });
+        } finally {
+          await browser.switchFrame(null);
+        }
+        // eslint-disable-next-line no-console
+        console.log(`[hamburger-diag] ${JSON.stringify(diag, null, 2)}`);
+        throw new Error(
+          `Hamburger button never appeared. ` +
+            `Reveal=${diag.hasReveal} ready=${diag.revealReady} ` +
+            `RevealMenu=${diag.hasRevealMenu} ` +
+            `plugins=[${diag.plugins.join(",")}] ` +
+            `buttons=[${diag.allButtons.join(",")}]`
+        );
+      }
+      // Click the hamburger and verify the drawer opens.
+      await browser.switchFrame(probeIframe);
+      let drawerOpen = false;
+      try {
+        await browser.execute(() => {
+          const btn = document.querySelector(
+            ".slide-menu-button"
+          ) as HTMLElement | null;
+          btn?.click();
+        });
+        // Reveal-menu animates in — poll briefly for the open state.
+        for (let i = 0; i < 20; i++) {
+          drawerOpen = await browser.execute(() => {
+            // reveal-menu adds `body.has-menu-open` and `.slide-menu`
+            // gains `.active` / `.is-open` depending on the build.
+            const menu = document.querySelector(".slide-menu");
+            if (!menu) return false;
+            const bodyHasClass =
+              document.body.classList.contains("has-menu-open");
+            const menuHasOpenClass =
+              menu.classList.contains("active") ||
+              menu.classList.contains("is-open") ||
+              menu.classList.contains("open");
+            // Some menu builds toggle data attribute instead.
+            const dataOpen =
+              menu.getAttribute("data-open") === "true";
+            return bodyHasClass || menuHasOpenClass || dataOpen;
+          });
+          if (drawerOpen) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      } finally {
+        await browser.switchFrame(null);
+      }
+      // Screenshot whether or not the assertion passes — useful for
+      // visual verification.
+      await browser.saveScreenshot(`${SCREENSHOT_DIR}/hamburger-clicked.png`);
+      // Clean up the probe iframe so other tests aren't affected.
+      await browser.execute(() => {
+        const el = document.getElementById("slides-ng-hamburger-probe");
+        if (el) el.remove();
+      });
+      if (!drawerOpen) {
+        throw new Error(
+          "Hamburger button clicked but the menu drawer didn't open " +
+            "(neither body.has-menu-open nor .slide-menu.active|.is-open|.open " +
+            "nor [data-open=true] became true within 2 s)."
+        );
+      }
+    });
+  });
+
+  // v0.11.32: reveal.js keyboard shortcuts should work in the
+  // exported HTML when opened in a real browser. We can't dispatch
+  // keys to a separate browser window, but we CAN inject the
+  // export into a hidden iframe (same path the hamburger test uses)
+  // and dispatch keyboard events INSIDE the iframe. If reveal's
+  // keyboard handler is wired correctly, M (open menu), B (blackout),
+  // and arrow keys (navigate) should all respond.
+  describe("reveal keyboard shortcuts in the exported HTML", function () {
+    async function getOrInjectProbe(): Promise<void> {
+      const exists = await browser.execute(() => {
+        return !!document.getElementById("slides-ng-hamburger-probe");
+      });
+      if (exists) return;
+      const exportContent = await browser.executeObsidian(async ({ app }) => {
+        // @ts-expect-error — adapter.list is internal API
+        const all = (await app.vault.adapter.list("/")).files as string[];
+        const exports = all.filter((p) => p.includes(".slides-ng-export-"));
+        if (exports.length === 0) return null;
+        exports.sort();
+        const latest = exports[exports.length - 1];
+        // @ts-expect-error — adapter.read is internal API
+        return (await app.vault.adapter.read(latest)) as string;
+      });
+      await browser.execute((html: string) => {
+        const iframe = document.createElement("iframe");
+        iframe.id = "slides-ng-hamburger-probe";
+        iframe.style.cssText =
+          "position:fixed;bottom:0;right:0;width:800px;height:600px;" +
+          "border:1px solid #888;z-index:9999;";
+        iframe.srcdoc = html;
+        document.body.appendChild(iframe);
+      }, exportContent);
+      const probe = await $("#slides-ng-hamburger-probe");
+      await probe.waitForExist({ timeout: 8000 });
+      // Wait for reveal to finish init.
+      for (let i = 0; i < 40; i++) {
+        await browser.switchFrame(probe);
+        let ready = false;
+        try {
+          ready = await browser.execute(() => {
+            const w = window as unknown as { Reveal?: { isReady?: () => boolean } };
+            return !!w.Reveal && typeof w.Reveal.isReady === "function" && w.Reveal.isReady();
+          });
+        } finally {
+          await browser.switchFrame(null);
+        }
+        if (ready) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+
+    it("pressing M opens the hamburger menu", async () => {
+      await getOrInjectProbe();
+      const probe = await $("#slides-ng-hamburger-probe");
+      await browser.switchFrame(probe);
+      let opened = false;
+      try {
+        // Reset state — close any previously-open menu.
+        await browser.execute(() => {
+          const menu = document.querySelector(".slide-menu");
+          if (menu && menu.classList.contains("active")) {
+            const btn = document.querySelector(
+              ".slide-menu-button"
+            ) as HTMLElement | null;
+            btn?.click();
+          }
+        });
+        await new Promise((r) => setTimeout(r, 300));
+        // Dispatch M keydown on the iframe document.
+        await browser.execute(() => {
+          const ev = new KeyboardEvent("keydown", {
+            key: "m",
+            code: "KeyM",
+            keyCode: 77,
+            which: 77,
+            bubbles: true,
+            cancelable: true,
+          });
+          document.dispatchEvent(ev);
+        });
+        for (let i = 0; i < 20; i++) {
+          opened = await browser.execute(() => {
+            const menu = document.querySelector(".slide-menu");
+            if (!menu) return false;
+            return (
+              menu.classList.contains("active") ||
+              menu.classList.contains("is-open") ||
+              menu.classList.contains("open")
+            );
+          });
+          if (opened) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      } finally {
+        await browser.switchFrame(null);
+      }
+      if (!opened) {
+        throw new Error("M key did not open the reveal menu inside the export.");
+      }
+    });
+
+    it("right-arrow navigates to the next slide", async () => {
+      await getOrInjectProbe();
+      const probe = await $("#slides-ng-hamburger-probe");
+      await browser.switchFrame(probe);
+      let advanced = false;
+      try {
+        // The previous test (M-key) may have left the menu open,
+        // which captures keyboard events. Force-close it so arrow
+        // keys reach reveal.
+        await browser.execute(() => {
+          const w = window as unknown as {
+            Reveal?: { getPlugin?: (id: string) => { closeMenu?: () => void } | null };
+          };
+          const menuPlugin = w.Reveal?.getPlugin?.("menu");
+          if (menuPlugin && typeof menuPlugin.closeMenu === "function") {
+            menuPlugin.closeMenu();
+          }
+        });
+        await new Promise((r) => setTimeout(r, 200));
+        const startIdx = await browser.execute(() => {
+          const w = window as unknown as { Reveal?: { getIndices?: () => { h: number } } };
+          return w.Reveal?.getIndices?.().h ?? 0;
+        });
+        // First go back to slide 0 for a deterministic start.
+        await browser.execute(() => {
+          const w = window as unknown as { Reveal?: { slide?: (h: number) => void } };
+          w.Reveal?.slide?.(0);
+        });
+        await new Promise((r) => setTimeout(r, 200));
+        // Press arrow-right.
+        await browser.execute(() => {
+          const ev = new KeyboardEvent("keydown", {
+            key: "ArrowRight",
+            code: "ArrowRight",
+            keyCode: 39,
+            which: 39,
+            bubbles: true,
+            cancelable: true,
+          });
+          document.dispatchEvent(ev);
+        });
+        for (let i = 0; i < 20; i++) {
+          const idx = await browser.execute(() => {
+            const w = window as unknown as { Reveal?: { getIndices?: () => { h: number } } };
+            return w.Reveal?.getIndices?.().h ?? 0;
+          });
+          if ((idx as number) > 0) {
+            advanced = true;
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        // eslint-disable-next-line no-console
+        console.log(
+          `[reveal-keyboard] startIdx=${startIdx}, advanced=${advanced}`
+        );
+      } finally {
+        await browser.switchFrame(null);
+      }
+      if (!advanced) {
+        throw new Error("ArrowRight key did not advance the slide.");
+      }
+    });
+
+    it("captures a screenshot of the exported HTML with the probe iframe visible", async () => {
+      await getOrInjectProbe();
+      await browser.saveScreenshot(
+        `${SCREENSHOT_DIR}/exported-html-probe.png`
+      );
+      // Clean up the probe so it doesn't bleed into other specs.
+      await browser.execute(() => {
+        const el = document.getElementById("slides-ng-hamburger-probe");
+        if (el) el.remove();
+      });
+    });
+  });
 });

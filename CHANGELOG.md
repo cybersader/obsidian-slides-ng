@@ -6,6 +6,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.32] — 2026-05-14
+
+### Fixed
+
+- **Hamburger menu actually renders in the exported HTML.** The
+  reveal-menu plugin's `init()` blocks on loading
+  `menu.css` via the network and only builds the menu DOM
+  inside the stylesheet load callback. We bundle the CSS
+  inline (via `revealMenuCss`), so the network load 404s
+  (path resolves to `app://obsidian.md/menu.css` which doesn't
+  exist), the callback never fires, and the hamburger never
+  appears. Fix: after `Reveal.initialize()` resolves, call
+  `Reveal.getPlugin('menu').initialiseMenu()` directly —
+  bypasses the network wait, the menu DOM gets built, the
+  `M` keyboard shortcut works, the corner button is
+  clickable. Affects the standalone export (`Open in
+  browser`, `Export PDF`) — not the embedded preview, which
+  has `showMenuEmbedded: false` by default.
+
+### Added
+
+- **Experimental: modular grid speaker view (stub).** New
+  setting at Settings → Slides NG, default `false`. Toggling
+  it on currently shows a "not implemented yet" Notice and
+  reverts to `false`. The actual grid-layout engine isn't
+  shipped (the toggle adds 0 KB; the engine, when implemented,
+  is anticipated at ~15–25 KB). Documented in
+  `experimentalGridSpeakerView`'s comment in `settings.ts`
+  including the bundle-size policy (lazy-load if it grows
+  beyond ~50 KB).
+
+### Verified
+
+- **Hamburger menu click-through (E2E).** New WDIO test
+  injects the exported HTML into a hidden iframe via srcdoc,
+  waits for reveal + the menu plugin to boot (now via the
+  `initialiseMenu()` call), clicks `.slide-menu-button`, and
+  asserts the drawer opens (one of `body.has-menu-open`,
+  `.slide-menu.active|.is-open|.open`, or
+  `[data-open="true"]`).
+- **Reveal keyboard shortcuts (E2E).** Dispatches `M` keydown
+  → asserts menu opens. Dispatches `ArrowRight` → asserts
+  Reveal's slide index increases. (Force-closes the menu
+  between the two tests so the second one's keyboard input
+  reaches reveal instead of the open drawer.)
+- **PDF export URL pipeline (E2E).** Monkey-patches
+  `electron.shell.openExternal` to capture the URL emitted by
+  the export-for-pdf command. Asserts the URL is a
+  well-formed `file://...?print-pdf&showNotes=true` and
+  parses cleanly via the `URL` constructor. Proves the full
+  pipeline (modal → exportAndOpenForPdf → pathToFileUrl →
+  shell.openExternal) carries options end-to-end.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — after `Reveal.initialize`,
+  resolves the returned Promise (or falls back to a
+  `Reveal.on('ready', …)` listener / `setTimeout`) and
+  invokes `Reveal.getPlugin('menu').initialiseMenu()` when
+  the menu hasn't been initialised yet. Idempotent: also
+  checks `isMenuInitialised()` before calling.
+- `src/settings.ts` — new
+  `experimentalGridSpeakerView: boolean` field, default
+  `false`.
+- `src/SlidesNGSettingTab.ts` — toggle with revert-to-false
+  behaviour while the engine is unimplemented.
+- `test/e2e/open-in-browser.spec.ts` — two new describe
+  blocks (`hamburger menu in the exported HTML` and
+  `reveal keyboard shortcuts in the exported HTML`) plus a
+  shared `getOrInjectProbe()` helper that reuses the
+  injected iframe across tests.
+- `test/e2e/pdf-print.spec.ts` — new describe block (`PDF
+  export URL pipeline (E2E)`) with the
+  `electron.shell.openExternal` spy.
+
 ## [0.11.31] — 2026-05-14
 
 ### Fixed
