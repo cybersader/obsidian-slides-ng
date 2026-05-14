@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, setIcon } from "obsidian";
+import { App, PluginSettingTab, Setting, setIcon, Notice } from "obsidian";
 import type SlidesNGPlugin from "./main";
 import {
   REVEAL_TRANSITIONS,
@@ -564,10 +564,40 @@ body markdown`,
     ];
 
     for (const section of sections) {
-      body.createEl("h4", { text: section.title });
+      const heading = body.createDiv({
+        cls: "slides-ng-frontmatter-ref-heading",
+      });
+      heading.createEl("h4", { text: section.title });
+      // v0.11.29: per-block copy button — easier to share with an
+      // agent. Tooltip + Notice on success. Falls back to no-op if
+      // the clipboard API throws (e.g. unsupported environment).
+      const copyBtn = heading.createEl("button", {
+        cls: "slides-ng-frontmatter-ref-copy",
+        attr: { type: "button", "aria-label": "Copy this block" },
+      });
+      setIcon(copyBtn, "copy");
+      copyBtn.addEventListener("click", () => {
+        void this.copyToClipboard(section.code, section.title);
+      });
       const pre = body.createEl("pre", { cls: "slides-ng-frontmatter-ref-code" });
       pre.createEl("code", { text: section.code });
     }
+
+    // v0.11.29: 'Copy all' affordance. Concatenates every section
+    // with its title so the resulting paste retains structure.
+    const footer = body.createDiv({ cls: "slides-ng-frontmatter-ref-actions" });
+    const copyAllBtn = footer.createEl("button", {
+      cls: "slides-ng-frontmatter-ref-copy-all",
+      attr: { type: "button" },
+    });
+    setIcon(copyAllBtn, "copy");
+    copyAllBtn.createSpan({ text: "Copy all sections" });
+    copyAllBtn.addEventListener("click", () => {
+      const combined = sections
+        .map((s) => `# ${s.title}\n${s.code}`)
+        .join("\n\n");
+      void this.copyToClipboard(combined, "All sections");
+    });
 
     body.createEl("p", {
       cls: "slides-ng-frontmatter-ref-footer",
@@ -577,6 +607,32 @@ body markdown`,
         "rendering (e.g. unsupported numeric values), check the iframe " +
         "console (Ctrl+Shift+I).",
     });
+  }
+
+  /**
+   * v0.11.29: clipboard helper used by the frontmatter ref-card
+   * copy buttons. Falls back to a textarea-select trick if
+   * `navigator.clipboard` isn't available (rare in modern Obsidian
+   * but kept as a safety net). Shows a Notice on success / failure.
+   */
+  private async copyToClipboard(text: string, label: string): Promise<void> {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.top = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      new Notice(`Copied: ${label}`);
+    } catch (err) {
+      new Notice(`Copy failed: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
   private renderSceneEditor(containerEl: HTMLElement): void {

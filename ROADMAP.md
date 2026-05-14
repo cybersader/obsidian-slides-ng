@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.11.29** — frontmatter ref card gets per-section copy buttons + a "Copy all sections" button for one-click sharing with an AI agent. Plus icon-tool button border rules use `!important` to defeat opinionated theme overrides (Minimal, Things, etc.) — vanilla Obsidian was already clean per WDIO screenshots.
 - **0.11.28** — picker header buttons no longer touch the iframe container below. Added `margin-bottom: 0.4rem` on the header (the picker-wrap uses block flow, not flex with gap, so without this the borderless icon buttons sat flush against the picker container's top edge).
 - **0.11.27** — panel-header icons are now truly borderless at rest (was `border-color: transparent`, still allocated 1 px width). Hover gives a soft rounded-square (6 px radius) background — the only visual affordance. Notes Edit becomes icon-only (pencil + tooltip) to match the picker chrome.
 - **0.11.26** — panel-header buttons (picker orientation + magnifier + notes Edit + drag/hide group) redesigned as a minimal icon toolbar: 24-px transparent icon-only buttons with subtle hover background, plus a compact-pill modifier for icon+label buttons that keeps the label visible at every pane width. Reads as secondary chrome instead of competing with the section title.

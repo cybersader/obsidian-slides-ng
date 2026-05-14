@@ -760,25 +760,23 @@
   width: 24px;
   height: 24px;
   padding: 0;
-  background: transparent;
-  /* v0.11.27: `border: none` (not transparent) removes the 1 px
-   * border allocation entirely — even a transparent border leaves
-   * a faint visual outline because the parent container's bg
-   * shows through it. */
-  border: none;
+  /* v0.11.29: !important added to defeat theme overrides
+   * (Minimal etc. apply borders to all buttons via high-specificity
+   * theme selectors). Without !important the user reported a faint
+   * border still appearing in the b&g vault running Minimal. */
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   border-radius: 6px;
   color: var(--text-muted);
   gap: 0;
 }
 .slides-ng-speaker-btn.slides-ng-icon-tool:hover {
-  /* Soft rounded-square hover affordance — same shape as the icon
-   * but with a subtle accent fill. */
-  background: var(--background-modifier-hover);
-  border: none;
+  background: var(--background-modifier-hover) !important;
   color: var(--text-normal);
 }
 .slides-ng-speaker-btn.slides-ng-icon-tool:active {
-  background: var(--background-modifier-active-hover, var(--background-modifier-hover));
+  background: var(--background-modifier-active-hover, var(--background-modifier-hover)) !important;
 }
 .slides-ng-speaker-btn.slides-ng-icon-tool .svg-icon {
   width: 14px;
@@ -927,6 +925,71 @@
   color: var(--text-normal);
   border-bottom: 1px solid var(--background-modifier-border);
   padding-bottom: 0.25rem;
+}
+/* v0.11.29: per-section heading bar — H4 on the left, copy button
+ * on the right. Lets the user grab any frontmatter block with one
+ * click (handy for sharing with an LLM agent / collaborator). */
+.slides-ng-frontmatter-ref-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+.slides-ng-frontmatter-ref-heading h4 {
+  flex: 1 1 auto;
+  margin: 1rem 0 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.slides-ng-frontmatter-ref-copy {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 80ms ease, color 80ms ease;
+}
+.slides-ng-frontmatter-ref-copy:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.slides-ng-frontmatter-ref-copy .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.slides-ng-frontmatter-ref-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.8rem;
+}
+.slides-ng-frontmatter-ref-copy-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: background 80ms ease, border-color 80ms ease;
+}
+.slides-ng-frontmatter-ref-copy-all:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border-hover, var(--background-modifier-border));
+}
+.slides-ng-frontmatter-ref-copy-all .svg-icon {
+  width: 14px;
+  height: 14px;
 }
 .slides-ng-frontmatter-ref-code {
   background: var(--background-primary);

@@ -6,6 +6,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.29] — 2026-05-14
+
+### Added
+
+- **Copy buttons in the frontmatter reference card.** Each
+  section heading in Settings → Slides NG → Frontmatter
+  reference now has a small copy icon to its right. Click to
+  copy that block's content to the clipboard (handy for
+  sharing with an AI agent / collaborator). A separate
+  "Copy all sections" button at the bottom of the card
+  concatenates every block (prefixed with its section
+  heading) into one paste.
+
+### Changed
+
+- **Icon-tool buttons now use `!important` to defeat theme
+  overrides.** Some Obsidian themes (Minimal, Things etc.)
+  apply borders to all buttons via high-specificity theme
+  selectors, which leaked through v0.11.27's `border: none`.
+  Default-Obsidian builds were already clean (verified in
+  WDIO screenshots); this is purely defensive for vault
+  users running an opinionated theme.
+
+### Technical
+
+- `src/styles.css` — `.slides-ng-icon-tool` rest, hover, and
+  active states now use `!important` on `background`,
+  `border`, and `box-shadow`. Also new rules for the
+  frontmatter-ref-copy / -copy-all buttons.
+- `src/SlidesNGSettingTab.ts` — new `copyToClipboard(text,
+  label)` helper with a textarea-select fallback for
+  environments where `navigator.clipboard` isn't available.
+  The frontmatter card loop now wraps each section heading
+  with a copy button; a copy-all button at the bottom emits
+  the full reference content prefixed by section titles.
+
 ## [0.11.28] — 2026-05-14
 
 ### Changed
