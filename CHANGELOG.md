@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.28] — 2026-05-14
+
+### Changed
+
+- **Picker header now has breathing room above the iframe
+  container.** The new borderless icon-tool buttons read as
+  flush against the picker container's top edge because the
+  picker-wrap doesn't have a flex gap (block flow). Added
+  `margin-bottom: 0.4rem` on `.slides-ng-speaker-picker-header`.
+
 ## [0.11.27] — 2026-05-14
 
 ### Changed

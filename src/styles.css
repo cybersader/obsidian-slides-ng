@@ -670,6 +670,11 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  /* v0.11.28: breathing room between the header and the picker
+   * container below. Without this margin the icon-tool buttons
+   * sit flush against the iframe container's top edge and look
+   * like they're touching it. */
+  margin-bottom: 0.4rem;
 }
 .slides-ng-speaker-picker {
   /* v0.10.3: single scrollable column of slide rows. Capped height
