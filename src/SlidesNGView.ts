@@ -52,6 +52,12 @@ export class SlidesNGView extends ItemView {
   private debug?: DebugLog;
   /** Parent-side ResizeObserver on the iframe element; posts `relayout` to the bridge. */
   private iframeResizeObserver?: ResizeObserver;
+  /**
+   * True iff the last `refresh()` set srcdoc while the iframe was still
+   * at 0x0 (wait-for-size timed out). Cleared when a subsequent resize
+   * re-triggers refresh. v0.10.6+.
+   */
+  private renderedAtZeroSize = false;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -191,6 +197,20 @@ export class SlidesNGView extends ItemView {
       const ro = new ResizeObserver(() => {
         if (!this.iframeEl) return;
         if (this.iframeEl.clientWidth === 0 || this.iframeEl.clientHeight === 0) return;
+        // v0.10.6: if the last refresh happened while the iframe was
+        // still at 0x0 (wait-for-size timeout fallback), reveal's
+        // slide-stage was baked at 0x0 and can't fully recover via
+        // layout(). Re-trigger refresh() so Reveal initialises fresh
+        // into the now-real viewport.
+        if (this.renderedAtZeroSize) {
+          this.renderedAtZeroSize = false;
+          this.debug?.log("view/resize/re-render-at-real-size", {
+            clientW: this.iframeEl.clientWidth,
+            clientH: this.iframeEl.clientHeight,
+          });
+          void this.refresh();
+          return;
+        }
         postRelayoutBurst();
         this.debug?.log("view/resize/post-relayout", {
           clientW: this.iframeEl.clientWidth,
@@ -431,16 +451,26 @@ export class SlidesNGView extends ItemView {
       // those into the slide-stage transform — if it runs at 0x0,
       // the slides are sized to nothing and the pane stays black,
       // no amount of subsequent Reveal.layout() calls can fully
-      // recover. Waiting until the iframe is real-sized solves the
-      // problem at its source.
+      // recover.
+      //
+      // v0.10.6: if waitForIframeSize times out at 0x0 (rare but
+      // observed via command-palette open: iframe stayed at 0x0 for
+      // ~1.5s, then resized AFTER timeout fired), we set srcdoc
+      // anyway as a fallback BUT mark the view so the parent-side
+      // ResizeObserver knows to re-trigger refresh() when the iframe
+      // finally gets real dimensions.
       await this.waitForIframeSize();
       if (!this.iframeEl) return; // view closed during wait
+      const stillZero =
+        this.iframeEl.clientWidth === 0 || this.iframeEl.clientHeight === 0;
+      this.renderedAtZeroSize = stillZero;
       this.iframeEl.srcdoc = html;
       this.debug?.log("view/refresh/rendered", {
         filePath: this.filePath,
         htmlLength: html.length,
         iframeClientW: this.iframeEl.clientWidth,
         iframeClientH: this.iframeEl.clientHeight,
+        renderedAtZeroSize: stillZero,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -463,7 +493,7 @@ export class SlidesNGView extends ItemView {
    * and the v0.10.4 parent-side ResizeObserver will fire the
    * relayout burst as before.
    */
-  private async waitForIframeSize(timeoutMs = 1500): Promise<void> {
+  private async waitForIframeSize(timeoutMs = 3000): Promise<void> {
     const iframe = this.iframeEl;
     if (!iframe) return;
     if (iframe.clientWidth > 0 && iframe.clientHeight > 0) return;

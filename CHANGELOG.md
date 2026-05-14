@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.6] — 2026-05-14
+
+### Fixed
+
+- **Intermittent ribbon black-pane bug, take 5** — confirmed by
+  user logs: the v0.10.5 `waitForIframeSize` could time out at
+  0×0 in ~10% of opens (notably the command-palette path),
+  setting srcdoc into a still-zero-sized iframe and falling
+  through to the broken state. The iframe got real dimensions
+  ~1.2 seconds AFTER the timeout fired, by which point Reveal
+  had already baked 0×0 into its slide-stage transform.
+  - Bumped `waitForIframeSize` default timeout from 1.5 s → 3 s
+    so a wider window of slow opens hit the fast path.
+  - When the wait DOES time out at 0×0, the view now marks
+    itself `renderedAtZeroSize = true`. The parent-side
+    `ResizeObserver` (added in v0.10.4) checks this flag on
+    every non-zero resize; if set, it re-triggers `refresh()`
+    instead of just posting `relayout`. Reveal then initialises
+    fresh into the now-real viewport.
+
+### Technical
+
+- `src/SlidesNGView.ts` — `renderedAtZeroSize` field;
+  `refresh()` sets it when wait-for-size times out; iframe
+  ResizeObserver consumes it to re-trigger `refresh()` on first
+  non-zero resize. New log tag `view/resize/re-render-at-real-size`
+  makes the recovery visible in the debug log.
+
 ## [0.10.5] — 2026-05-14
 
 ### Fixed

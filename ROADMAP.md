@@ -17,6 +17,8 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.10.6** — patch: intermittent black-pane fix. `waitForIframeSize` timeout 1.5s → 3s; when it times out at 0×0, view marks itself `renderedAtZeroSize` and the parent-side ResizeObserver re-triggers `refresh()` on the first non-zero resize so Reveal initialises fresh into the real viewport.
+- **0.10.5** — defer srcdoc until iframe has non-zero dimensions (waitForIframeSize helper).
 - **0.10.4** — patch: parent-side ResizeObserver on the iframe element posts `relayout` burst to the iframe bridge (now+60ms+180ms+400ms+900ms); iframe bridge handles `relayout` by calling `Reveal.layout()`+`sync()`; belt-and-suspenders `Reveal.layout()` inside the iframe's `Reveal.on('ready')` hook. Together these defeat the ribbon-open-blank-pane bug that v0.10.2's in-iframe observer couldn't catch in Electron.
 - **0.10.3** — picker rebuilt as single scrollable column (compact/list toggle gone, "Show all N" footer gone); inline countdown-target input on the timer panel; `nextLine` ("Next: …" text) panel retired; mermaid blocks in two example decks replaced with ASCII (mermaid bundling added to idea jar).
 - **0.10.2** — patch: iframe ResizeObserver-driven relayout guard fixes "black pane on initial open, wrong size after tab switch"; Menu toolbar button uses `Reveal.getPlugin('menu').toggle()` (was clicking the menu plugin's button programmatically and silently no-op'ing); Grid icon switched from `grid-3x3` to `layout-grid` (former wasn't bundled); visual-next-slide goto retries to defeat the bridge-not-yet-listening race; file-based debug logger added.
