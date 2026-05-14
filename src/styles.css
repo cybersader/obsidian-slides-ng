@@ -737,6 +737,62 @@
   font-size: 0.92em;
 }
 
+/* v0.11.10: Frontmatter-reference collapsible card in settings.
+ * Sits at the bottom of the settings tab; collapsed by default
+ * (uses native <details>/<summary>). Code blocks are styled with
+ * the standard Obsidian monospace + a subtle background so
+ * authors can quickly scan + copy keys without leaving Obsidian. */
+.slides-ng-frontmatter-ref {
+  margin-top: 1.5rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+}
+.slides-ng-frontmatter-ref > summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+  padding: 0.2rem 0;
+}
+.slides-ng-frontmatter-ref > summary:hover {
+  color: var(--text-accent);
+}
+.slides-ng-frontmatter-ref[open] > summary {
+  margin-bottom: 0.75rem;
+}
+.slides-ng-frontmatter-ref-body p {
+  color: var(--text-muted);
+  font-size: 0.92em;
+  line-height: 1.45;
+  margin: 0.5rem 0;
+}
+.slides-ng-frontmatter-ref-body h4 {
+  margin: 1rem 0 0.3rem;
+  font-size: 0.95em;
+  color: var(--text-normal);
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 0.25rem;
+}
+.slides-ng-frontmatter-ref-code {
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 0.5rem 0.7rem;
+  margin: 0.25rem 0 0.6rem;
+  overflow-x: auto;
+  font-family: var(--font-monospace);
+  font-size: 0.82em;
+  line-height: 1.5;
+  white-space: pre;
+}
+.slides-ng-frontmatter-ref-footer {
+  margin-top: 1rem !important;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--background-modifier-border);
+  font-style: italic;
+}
+
 /* ===== Export-for-PDF options modal ===== */
 .slides-ng-export-pdf-modal h2 {
   margin-top: 0;

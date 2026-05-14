@@ -412,6 +412,129 @@ export class SlidesNGSettingTab extends PluginSettingTab {
           }
         );
       });
+
+    // ---------- Frontmatter reference ----------
+    // Collapsible (<details>) reference card listing every
+    // per-deck frontmatter knob. Lives at the bottom because it's
+    // long; collapsed by default so it doesn't dominate the page.
+    this.renderFrontmatterReference(containerEl);
+  }
+
+  /**
+   * v0.11.10: render a `<details>`-collapsed reference of every
+   * frontmatter key the plugin reads, with a brief description
+   * and an example value. Helps deck authors discover the
+   * "escape hatches" without leaving Obsidian.
+   */
+  private renderFrontmatterReference(containerEl: HTMLElement): void {
+    const details = containerEl.createEl("details", {
+      cls: "slides-ng-frontmatter-ref",
+    });
+    details.createEl("summary", {
+      text: "📋 Frontmatter reference (deck-level + per-slide keys)",
+    });
+    const body = details.createDiv({ cls: "slides-ng-frontmatter-ref-body" });
+    body.createEl("p", {
+      text:
+        "All deck-level keys go in the top-of-file YAML block. Most are " +
+        "optional — absence means the global setting applies. The " +
+        "`slides-ng-` prefix is recommended (avoids colliding with other " +
+        "vault plugins); the legacy unprefixed forms still work.",
+    });
+
+    const sections: Array<{ title: string; code: string }> = [
+      {
+        title: "Required",
+        code:
+`slides-ng: true     # opt-in flag — Obsidian recognises this as a deck`,
+      },
+      {
+        title: "Appearance",
+        code:
+`slides-ng-theme: black                 # bundled theme names: black, white,
+                                       #   league, beige, sky, night, serif,
+                                       #   simple, solarized, blood, moon,
+                                       #   dracula, plus 3 "*-contrast" variants
+slides-ng-transition: slide            # none, fade, slide, convex, concave, zoom
+slides-ng-transition-speed: default    # default, fast, slow
+slides-ng-slide-number: false          # show slide-number badge
+slides-ng-custom-css: |                # multi-line CSS injection
+  .reveal h1 { color: #f9c74f }
+  .reveal section { padding-top: 1em }`,
+      },
+      {
+        title: "Authoring shortcuts",
+        code:
+`slides-ng-auto-h1-breaks: true         # treat every "# heading" as a new slide
+                                       #   (no "---" separators needed)`,
+      },
+      {
+        title: "Embedded preview",
+        code:
+`slides-ng-show-controls: true          # reveal's corner chevron arrows
+slides-ng-show-menu: false             # disable the reveal-menu side panel
+                                       #   (saves ~45KB from the iframe srcdoc)`,
+      },
+      {
+        title: "Image-layout slides",
+        code:
+`slides-ng-image-layout-split: 60/40    # column ratio: 50/50, 60/40, 40/60`,
+      },
+      {
+        title: "Code blocks",
+        code:
+`slides-ng-line-step-dim: 0.5           # 0–1 dim opacity for line-step mode
+slides-ng-code-block-max-height: 40vh  # CSS length, or "none" to disable cap
+slides-ng-code-block-overflow-scroll: false  # clip instead of scrolling`,
+      },
+      {
+        title: "Animations",
+        code:
+`slides-ng-magic-move-duration: 800     # Magic Move animation duration in ms`,
+      },
+      {
+        title: "Power-user passthrough",
+        code:
+`slides-ng-reveal-config:               # any object — passed to Reveal.initialize()
+  autoSlide: 5000                      # ms between auto-advance
+  loop: true                           # loop at end
+  width: 1280                          # override slide stage width
+  height: 720                          # ...and height
+  disableLayout: false`,
+      },
+      {
+        title: "Per-slide frontmatter (between two `---` separators)",
+        code:
+`---
+layout: image-left          # default, center, image-left, image-right,
+                            #   cover, statement, quote
+image: assets/photo.png     # vault-relative path; required for image-* layouts
+---
+# Slide title
+body markdown`,
+      },
+      {
+        title: "Per-slide HTML annotations",
+        code:
+`<!-- slide: notes="Spoken-only commentary the audience won't see" -->
+<!-- element: class="fragment" -->     # reveal-style v-click reveal markers`,
+      },
+    ];
+
+    for (const section of sections) {
+      body.createEl("h4", { text: section.title });
+      const pre = body.createEl("pre", { cls: "slides-ng-frontmatter-ref-code" });
+      pre.createEl("code", { text: section.code });
+    }
+
+    body.createEl("p", {
+      cls: "slides-ng-frontmatter-ref-footer",
+      text:
+        "Tip: a missing or invalid key falls through to the global setting " +
+        "above — nothing breaks. For Reveal-config keys that DO break " +
+        "rendering (e.g. unsupported numeric values), check the iframe " +
+        "console (Ctrl+Shift+I).",
+    });
   }
 
   private renderSceneEditor(containerEl: HTMLElement): void {

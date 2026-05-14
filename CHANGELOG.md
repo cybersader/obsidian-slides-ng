@@ -6,6 +6,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.10] — 2026-05-14
+
+### Added
+
+- **Frontmatter reference card in Settings → Slides NG.**
+  Collapsible `<details>` panel at the bottom of the settings
+  tab listing every per-deck frontmatter key with a brief
+  description and an example. Sections: Required, Appearance,
+  Authoring shortcuts, Embedded preview, Image-layout slides,
+  Code blocks, Animations, Power-user passthrough, Per-slide
+  frontmatter, Per-slide HTML annotations. Collapsed by
+  default so it doesn't dominate the page; click to expand.
+  Closes the gap users had: "what frontmatter keys can I
+  even set?"
+
+### Technical
+
+- `src/SlidesNGSettingTab.ts` — `renderFrontmatterReference()`
+  method renders the `<details>` block.
+- `src/styles.css` — `.slides-ng-frontmatter-ref{,-body,-code,
+  -footer}` styling using Obsidian theme variables.
+- `src/render/renderDeck.ts` — commented note explaining why
+  `slides-ng-code-theme` is NOT a frontmatter override (Shiki
+  highlighting runs before headmatter is merged; only the
+  global setting applies).
+
 ## [0.11.9] — 2026-05-14
 
 ### Added

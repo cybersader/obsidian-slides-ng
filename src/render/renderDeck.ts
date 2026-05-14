@@ -424,6 +424,12 @@ function headmatterToOptions(
   // Move timing, etc., without touching global settings. All
   // optional — absence means "fall through to plugin defaults."
 
+  // (Note: `slides-ng-code-theme` was considered but Shiki
+  // highlighting runs during markdown → HTML conversion BEFORE
+  // headmatter is merged into the render options, so a per-deck
+  // override wouldn't actually take effect. Use the global
+  // setting instead.)
+
   // `slides-ng-show-controls: true` — show reveal's stock corner
   // chevron arrows in the embedded iframe.
   const showControls = readBoolFrontmatter(

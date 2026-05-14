@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.11.10** — collapsible frontmatter-reference card at the bottom of Settings → Slides NG. Lists every deck-level + per-slide key with a brief description and example. Closes the discoverability gap: previously the only docs were in PROJECT_BRIEF / CHANGELOG.
 - **0.11.9** — per-deck frontmatter escape hatches. New `slides-ng-show-controls`, `slides-ng-show-menu`, `slides-ng-image-layout-split`, `slides-ng-line-step-dim`, `slides-ng-code-block-max-height`, `slides-ng-code-block-overflow-scroll`, `slides-ng-magic-move-duration`. Plus a power-user raw `slides-ng-reveal-config:` object that passes through to `Reveal.initialize()` for any reveal config the author wants (`autoSlide`, `loop`, `width`, `height`, etc.).
 - **0.11.8** — removed the Menu toolbar button. After multiple rounds of fixes (v0.10.2 / v0.11.3) it remained unreliable across users — Grid covers slide navigation with real thumbnails, and the reveal-menu plugin is still loaded so its `M` keyboard shortcut still works inside the preview iframe.
 - **0.11.7** — preview toolbar Prev/Next nav buttons + cursor-follow now respects auto-h1-breaks. slideIndexFromCursor was only counting `---` separators in the raw markdown, so cursor-follow stayed on slide 0 for auto-split decks. Now accepts an `autoH1Breaks` option (with frontmatter override) and bumps the slide index on each `#` after the first.
