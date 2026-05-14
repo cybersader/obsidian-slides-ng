@@ -843,8 +843,13 @@ ${sectionsHtml}
                 'justify-content:start;gap:0.85rem;';
               overlay.appendChild(grid);
               var currentIdx = (Reveal.getIndices() || {}).h || 0;
-              var SLIDE_W = 960;
-              var SLIDE_H = 700;
+              // v0.10.1: read the actual slide dimensions from Reveal
+              // instead of hardcoding 960 by 700. Decks with custom
+              // width or height settings (or the v0.9.0 PDF aspect
+              // override) used to produce mis-scaled thumbnails.
+              var revealConfig = (typeof Reveal.getConfig === 'function' ? Reveal.getConfig() : {}) || {};
+              var SLIDE_W = typeof revealConfig.width === 'number' && revealConfig.width > 0 ? revealConfig.width : 960;
+              var SLIDE_H = typeof revealConfig.height === 'number' && revealConfig.height > 0 ? revealConfig.height : 700;
               var TILE_W = 220;
               var THUMB_SCALE = TILE_W / SLIDE_W;
               meta.forEach(function (s) {

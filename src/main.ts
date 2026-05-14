@@ -43,15 +43,29 @@ export default class SlidesNGPlugin extends Plugin {
     );
 
     // Track the user's most recently focused markdown file so the ribbon
-    // button can still recover it after focus-steal. Seed with the
-    // currently active view (if any) so the tracker works even before
-    // the first leaf-change event fires after enable.
-    const initialMd = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (initialMd?.file) this.lastMarkdownFile = initialMd.file;
+    // button can still recover it after focus-steal. v0.10.1: seed both
+    // immediately AND on layout-ready (some workspaces aren't fully
+    // loaded when onload runs — getActiveViewOfType returns null in
+    // that window), and listen on `file-open` as well as
+    // `active-leaf-change` so it works for both tabs-with-files and
+    // tab-switches.
+    const seed = (): void => {
+      const md = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (md?.file) this.lastMarkdownFile = md.file;
+    };
+    seed();
+    this.app.workspace.onLayoutReady(seed);
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
         if (leaf?.view instanceof MarkdownView && leaf.view.file) {
           this.lastMarkdownFile = leaf.view.file;
+        }
+      })
+    );
+    this.registerEvent(
+      this.app.workspace.on("file-open", (file) => {
+        if (file && file.extension === "md") {
+          this.lastMarkdownFile = file;
         }
       })
     );

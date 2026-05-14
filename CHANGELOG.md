@@ -6,6 +6,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-05-14
+
+### Fixed
+
+- **Ribbon-button "Open preview" no longer shows a blank pane until
+  you click Reload.** Two compounding causes:
+  - `onOpen` awaited `warmHighlighter()` before the first refresh.
+    When Shiki's cold start was slow (first-ever Obsidian session,
+    sluggish disk), the await blocked the final `await refresh()` —
+    the iframe stayed empty. Reload re-rendered because it didn't
+    wait for highlighter. Now warmed in the background; the first
+    render falls back to plain `<pre><code>` and re-renders with
+    colour as soon as the highlighter is ready.
+  - `setState` could be invoked with `filePath: undefined` if the
+    ribbon click stole focus before `active-leaf-change` fired the
+    plugin's `lastMarkdownFile` tracker. `onOpen` now defensively
+    falls back to the plugin's `resolveDeckFile()` accessor when
+    `this.filePath` is still null at iframe creation time.
+  - Plugin also seeds `lastMarkdownFile` from `onLayoutReady` and
+    listens on `file-open` (in addition to `active-leaf-change`)
+    so the tracker is always populated by the time the user can
+    plausibly click the ribbon icon.
+- **Speaker view section titles ("Speaker notes", "Slides", etc.)
+  no longer appear visually centred** when inserted next to the
+  drag handle. v0.10.0's `attachDragHandle` inserted the handle as
+  a third sibling into headers that already used
+  `justify-content: space-between` (notesHeader, pickerHeader);
+  space-between then distributed `[handle, title, button]` at
+  start/center/end — putting the title in the middle. Fix wraps
+  handle + title in a `slides-ng-speaker-panel-header-group`
+  sub-div so the header still sees two children and pushes the
+  trailing button to the right.
+- **Drop-indicator no longer flashes for no-op drop positions** —
+  hovering directly above the panel that comes right after the
+  dragged panel, or directly below the panel that comes right
+  before it (both would leave the order unchanged), now hides the
+  indicator entirely. Tracked via a new `draggingPanelId` field
+  set in `dragstart` (HTML5 DnD forbids reading `dataTransfer`
+  during `dragover`).
+- **Grid tile thumbnails sized correctly for non-default deck
+  dimensions.** The Grid overlay hard-coded `SLIDE_W = 960`,
+  `SLIDE_H = 700`. Decks with custom width / height — or any deck
+  exported through the v0.9.0 PDF modal with an aspect override —
+  produced mis-scaled clones. Now reads `Reveal.getConfig()` at
+  toggle time and falls back to 960×700 only when reveal hasn't
+  reported dimensions yet.
+
+### Technical
+
+- `src/main.ts` — `seed()` + `onLayoutReady` + `file-open` event.
+- `src/SlidesNGView.ts` — defensive `filePath` fallback in
+  `onOpen`; background `warmHighlighter()` with re-render on
+  resolve.
+- `src/SlidesNGSpeakerView.ts` — `attachDragHandle` wraps
+  handle + title in a sub-div when inserting into an existing
+  `*-header` element; `draggingPanelId` field + signature change
+  on `updateDropIndicator(target, targetId, cursorY)`; no-op
+  drop-position suppression in `updateDropIndicator`.
+- `src/styles.css` — `.slides-ng-speaker-panel-header-group` row
+  layout.
+- `src/render/revealTemplate.ts` — `SLIDE_W` / `SLIDE_H` read
+  from `Reveal.getConfig()` instead of hard-coded.
+
 ## [0.10.0] — 2026-05-14
 
 ### Added

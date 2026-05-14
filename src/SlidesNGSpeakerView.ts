@@ -139,6 +139,8 @@ export class SlidesNGSpeakerView extends ItemView {
   /** True = drop ABOVE the current hover target; false = drop BELOW. */
   private dropAbove = true;
   private dropTargetEl?: HTMLElement;
+  /** Panel id currently being dragged. `null` when no drag is in flight. v0.10.1+. */
+  private draggingPanelId: SpeakerPanelId | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -502,12 +504,18 @@ export class SlidesNGSpeakerView extends ItemView {
       if (!e.dataTransfer) return;
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/x-slides-ng-panel", id);
+      // Track the id locally too — HTML5 DnD forbids reading
+      // dataTransfer.getData() during dragover (only during drop),
+      // and we need to know what's being dragged in dragover to
+      // suppress no-op drop indicators.
+      this.draggingPanelId = id;
       panel.classList.add("dragging");
       this.contentEl.classList.add("slides-ng-speaker-dragging");
     });
     handle.addEventListener("dragend", () => {
       panel.classList.remove("dragging");
       this.contentEl.classList.remove("slides-ng-speaker-dragging");
+      this.draggingPanelId = null;
       this.hideDropIndicator();
     });
     panel.addEventListener("dragover", (e) => {
@@ -516,7 +524,7 @@ export class SlidesNGSpeakerView extends ItemView {
       if (!dt.types.includes("text/x-slides-ng-panel")) return;
       e.preventDefault();
       dt.dropEffect = "move";
-      this.updateDropIndicator(panel, e.clientY);
+      this.updateDropIndicator(panel, id, e.clientY);
     });
     panel.addEventListener("drop", (e) => {
       const dt = e.dataTransfer;
@@ -577,7 +585,20 @@ export class SlidesNGSpeakerView extends ItemView {
     const titleParentIsHeader =
       !!titleParent && /-header\b/.test(titleParent.className);
     if (titleParentIsHeader) {
-      titleParent!.insertBefore(handle, title);
+      // The existing header (notesHeader, pickerHeader) uses
+      // `justify-content: space-between` to push the title to the
+      // left and a trailing action button (Edit / Mode toggle) to
+      // the right. Inserting the handle as a third sibling would
+      // trigger space-between's start/center/end distribution —
+      // the v0.10.0 release shipped this bug, with the title ending
+      // up in the visual centre. Fix: wrap handle+title in a
+      // sub-group so the header still sees two children and
+      // distributes correctly.
+      const group = document.createElement("div");
+      group.className = "slides-ng-speaker-panel-header-group";
+      titleParent!.insertBefore(group, title);
+      group.appendChild(handle);
+      group.appendChild(title);
     } else if (titleParent) {
       // Wrap title in a new header div so the handle + title sit on a
       // row without forcing row-direction on the panel itself.
@@ -612,14 +633,57 @@ export class SlidesNGSpeakerView extends ItemView {
    * hovered panel, depending on which half of the panel the cursor
    * is in. Standard reorder-DnD UX: drop above if hovering top
    * half, below if bottom half.
+   *
+   * v0.10.1: suppress the indicator entirely when the drop would
+   * be a no-op — i.e. dropping the panel back into the slot it
+   * currently occupies. Specifically:
+   *   - hovering the dragged panel itself (always no-op)
+   *   - hovering ABOVE the panel that comes right AFTER the
+   *     dragged one (drop would put it right back where it was)
+   *   - hovering BELOW the panel that comes right BEFORE the
+   *     dragged one (same)
    */
-  private updateDropIndicator(target: HTMLElement, cursorY: number): void {
+  private updateDropIndicator(
+    target: HTMLElement,
+    targetId: SpeakerPanelId,
+    cursorY: number
+  ): void {
     const rect = target.getBoundingClientRect();
     const containerRect = this.contentEl.getBoundingClientRect();
     const middle = rect.top + rect.height / 2;
     const isAbove = cursorY < middle;
     this.dropAbove = isAbove;
     this.dropTargetEl = target;
+
+    // No-op suppression. Compute the current panel order and see
+    // whether this hover position would actually change anything.
+    const draggingId = this.draggingPanelId;
+    if (draggingId) {
+      if (targetId === draggingId) {
+        this.hideDropIndicator();
+        return;
+      }
+      const settings = this.getSettings?.();
+      const order: SpeakerPanelId[] =
+        settings?.speakerPanelOrder && settings.speakerPanelOrder.length > 0
+          ? [...settings.speakerPanelOrder]
+          : [...DEFAULT_SPEAKER_PANEL_ORDER];
+      const draggedAt = order.indexOf(draggingId);
+      const targetAt = order.indexOf(targetId);
+      if (draggedAt !== -1 && targetAt !== -1) {
+        // dragged comes RIGHT BEFORE target + hovering top half = no-op
+        if (isAbove && targetAt === draggedAt + 1) {
+          this.hideDropIndicator();
+          return;
+        }
+        // dragged comes RIGHT AFTER target + hovering bottom half = no-op
+        if (!isAbove && targetAt === draggedAt - 1) {
+          this.hideDropIndicator();
+          return;
+        }
+      }
+    }
+
     const ind = this.ensureDropIndicator();
     ind.style.display = "block";
     ind.style.left = `${rect.left - containerRect.left}px`;

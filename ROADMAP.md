@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.10.1** — patch: ribbon-button auto-render fix (Shiki cold-start blocked the first render; setState/active-leaf race left filePath null); title-centering fix (drag handle inserted into space-between header now wraps in a sub-div); drop-indicator no-op suppression; Grid tile dimensions read from Reveal config instead of hard-coded.
 - **0.10.0** — speaker-view polish bundle: unified Timer panel with elapsed/countdown/lap modes (warning + overrun colours); 2-column auto-fit panel flow at ≥ 900 px container width; visual-next-slide width capped + centred; "Show all N slides" picker footer restyled as text-link; Grid moved from speaker view to preview toolbar; per-scene Lucide icon customisation via settings; drag-handle layout no longer accidentally centres adjacent panel content.
 - **0.9.0** — export-for-PDF options modal: notes on/off, aspect ratio (current/16:9/4:3), theme override, max-pages-per-slide. Aspect/theme flow through RenderDefaults; notes/pages flow through reveal URL params. Modal opens for both the toolbar button and the `export-for-pdf` command.
 - **0.8.4** — drag handles moved inline next to panel section titles (no longer floating on the left edge)

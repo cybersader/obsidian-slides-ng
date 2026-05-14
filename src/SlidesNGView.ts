@@ -177,10 +177,32 @@ export class SlidesNGView extends ItemView {
       this.scheduleCursorFollow();
     });
 
-    // Ensure Shiki is warm before the first render so syntax highlighting
-    // AND magic-move keyed-token computation work on the first frame.
-    // (Subsequent renders are unaffected — the highlighter caches itself.)
-    await warmHighlighter().catch(() => undefined);
+    // v0.10.1: defensive file-resolution. If setState ran with a
+    // null filePath (ribbon click before active-leaf-change fired)
+    // OR didn't fire at all in this lifecycle, fall back to the
+    // plugin's `lastMarkdownFile` tracker. Without this fallback
+    // the user saw a blank pane until they clicked Reload.
+    if (!this.filePath) {
+      const fallback = this.resolveDeckFile();
+      if (fallback) this.filePath = fallback.path;
+    }
+
+    // v0.10.1: warm Shiki in the background instead of blocking the
+    // first render. Awaiting it here was the root of "ribbon opens
+    // preview but deck doesn't show until you click Reload" — if the
+    // highlighter took longer than expected (cold start, slow disk),
+    // the final refresh() below never fired and the user saw a blank
+    // iframe. The highlighter is warmed eagerly in main.ts onload as
+    // well, so by the time the user opens a deck it's usually ready;
+    // if it isn't, the first render falls back to plain <pre><code>
+    // and re-renders with colour on the next file modify or Reload.
+    void warmHighlighter().then(() => {
+      // Once warm, re-render so any code blocks pick up syntax
+      // highlighting. Cheap because renderDeck caches per-fence.
+      if (this.iframeEl && this.filePath) {
+        void this.refresh();
+      }
+    });
     await this.refresh();
   }
 

@@ -363,6 +363,19 @@
   justify-content: flex-start;
   gap: 0.35rem;
 }
+/* v0.10.1: subgroup that wraps handle + title when both are
+ * inserted into an existing space-between header (notesHeader,
+ * pickerHeader). Without this wrapper the header would see 3
+ * children [handle, title, button] and distribute them with the
+ * title in the middle — which was the v0.10.0 centering bug. */
+.slides-ng-speaker-panel-header-group {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  min-width: 0; /* allow ellipsis if title overflows */
+}
 /* Show only when hovering THIS panel specifically. While dragging,
  * ALL handles are visible so the user can see what's draggable. */
 .slides-ng-speaker-panel:hover .slides-ng-speaker-panel-handle,
