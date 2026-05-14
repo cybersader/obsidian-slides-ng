@@ -756,14 +756,24 @@
   height: 24px;
   padding: 0;
   background: transparent;
-  border-color: transparent;
+  /* v0.11.27: `border: none` (not transparent) removes the 1 px
+   * border allocation entirely — even a transparent border leaves
+   * a faint visual outline because the parent container's bg
+   * shows through it. */
+  border: none;
+  border-radius: 6px;
   color: var(--text-muted);
   gap: 0;
 }
 .slides-ng-speaker-btn.slides-ng-icon-tool:hover {
+  /* Soft rounded-square hover affordance — same shape as the icon
+   * but with a subtle accent fill. */
   background: var(--background-modifier-hover);
-  border-color: transparent;
+  border: none;
   color: var(--text-normal);
+}
+.slides-ng-speaker-btn.slides-ng-icon-tool:active {
+  background: var(--background-modifier-active-hover, var(--background-modifier-hover));
 }
 .slides-ng-speaker-btn.slides-ng-icon-tool .svg-icon {
   width: 14px;

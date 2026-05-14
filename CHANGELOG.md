@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.27] — 2026-05-14
+
+### Changed
+
+- **Panel-header icon buttons are now truly borderless at rest.**
+  v0.11.26's `border-color: transparent` still allocated 1 px
+  of border width, which read visually as a faint outline
+  against the panel background. Switched to `border: none`
+  (no border allocation at all). Hover gives a soft
+  rounded-square background (6-px radius) — the only visual
+  affordance, exactly as the user requested.
+- **Notes "Edit" button is now icon-only (pencil).** Matches
+  the visual language of the other panel-header chrome. The
+  "Edit" label was reading as a heavier-weight action than
+  it actually was; the pencil + tooltip carry the same
+  meaning with less header competition.
+
+### Technical
+
+- `src/styles.css` — `.slides-ng-icon-tool` rule uses
+  `border: none` (was `border-color: transparent`) at rest,
+  hover, and active. Explicit 6 px border-radius for the
+  soft hover-square.
+- `src/SlidesNGSpeakerView.ts` — Edit button: dropped the
+  `slides-ng-compact-pill` modifier and the `Edit` label
+  span, switched to `slides-ng-icon-tool` matching the
+  picker chrome.
+
 ## [0.11.26] — 2026-05-14
 
 ### Changed

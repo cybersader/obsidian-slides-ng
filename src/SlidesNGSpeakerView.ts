@@ -479,13 +479,14 @@ export class SlidesNGSpeakerView extends ItemView {
       cls: "slides-ng-speaker-section-title",
       text: "Speaker notes",
     });
+    // v0.11.27: icon-only Edit button (was icon+"Edit" label).
+    // Tooltip carries the verb, matching the picker header pattern
+    // (no labels on icon-only chrome).
     const editBtn = notesHeader.createEl("button", {
-      cls: "slides-ng-speaker-btn slides-ng-compact-pill slides-ng-speaker-notes-edit",
+      cls: "slides-ng-speaker-btn slides-ng-icon-tool slides-ng-speaker-notes-edit",
       attr: { type: "button" },
     });
-    const editIcon = editBtn.createSpan({ cls: "slides-ng-speaker-btn-icon" });
-    setIcon(editIcon, "pencil");
-    editBtn.createSpan({ cls: "slides-ng-speaker-btn-label", text: "Edit" });
+    setIcon(editBtn, "pencil");
     setTooltip(editBtn, "Edit the current slide's speaker notes");
     editBtn.addEventListener("click", () => this.enterNotesEditMode());
     this.notesEl = notesWrap.createDiv({ cls: "slides-ng-speaker-notes" });
