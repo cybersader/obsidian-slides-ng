@@ -125,6 +125,14 @@ export class SlidesNGSpeakerView extends ItemView {
    */
   private pickerCurrentBurstTimers: number[] = [];
   /**
+   * v0.11.24: pending driveVisualNextSlideTo burst timers. Same
+   * flicker class as the picker — rapid navigation left stale goto
+   * posts in flight that landed on the up-next iframe after a newer
+   * navigation already updated it. Tracking + cancelling on each
+   * fresh call eliminates the flip-back.
+   */
+  private visualNextBurstTimers: number[] = [];
+  /**
    * Per-deck override read from `slides-ng-picker-tile-width` in
    * frontmatter; cached so we don't re-peek on every tile re-render.
    * `undefined` = no override, fall back to settings; `0` = explicit
@@ -1393,6 +1401,17 @@ export class SlidesNGSpeakerView extends ItemView {
    */
   private driveVisualNextSlideTo(idx: number): void {
     if (!this.nextSlideIframe?.contentWindow) return;
+    // v0.11.24: cancel any prior burst's pending posts before
+    // scheduling new ones. Without this, a rapid sequence of
+    // navigations queued overlapping bursts; the first burst's later
+    // posts arrived after the second burst's first post had already
+    // updated the up-next iframe to the new slide, briefly flipping
+    // back to the previous one — same flicker class as the picker
+    // current-tile bug (v0.11.21).
+    for (const id of this.visualNextBurstTimers) {
+      window.clearTimeout(id);
+    }
+    this.visualNextBurstTimers = [];
     const safeIdx = Math.max(0, idx);
     const post = (): void => {
       try {
@@ -1407,7 +1426,7 @@ export class SlidesNGSpeakerView extends ItemView {
     // yet-listening case for fresh iframes. Cheap (~5 messages).
     const delays = [50, 150, 350, 700];
     for (const d of delays) {
-      window.setTimeout(post, d);
+      this.visualNextBurstTimers.push(window.setTimeout(post, d));
     }
   }
 

@@ -300,6 +300,144 @@ describe("v0.11.20 picker sizing — every orientation × magnifier combo", func
     }
   }
 
+  // v0.11.24: up-next iframe flicker check. Mirrors the picker
+  // flicker test — installs a MutationObserver inside the up-next
+  // iframe that records every time a slide section gains `.present`
+  // (reveal.js's "currently visible" marker), fires two rapid
+  // navigations, and asserts no ping-pong. Without burst-timer
+  // cancellation in `driveVisualNextSlideTo`, the up-next briefly
+  // flipped back to the previous slide after a fresh navigation
+  // because stale `goto` posts arrived after the new one landed.
+  describe("up-next iframe stability", function () {
+    it("rapid navigations don't cause the up-next to flicker back", async () => {
+      // Make sure the up-next iframe is visible (panel-visibility may
+      // be off by default for some users).
+      await browser.executeObsidian(async ({ app }) => {
+        // @ts-expect-error — plugins is internal
+        const plugin = app.plugins.plugins["slides-ng"];
+        if (!plugin) return;
+        plugin.settings.speakerPanelVisibility = {
+          ...(plugin.settings.speakerPanelVisibility || {}),
+          visualNext: true,
+        };
+        if (typeof plugin.saveSettings === "function") {
+          await plugin.saveSettings();
+        }
+      });
+      await new Promise((r) => setTimeout(r, 800));
+      const upNextIframe = await browser.$(
+        ".slides-ng-speaker-visual-next-frame"
+      );
+      const exists = await upNextIframe.isExisting();
+      if (!exists) {
+        // Bail with a clear message rather than a misleading failure.
+        // eslint-disable-next-line no-console
+        console.log("[up-next] iframe not mounted — skipping flicker test");
+        return;
+      }
+      await browser.switchFrame(upNextIframe);
+      try {
+        await browser.execute(() => {
+          interface FlickerEntry {
+            t: number;
+            idx: number;
+          }
+          const log: FlickerEntry[] = [];
+          const sections = document.querySelectorAll<HTMLElement>(
+            ".reveal .slides > section"
+          );
+          const ro = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+              if (m.type !== "attributes" || m.attributeName !== "class")
+                continue;
+              const t = m.target as HTMLElement;
+              const wasPresent =
+                (m.oldValue || "").indexOf("present") !== -1;
+              const isPresent = t.classList.contains("present");
+              if (!wasPresent && isPresent) {
+                const idx = Array.prototype.indexOf.call(
+                  t.parentElement?.children || [],
+                  t
+                );
+                log.push({ t: performance.now(), idx });
+              }
+            }
+          });
+          sections.forEach((s) =>
+            ro.observe(s, {
+              attributes: true,
+              attributeOldValue: true,
+              attributeFilter: ["class"],
+            })
+          );
+          (window as unknown as { __slidesNgUpNext: FlickerEntry[] }).__slidesNgUpNext = log;
+        });
+      } finally {
+        await browser.switchFrame(null);
+      }
+      // Simulate two rapid clicks to drive the speaker view's
+      // applyState (and therefore driveVisualNextSlideTo) twice in
+      // quick succession.
+      await browser.execute(() => {
+        window.postMessage(
+          { type: "slides-ng-picker", event: "click", idx: 3 },
+          "*"
+        );
+      });
+      await new Promise((r) => setTimeout(r, 200));
+      await browser.execute(() => {
+        window.postMessage(
+          { type: "slides-ng-picker", event: "click", idx: 8 },
+          "*"
+        );
+      });
+      // Sleep past the full burst window (700 ms + buffer).
+      await new Promise((r) => setTimeout(r, 1500));
+      // Read the up-next iframe's mutation log.
+      let log: Array<{ t: number; idx: number }> = [];
+      await browser.switchFrame(upNextIframe);
+      try {
+        const raw = await browser.execute(
+          () =>
+            (window as unknown as { __slidesNgUpNext?: unknown[] })
+              .__slidesNgUpNext ?? []
+        );
+        if (Array.isArray(raw)) log = raw as typeof log;
+      } finally {
+        await browser.switchFrame(null);
+      }
+      const idxSeq = log.map((e) => e.idx);
+      // eslint-disable-next-line no-console
+      console.log(
+        `[up-next] .present transitions: [${idxSeq.join(", ")}], total: ${log.length}`
+      );
+      // We drove the speaker to slide 3 then slide 8 — up-next should
+      // track currentIdx+1 = 4 then 9. Each `goto` call inside the
+      // iframe fires multiple class mutations (reveal.js cycles
+      // through .past/.future/.present), so raw mutation count isn't
+      // a useful flicker signal. The flicker SIGNATURE is that after
+      // slide 9 first appears, slide 4 should NEVER appear again.
+      // Burst-leak would produce [4, 9, 4, 9, 4, ...] interleaved.
+      const firstNineIdx = idxSeq.indexOf(9);
+      if (firstNineIdx === -1) {
+        throw new Error(
+          `Up-next never landed on slide 9 after navigating to slide 8. ` +
+            `Sequence: [${idxSeq.join(", ")}]`
+        );
+      }
+      const afterFirstNine = idxSeq.slice(firstNineIdx);
+      const offTargetAfter = afterFirstNine.filter((i) => i !== 9);
+      if (offTargetAfter.length > 0) {
+        throw new Error(
+          `Up-next flipped back to non-target slide(s) ` +
+            `[${offTargetAfter.join(", ")}] AFTER first landing on slide 9. ` +
+            `Burst-cancel (v0.11.24) regressed. ` +
+            `Full sequence: [${idxSeq.join(", ")}]`
+        );
+      }
+    });
+  });
+
   // v0.11.23: horizontal-mode magnifier check. The default WDIO test
   // environment renders the picker iframe so short (~30 px tall) that
   // every preset clamps to "fill the strip height" and looks identical.

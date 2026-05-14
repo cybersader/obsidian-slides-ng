@@ -6,6 +6,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.24] — 2026-05-14
+
+### Fixed
+
+- **Up-next iframe no longer flickers back to the previous
+  slide after rapid navigation.** Same root cause as the
+  v0.11.21 picker flicker bug: `driveVisualNextSlideTo`
+  issued a burst of 5 `goto` posts (now + 50, 150, 350,
+  700 ms) to defeat bridge-install races on fresh iframes.
+  When the user navigated rapidly, the first burst's
+  delayed posts arrived after the second burst's first
+  post had already updated the up-next iframe, briefly
+  flipping back to the previous slide. Burst timer IDs
+  are now tracked + cleared before scheduling new ones.
+
+### Technical
+
+- `src/SlidesNGSpeakerView.ts` — new
+  `visualNextBurstTimers: number[]` field;
+  `driveVisualNextSlideTo` clears them before each new
+  burst (mirrors the v0.11.21 picker pattern).
+- `test/e2e/picker-sizing.spec.ts` — new
+  `up-next iframe stability` test installs a
+  `MutationObserver` inside the up-next iframe that tracks
+  every `.present` class transition on slide sections,
+  fires two rapid `slides-ng-picker` clicks 200 ms apart,
+  sleeps past the burst window (1.5 s), then asserts at
+  most 5 `.present` transitions logged. Catches the
+  burst-leak regression directly.
+
 ## [0.11.23] — 2026-05-14
 
 ### Changed
