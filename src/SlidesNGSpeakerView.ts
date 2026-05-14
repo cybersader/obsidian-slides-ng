@@ -1177,6 +1177,11 @@ export class SlidesNGSpeakerView extends ItemView {
           cmd: "enablePickerStrip",
           orientation: orient,
           tileWidth,
+          // v0.11.2: tell the iframe which tile is "current". Inside
+          // the picker iframe Reveal.getIndices() is always 0 (we
+          // never navigate that iframe), so this is the only reliable
+          // signal for the initial highlight.
+          currentIdx: this.state?.currentIdx ?? 0,
         });
       };
       post();
@@ -1287,11 +1292,23 @@ export class SlidesNGSpeakerView extends ItemView {
     // or update the thumbnail-strip iframe's current-tile highlight.
     if (this.pickerStripIframe) {
       void this.ensurePickerStripRendered().then(() => {
-        this.postToPicker({
-          type: "slides-ng-cmd",
-          cmd: "setPickerCurrent",
-          idx: this.state!.currentIdx,
-        });
+        // v0.11.2: burst the setPickerCurrent post. Single-shot was
+        // racing the iframe's bridge listener install on fresh
+        // mounts (observed in E2E screenshots where the strip
+        // stayed marked at tile 0 even though the deck had
+        // advanced 10 slides). Cheap — ~5 messages total.
+        const idx = this.state!.currentIdx;
+        const post = (): void => {
+          this.postToPicker({
+            type: "slides-ng-cmd",
+            cmd: "setPickerCurrent",
+            idx,
+          });
+        };
+        post();
+        for (const delay of [60, 180, 400, 900]) {
+          window.setTimeout(post, delay);
+        }
       });
     } else {
       this.renderPicker();

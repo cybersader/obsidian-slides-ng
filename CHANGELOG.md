@@ -6,6 +6,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.2] — 2026-05-14
+
+### Fixed
+
+- **Picker current-tile highlight could lag the actual slide** —
+  caught via E2E screenshots. Two underlying causes:
+  - `setPickerCurrent` was posted single-shot. If the iframe's
+    bridge listener wasn't up yet (fresh mount, srcdoc still
+    parsing) the message was dropped and the strip stayed
+    marked at whichever tile `buildPickerStrip` set initially.
+  - `buildPickerStrip` used `Reveal.getIndices()` for the
+    initial highlight, but inside the picker iframe Reveal is
+    always at index 0 (we never navigate that iframe), so the
+    initial highlight was always wrong.
+- Fixes:
+  - `enablePickerStrip` payload now includes `currentIdx`. The
+    iframe-side builder uses it for the initial highlight.
+  - `setPickerCurrent` post is now bursted on every state
+    change (now + 60ms + 180ms + 400ms + 900ms — same pattern
+    as `driveVisualNextSlideTo` and the parent ResizeObserver
+    relayout).
+  - Extracted `applyCurrentTileStyle()` / `clearCurrentTileStyle()`
+    helpers so the .current visual treatment (accent border,
+    halo, badge tint) is applied consistently whether it comes
+    from `buildPickerStrip`, `applyPickerStripLayout` (orientation
+    flip), or `setPickerCurrent` (state change). Previously the
+    classList toggle didn't update inline styles, so orientation
+    flips lost the highlight.
+
+### E2E test coverage
+
+- `test/e2e/picker-thumbnails.spec.ts` now runs 15 checks
+  (was 8): loads the kitchen-sink deck, exercises the scroll
+  configuration, clicks tiles via simulated postMessage, runs
+  rapid sequential picks, and round-trips horizontal-mode +
+  scroll + click. Screenshots: `v0110-picker-{vertical,horizontal}.png`
+  and `v0111-picker-{default,scrolled,at-slide-5,horizontal-kitchen-sink,final}.png`.
+
 ## [0.11.1] — 2026-05-14
 
 ### Changed

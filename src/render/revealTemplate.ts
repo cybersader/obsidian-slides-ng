@@ -814,7 +814,7 @@ ${sectionsHtml}
        * orientation: 'vertical' (column) or 'horizontal' (row)
        * tileWidth: pixel width for tiles; 0 = auto-fit container
        */
-      function buildPickerStrip(orientation, tileWidth) {
+      function buildPickerStrip(orientation, tileWidth, initialCurrentIdx) {
         var existing = document.getElementById('slides-ng-picker-strip');
         if (existing) existing.remove();
         var revealEl = document.querySelector('.reveal');
@@ -870,10 +870,50 @@ ${sectionsHtml}
         strip.setAttribute('data-slide-w', String(SLIDE_W2));
         strip.setAttribute('data-slide-h', String(SLIDE_H2));
         applyPickerStripLayout(strip);
-        // Highlight the current slide right away.
-        var idx0 = (Reveal.getIndices() || {}).h || 0;
+        // v0.11.2: highlight the current slide using the index the
+        // parent passed in — Reveal.getIndices() inside the picker
+        // iframe always returns 0 because we never navigate this
+        // iframe (the bridge swaps it straight to picker-strip
+        // mode at idx 0). Falls back to 0 if no idx provided.
+        var idx0 = typeof initialCurrentIdx === 'number' ? initialCurrentIdx : 0;
         var current = strip.querySelector('button[data-slide-idx="' + idx0 + '"]');
-        if (current) current.classList.add('current');
+        if (current) {
+          current.classList.add('current');
+          // Re-apply inline styles for the .current state since
+          // applyPickerStripLayout already ran above.
+          applyCurrentTileStyle(current);
+        }
+      }
+
+      /**
+       * Apply the inline accent styles for a tile marked .current,
+       * AND tint its slide-number badge. Used both during
+       * applyPickerStripLayout and during setPickerCurrent so the
+       * styling stays consistent regardless of which path set
+       * .current.
+       */
+      function applyCurrentTileStyle(tile) {
+        tile.style.border = '2px solid var(--r-link-color, #42affa)';
+        tile.style.boxShadow = '0 0 0 3px rgba(66, 175, 250, 0.32)';
+        var num = tile.querySelector('.slides-ng-picker-tile-num');
+        if (num) {
+          num.style.background = 'var(--r-link-color, #42affa)';
+          num.style.borderColor = '#fff';
+        }
+      }
+
+      /**
+       * Reset a tile to non-current styling. Used by setPickerCurrent
+       * when shifting the current marker off an old tile.
+       */
+      function clearCurrentTileStyle(tile) {
+        tile.style.border = '2px solid rgba(255,255,255,0.18)';
+        tile.style.boxShadow = '';
+        var num = tile.querySelector('.slides-ng-picker-tile-num');
+        if (num) {
+          num.style.background = 'rgba(0,0,0,0.78)';
+          num.style.borderColor = 'rgba(255,255,255,0.55)';
+        }
       }
 
       /**
@@ -968,14 +1008,9 @@ ${sectionsHtml}
               'text-shadow:0 1px 2px rgba(0,0,0,0.6);';
           }
           if (t.classList.contains('current')) {
-            // v0.11.1: thicker accent border + stronger glow. Also
-            // tint the slide-number badge so it reads as "you are here".
-            t.style.border = '2px solid var(--r-link-color, #42affa)';
-            t.style.boxShadow = '0 0 0 3px rgba(66, 175, 250, 0.32)';
-            if (num) {
-              num.style.background = 'var(--r-link-color, #42affa)';
-              num.style.borderColor = '#fff';
-            }
+            // v0.11.2: delegate to shared helper so setPickerCurrent
+            // can apply the same styling without duplicated CSS.
+            applyCurrentTileStyle(t);
           }
         });
       }
@@ -1238,7 +1273,9 @@ ${sectionsHtml}
                   ? 'horizontal' : 'vertical';
                 var tileWidth = (data && typeof data.tileWidth === 'number')
                   ? data.tileWidth : 0;
-                buildPickerStrip(orient, tileWidth);
+                var initialIdx = (data && typeof data.currentIdx === 'number')
+                  ? data.currentIdx : 0;
+                buildPickerStrip(orient, tileWidth, initialIdx);
               } catch (e) { console.warn('[slides-ng] enablePickerStrip', e); }
               break;
             }
@@ -1258,9 +1295,11 @@ ${sectionsHtml}
                   var tIdx = parseInt(t.getAttribute('data-slide-idx') || '0', 10);
                   if (tIdx === data.idx) {
                     t.classList.add('current');
+                    applyCurrentTileStyle(t);
                     t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-                  } else {
+                  } else if (t.classList.contains('current')) {
                     t.classList.remove('current');
+                    clearCurrentTileStyle(t);
                   }
                 });
               }
