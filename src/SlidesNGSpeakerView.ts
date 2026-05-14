@@ -1582,45 +1582,38 @@ export class SlidesNGSpeakerView extends ItemView {
     const iconEl = this.pickerSizeBtn.createSpan({
       cls: "slides-ng-speaker-btn-icon",
     });
-    // v0.11.22: tooltips updated for the new auto-fit semantics —
-    // the preset is the TILE WIDTH (clamped to strip width when
-    // narrower), not a minimum cell size. So comfortable / big
-    // now produce visibly different tile sizes at any strip width.
-    // Fixed-column modes (1-col / 2-col) still ignore the preset
-    // (tiles fill the column) — the size button has no effect there.
+    // v0.11.23: magnifier preset now affects layout in every
+    // orientation (1-col, 2-col, auto-fit, AND horizontal). In
+    // vertical modes the preset is tile width per column (orientation
+    // caps column count). In horizontal it's tile width along the
+    // film strip (height auto-derives via aspect). "auto" (preset = 0)
+    // means "fill the column" in vertical modes and "fill the strip
+    // height" in horizontal.
     const meta: Record<
       keyof typeof PICKER_TILE_PRESETS | "auto" | "custom",
       { icon: string; tip: string }
     > = {
       auto: {
         icon: "zoom-in",
-        tip:
-          "Tile size: auto (~160 px). Click for compact. " +
-          "Active in auto-fit orientation.",
+        tip: "Tile size: auto (~160 px). Click for compact.",
       },
       compact: {
         icon: "zoom-out",
-        tip:
-          "Tile size: compact (100 px). Click for comfortable. " +
-          "Active in auto-fit orientation.",
+        tip: "Tile size: compact (100 px). Click for comfortable.",
       },
       comfortable: {
         icon: "search",
-        tip:
-          "Tile size: comfortable (180 px). Click for big. " +
-          "Active in auto-fit orientation.",
+        tip: "Tile size: comfortable (180 px). Click for big.",
       },
       big: {
         icon: "zoom-in",
-        tip:
-          "Tile size: big (280 px). Click for compact. " +
-          "Active in auto-fit orientation.",
+        tip: "Tile size: big (280 px). Click for compact.",
       },
       custom: {
         icon: "search",
         tip:
           "Tile size: custom (set in Settings or deck frontmatter). " +
-          "Click to enter preset cycle. Active in auto-fit.",
+          "Click to enter preset cycle.",
       },
     };
     const m = meta[preset];

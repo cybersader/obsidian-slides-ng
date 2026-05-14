@@ -6,6 +6,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.23] — 2026-05-14
+
+### Changed
+
+- **Magnifier preset now affects horizontal-strip mode too.**
+  Previously horizontal mode forced tile height = strip height
+  and derived width from aspect — magnifier was ignored.
+  Now the preset is the tile WIDTH (height = `preset * aspect`,
+  clamped to strip height if it would overflow). compact (100),
+  comfortable (180), big (280) produce visibly different tile
+  widths in horizontal film-strip mode whenever strip height has
+  room. `auto` (preset = 0) keeps the original "fill strip height"
+  behaviour, matching the way `auto` works in vertical modes.
+- **Magnifier tooltips simplified.** Dropped the "Active in auto-
+  fit orientation" qualifier — the preset now affects layout in
+  every orientation.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — `applyPickerStripLayout`
+  horizontal branch reads `tileWidthAttr` and computes
+  `tileH = tileW * aspect`, with a clamp + recompute when
+  height would exceed `stripFloor`.
+- `test/e2e/picker-sizing.spec.ts` — new
+  `horizontal-mode magnifier` test forces the picker container
+  to 320 px tall, cycles through every preset, and asserts at
+  least 3 distinct tile widths emerge (auto + big may collapse
+  to "fill" if strip is shallow enough; compact + comfortable
+  should always differ).
+
 ## [0.11.22] — 2026-05-14
 
 Multiple fixes consolidated. v0.11.22a-d were intermediate

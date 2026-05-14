@@ -1106,12 +1106,24 @@ ${sectionsHtml}
         // Tile dimensions per orientation.
         var tileW, tileH;
         if (orientation === 'horizontal') {
-          // Fill the strip height; width derives from aspect. Magnifier
-          // preset still ignored here (changing tile height by user
-          // preset is a separate decision — film-strip pacing is
-          // dominated by container height in practice).
-          tileH = stripInnerH > 0 ? stripInnerH - 8 : 80;
-          tileW = Math.round(tileH / aspect);
+          // v0.11.23: magnifier preset now sets tile WIDTH in
+          // horizontal mode too. Tile height = preset * aspect. If
+          // that would exceed strip height, clamp height to fit and
+          // recompute width to preserve aspect.
+          // Preset = 0 (auto) keeps the original "fill strip height"
+          // behaviour for backward compatibility.
+          var stripFloor = Math.max(40, stripInnerH > 0 ? stripInnerH - 8 : 80);
+          if (tileWidthAttr > 0) {
+            tileW = tileWidthAttr;
+            tileH = Math.round(tileW * aspect);
+            if (tileH > stripFloor) {
+              tileH = stripFloor;
+              tileW = Math.round(tileH / aspect);
+            }
+          } else {
+            tileH = stripFloor;
+            tileW = Math.round(tileH / aspect);
+          }
         } else {
           // All three vertical orientations share the pixel-pinned
           // autoTileW computed above.

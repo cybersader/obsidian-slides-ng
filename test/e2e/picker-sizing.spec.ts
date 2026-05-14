@@ -300,6 +300,64 @@ describe("v0.11.20 picker sizing — every orientation × magnifier combo", func
     }
   }
 
+  // v0.11.23: horizontal-mode magnifier check. The default WDIO test
+  // environment renders the picker iframe so short (~30 px tall) that
+  // every preset clamps to "fill the strip height" and looks identical.
+  // To verify the magnifier actually changes tile width in horizontal
+  // mode, force the picker container to 320 px tall first.
+  describe("horizontal-mode magnifier", function () {
+    it("magnifier preset changes tile width in horizontal orientation", async () => {
+      await browser.execute(() => {
+        const c = document.querySelector(
+          ".slides-ng-speaker-picker-thumbs"
+        ) as HTMLElement | null;
+        if (c) {
+          c.style.height = "320px";
+          c.style.maxHeight = "320px";
+        }
+      });
+      await new Promise((r) => setTimeout(r, 500));
+      const widthsPerPreset: Record<string, number> = {};
+      const presets: Array<{ name: string; px: number }> = [
+        { name: "auto", px: 0 },
+        { name: "compact", px: 100 },
+        { name: "comfortable", px: 180 },
+        { name: "big", px: 280 },
+      ];
+      for (const { name, px } of presets) {
+        await setSettings("horizontal", px);
+        await rebuildPicker();
+        const geoms = await measureTiles();
+        widthsPerPreset[name] = geoms[0]?.tileW ?? 0;
+      }
+      // Restore container height.
+      await browser.execute(() => {
+        const c = document.querySelector(
+          ".slides-ng-speaker-picker-thumbs"
+        ) as HTMLElement | null;
+        if (c) {
+          c.style.height = "";
+          c.style.maxHeight = "";
+        }
+      });
+      // eslint-disable-next-line no-console
+      console.log(
+        `[horizontal-magnifier] tile widths: ${JSON.stringify(widthsPerPreset)}`
+      );
+      // Expect at least 3 distinct widths (auto and big both fill the
+      // 320 px strip height and may produce the same width; compact
+      // and comfortable should each be unique).
+      const uniqueWidths = new Set(Object.values(widthsPerPreset));
+      if (uniqueWidths.size < 3) {
+        throw new Error(
+          `Expected ≥3 distinct tile widths across magnifier presets ` +
+            `in horizontal mode, got ${uniqueWidths.size}: ` +
+            `${JSON.stringify(widthsPerPreset)}`
+        );
+      }
+    });
+  });
+
   // v0.11.22e: current-tile flicker check. Simulates rapid tile
   // clicks (the user-reported "flips back and forth to the previous
   // slide for a second" bug). Installs a MutationObserver inside the
@@ -434,16 +492,12 @@ describe("v0.11.20 picker sizing — every orientation × magnifier combo", func
     it("reflows tile geometry when the picker container width changes", async () => {
       // Settle into auto-fit with the comfortable preset so column
       // count meaningfully changes between narrow and wide containers.
-      await browser.executeObsidian(async ({ app }) => {
-        // @ts-expect-error — plugins is internal
-        const plugin = app.plugins.plugins["slides-ng"];
-        if (!plugin) return;
-        plugin.settings.speakerPickerOrientation = "auto";
-        plugin.settings.speakerPickerTileWidth = 180;
-        if (typeof plugin.saveSettings === "function") {
-          await plugin.saveSettings();
-        }
-      });
+      // Use setSettings + rebuildPicker so the iframe is actually in
+      // auto-fit before we start measuring. (Without this, an earlier
+      // test in the suite may have left the picker in horizontal,
+      // where width changes can't change col count by design.)
+      await setSettings("auto", 180);
+      await rebuildPicker();
       // Force two distinct container widths and check tile geometry
       // updates for each.
       const widths = [200, 700];
