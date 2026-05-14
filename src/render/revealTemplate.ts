@@ -1154,7 +1154,9 @@ ${sectionsHtml}
               // 220/960 ≈ 0.229 always exactly fills the tile. Larger
               // viewports just fit more tiles per row.
               grid.style.cssText =
-                'display:grid;grid-template-columns:repeat(auto-fill, 320px);' +
+                // v0.11.14: responsive — tiles fill the column,
+                // column maxes at 320px but shrinks for narrow viewports.
+                'display:grid;grid-template-columns:repeat(auto-fill, minmax(min(100%, 320px), 1fr));' +
                 'justify-content:start;gap:0.85rem;';
               overlay.appendChild(grid);
               var currentIdx = (Reveal.getIndices() || {}).h || 0;
@@ -1186,10 +1188,13 @@ ${sectionsHtml}
                   sourceContent = section ? section.cloneNode(true) : null;
                 }
                 var isCurrent = s.idx === currentIdx;
+                // v0.11.14: tile uses 100% of its grid column so the
+                // grid's minmax(min(100%, 320px), 1fr) responsive
+                // template actually shrinks. Height derives from
+                // aspect ratio (16:9 → 56.25% padding-top trick).
                 var tile = document.createElement('button');
                 tile.style.cssText =
-                  'position:relative;width:' + TILE_W + 'px;' +
-                  'height:' + Math.round(TILE_W * SLIDE_H / SLIDE_W) + 'px;' +
+                  'position:relative;width:100%;aspect-ratio:' + SLIDE_W + '/' + SLIDE_H + ';' +
                   'background:' + bodyBg + ';border:2px solid ' +
                   (isCurrent ? 'var(--r-link-color, #42affa)' : 'rgba(255,255,255,0.18)') +
                   ';border-radius:6px;padding:0;cursor:pointer;' +
@@ -1285,6 +1290,24 @@ ${sectionsHtml}
               };
               document.addEventListener('keydown', escHandler);
               document.body.appendChild(overlay);
+
+              // v0.11.14: after the grid is in the DOM, recompute the
+              // thumbnail scale based on the actual tile width. Tiles
+              // are responsive (grid template uses minmax(min(100%,
+              // 320px), 1fr)), so on narrow viewports each tile may
+              // be < 320px wide. Without this pass, the cloned slide
+              // content stays at SLIDE_W * 320/SLIDE_W scale and
+              // overflows the smaller tiles.
+              requestAnimationFrame(function () {
+                var firstTile = grid.querySelector('button');
+                if (!firstTile) return;
+                var actualW = firstTile.clientWidth;
+                if (!(actualW > 0)) return;
+                var actualScale = actualW / SLIDE_W;
+                grid.querySelectorAll('.reveal').forEach(function (rs) {
+                  rs.style.transform = 'scale(' + actualScale + ')';
+                });
+              });
               break;
             }
             case 'toggleMenu': {
@@ -1411,6 +1434,23 @@ ${sectionsHtml}
           console.warn('[slides-ng] postMessage command failed', e);
         }
       });
+
+      // v0.11.14: bridge-ready postback. The parent (speaker view)
+      // listens for this to know the iframe's message handler is
+      // installed; on receipt it re-posts pending commands like
+      // enablePickerStrip / setPickerCurrent. Defeats the race where
+      // all 5 retries of the parent's burst could miss before the
+      // listener attaches (causes picker iframe to stay in default
+      // reveal-render mode instead of strip mode).
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(
+            { type: 'slides-ng-bridge-ready' },
+            '*'
+          );
+        }
+      } catch (_) { /* parent unreachable; ignore */ }
+
       function attachListeners() {
         if (typeof Reveal === 'undefined') {
           setTimeout(attachListeners, 50);

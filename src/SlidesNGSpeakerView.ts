@@ -115,6 +115,32 @@ export class SlidesNGSpeakerView extends ItemView {
       idx?: number;
     };
     if (!data) return;
+    // v0.11.14: bridge-ready signal from any iframe. When the picker
+    // iframe's bridge attaches, re-post enablePickerStrip +
+    // setPickerCurrent — defeats the race where all retries of the
+    // burst could miss before the listener installed (caused picker
+    // to stay in default reveal-render mode).
+    if (data.type === "slides-ng-bridge-ready") {
+      const pickerWin = this.pickerStripIframe?.contentWindow;
+      if (pickerWin && event.source === pickerWin) {
+        const s = this.getSettings?.();
+        this.postToPicker({
+          type: "slides-ng-cmd",
+          cmd: "enablePickerStrip",
+          orientation: s?.speakerPickerOrientation ?? "vertical",
+          tileWidth: s?.speakerPickerTileWidth ?? 0,
+          currentIdx: this.state?.currentIdx ?? 0,
+        });
+        if (typeof this.state?.currentIdx === "number") {
+          this.postToPicker({
+            type: "slides-ng-cmd",
+            cmd: "setPickerCurrent",
+            idx: this.state.currentIdx,
+          });
+        }
+      }
+      return;
+    }
     // v0.11.0: picker-strip iframe sends `slides-ng-picker` events
     // when the user clicks a thumbnail. Forward as `goto` to the
     // MAIN preview iframe so the deck navigates there.
@@ -1253,7 +1279,9 @@ export class SlidesNGSpeakerView extends ItemView {
         });
       };
       post();
-      for (const delay of [80, 200, 450, 900]) {
+      // v0.11.14: extended the retry window to 2.5 s + added the
+      // bridge-ready postback fallback (see messageHandler).
+      for (const delay of [80, 200, 450, 900, 1500, 2500]) {
         window.setTimeout(post, delay);
       }
     } catch (err) {
@@ -1374,7 +1402,7 @@ export class SlidesNGSpeakerView extends ItemView {
           });
         };
         post();
-        for (const delay of [60, 180, 400, 900]) {
+        for (const delay of [60, 180, 400, 900, 1500, 2500]) {
           window.setTimeout(post, delay);
         }
       });

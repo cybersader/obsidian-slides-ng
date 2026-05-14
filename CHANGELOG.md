@@ -6,6 +6,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.14] — 2026-05-14
+
+### Fixed
+
+- **Speaker notes Save silently failed on auto-h1-breaks decks.**
+  Root cause: `findSlideRanges` in `editSlideNotes.ts` only
+  counted `---` separators. A deck using
+  `slides-ng-auto-h1-breaks: true` with no `---` separators
+  was seen as ONE slide, so any `currentIdx > 0` was out of
+  range — `replaceSlideNotes` returned the markdown unchanged
+  and the file write was a no-op. Fix: `findSlideRanges` now
+  peeks the auto-h1-breaks frontmatter flag and splits on `#`
+  headings when set. 3 new unit tests confirm the fix.
+- **Grid overlay overflowed on narrow viewports.** Tiles were
+  hardcoded `width: 320px` with a fixed-column grid template,
+  so on viewports narrower than 320px + gap they clipped on
+  the right. Now responsive: `grid-template-columns:
+  repeat(auto-fill, minmax(min(100%, 320px), 1fr))` + tiles
+  use `width: 100%` of their column. A post-build pass
+  recomputes the thumbnail scale based on actual tile width
+  so cloned slides shrink in step.
+- **Up-next iframe drag-resize asymmetric.** CSS
+  `min-height: 80px` blocked initial downward drag, but the
+  inline `height` set by JS after the first upward drag
+  overrode the CSS rule — so users could shrink way below
+  80px once they'd grown the panel. Now consistent: floor at
+  `min-height: 40px` from the start (just enough to keep the
+  resize handle visible).
+- **Picker iframe could stay in default reveal-render mode
+  (no thumbnails) when the deck file was modified or the
+  bridge installed slowly.** Five-shot `enablePickerStrip`
+  burst at 0/80/200/450/900 ms could all miss the listener.
+  Two-pronged fix:
+  - Iframe bridge now posts `slides-ng-bridge-ready` *once*
+    when it attaches. Speaker view listens (filtered by
+    `event.source === pickerStripIframe.contentWindow`) and
+    re-posts `enablePickerStrip` + `setPickerCurrent` on
+    receipt — guaranteed delivery as soon as the listener is
+    up.
+  - Burst retry window extended to 2.5 s (added 1500 ms +
+    2500 ms entries). Cheap belt-and-suspenders.
+
+### Added
+
+- **Three hamburger example decks** in
+  `_slides-ng-test/`: `08-hamburger-on.md` (default, ☰ visible),
+  `09-hamburger-off.md` (`slides-ng-show-menu: false`),
+  `10-keyboard-shortcuts.md` (full keystroke reference).
+
+### Technical
+
+- `src/parser/editSlideNotes.ts` — `findSlideRanges` peeks
+  `slides-ng-auto-h1-breaks`; H1-aware slide boundary
+  detection (mirrors parseDeck's `injectH1SlideBreaks`).
+- `src/render/revealTemplate.ts` — Grid `grid-template-columns`
+  + tile-width + aspect-ratio responsive; post-build
+  `requestAnimationFrame` pass recomputes `transform: scale()`;
+  `slides-ng-bridge-ready` postback right after the message
+  listener attaches.
+- `src/SlidesNGSpeakerView.ts` — `messageHandler` recognises
+  `slides-ng-bridge-ready` and re-issues picker setup; burst
+  retry schedules extended from 4 to 6 delays each.
+- `src/styles.css` — `.slides-ng-speaker-visual-next-frame-wrap`
+  min-height: 80 → 40.
+- `tests/editSlideNotes.test.ts` — 3 new tests for the
+  auto-h1-breaks insertion + readSlideNotes paths.
+
 ## [0.11.13] — 2026-05-14
 
 ### Changed

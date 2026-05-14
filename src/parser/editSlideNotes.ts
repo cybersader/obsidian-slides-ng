@@ -11,7 +11,13 @@
  *     edit the deck file directly for that case).
  *   - Slide annotations `<!-- slide ... -->` and `<!-- element ... -->`
  *     are explicitly NOT treated as notes.
+ *   - v0.11.14: when the deck uses `slides-ng-auto-h1-breaks: true`
+ *     (frontmatter), top-level `#` headings become slide boundaries
+ *     too — `findSlideRanges` peeks the flag and treats each `#`
+ *     line as a slide break, matching `parseDeck`'s behaviour.
  */
+
+import { peekFrontmatterFlag } from "./parseDeck";
 
 export interface SlideRange {
   /** Inclusive — first line of the slide's content. */
@@ -26,12 +32,21 @@ export interface SlideRange {
  * fenced code blocks.
  */
 export function findSlideRanges(markdown: string): SlideRange[] {
+  // v0.11.14: auto-h1-breaks mode. When the frontmatter flag is
+  // set, top-level `#` headings count as slide separators too —
+  // matches `parseDeck`'s injectH1SlideBreaks behaviour. The first
+  // `#` does NOT open a new slide (it's the start of slide 0);
+  // subsequent ones do. A `# ` immediately after a `---` doesn't
+  // double-bump.
+  const autoH1 = peekFrontmatterFlag(markdown, "slides-ng-auto-h1-breaks") === true;
+
   const lines = markdown.split("\n");
   const ranges: SlideRange[] = [];
   let inFrontmatter = false;
-  let frontmatterClosed = false;
   let inCodeFence = false;
   let currentStart = 0;
+  let seenFirstH1 = false;
+  let prevNonBlankWasSeparator = false;
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
@@ -44,7 +59,6 @@ export function findSlideRanges(markdown: string): SlideRange[] {
     if (inFrontmatter) {
       if (trimmed === "---") {
         inFrontmatter = false;
-        frontmatterClosed = true;
         currentStart = i + 1;
       }
       continue;
@@ -52,19 +66,46 @@ export function findSlideRanges(markdown: string): SlideRange[] {
 
     if (/^\s*```/.test(raw)) {
       inCodeFence = !inCodeFence;
+      prevNonBlankWasSeparator = false;
       continue;
     }
-    if (inCodeFence) continue;
+    if (inCodeFence) {
+      prevNonBlankWasSeparator = false;
+      continue;
+    }
 
     if (trimmed === "---") {
       ranges.push({ startLine: currentStart, endLine: i });
       currentStart = i + 1;
+      prevNonBlankWasSeparator = true;
+      continue;
+    }
+
+    // Auto-h1-break: `# ` heading starts a new slide (except the
+    // first one + when preceded immediately by `---`).
+    if (autoH1 && /^#\s/.test(trimmed)) {
+      if (!seenFirstH1) {
+        seenFirstH1 = true;
+      } else if (!prevNonBlankWasSeparator) {
+        // Close the previous slide at the line BEFORE this heading.
+        // Walk back past blank lines so the previous slide doesn't
+        // own trailing whitespace.
+        let endLine = i;
+        while (endLine > currentStart && lines[endLine - 1].trim() === "") {
+          endLine--;
+        }
+        ranges.push({ startLine: currentStart, endLine });
+        currentStart = i;
+      }
+    }
+
+    if (trimmed !== "") {
+      prevNonBlankWasSeparator = false;
     }
   }
   if (currentStart < lines.length) {
     ranges.push({ startLine: currentStart, endLine: lines.length });
   }
-  void frontmatterClosed; // satisfies linter; reserved for future use
 
   return ranges;
 }

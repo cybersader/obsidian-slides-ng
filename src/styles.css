@@ -465,9 +465,17 @@
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
   /* Native vertical resize handle (CSS-only). Browser shows the
-   * drag-handle in the bottom-right corner. Min/max keeps it sane. */
+   * drag-handle in the bottom-right corner.
+   *
+   * v0.11.14: dropped `min-height: 80px`. Was creating an asymmetric
+   * resize experience — the CSS min-height blocked initial downward
+   * drag, but once the user dragged bigger the JS-set inline `height`
+   * overrode the CSS rule and they could drag arbitrarily small.
+   * Now consistent from the start: the only floor is `min-height:
+   * 40px` (browser-default ish, prevents the iframe from vanishing
+   * entirely). max-height stays so it can't push other panels off. */
   resize: vertical;
-  min-height: 80px;
+  min-height: 40px;
   max-height: 80vh;
 }
 .slides-ng-speaker-visual-next-frame {

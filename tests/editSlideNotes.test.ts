@@ -142,6 +142,70 @@ describe("replaceSlideNotes — insert new", () => {
   });
 });
 
+describe("replaceSlideNotes — auto-h1-breaks decks (v0.11.14)", () => {
+  // User-reported bug: editing notes on a deck that uses
+  // `slides-ng-auto-h1-breaks: true` and no `---` separators
+  // silently does nothing. Cause: findSlideRanges only counts `---`
+  // separators and sees the whole deck as one slide, so any
+  // currentIdx > 0 is out of range. Need to apply the auto-h1-
+  // breaks transformation before slicing.
+  const AUTO_DECK = [
+    "---",
+    "slides-ng-auto-h1-breaks: true",
+    "---",
+    "",
+    "# Slide A",
+    "",
+    "body A",
+    "",
+    "# Slide B",
+    "",
+    "body B",
+    "",
+    "# Slide C",
+    "",
+    "body C",
+  ].join("\n");
+
+  test("inserts a note on the SECOND slide (idx 1) of an auto-h1-breaks deck", () => {
+    const updated = replaceSlideNotes(AUTO_DECK, 1, "note for B");
+    expect(updated).toContain("<!-- note for B -->");
+    // The note must appear AFTER `body B` and BEFORE `# Slide C`.
+    const lines = updated.split("\n");
+    const noteIdx = lines.findIndex((l) => l.trim() === "<!-- note for B -->");
+    const bodyBIdx = lines.findIndex((l) => l.trim() === "body B");
+    const slideCIdx = lines.findIndex((l) => l.trim() === "# Slide C");
+    expect(noteIdx).toBeGreaterThan(bodyBIdx);
+    expect(noteIdx).toBeLessThan(slideCIdx);
+  });
+
+  test("inserts a note on the THIRD slide (idx 2) of an auto-h1-breaks deck", () => {
+    const updated = replaceSlideNotes(AUTO_DECK, 2, "note for C");
+    expect(updated).toContain("<!-- note for C -->");
+    // The note must appear AFTER `body C` (at end of file).
+    const lines = updated.split("\n");
+    const noteIdx = lines.findIndex((l) => l.trim() === "<!-- note for C -->");
+    const bodyCIdx = lines.findIndex((l) => l.trim() === "body C");
+    expect(noteIdx).toBeGreaterThan(bodyCIdx);
+  });
+
+  test("readSlideNotes correctly extracts notes from an auto-h1-breaks deck slide", () => {
+    const deckWithNote = [
+      "---",
+      "slides-ng-auto-h1-breaks: true",
+      "---",
+      "",
+      "# A",
+      "<!-- note A -->",
+      "",
+      "# B",
+      "<!-- note B -->",
+    ].join("\n");
+    expect(readSlideNotes(deckWithNote, 0)).toBe("note A");
+    expect(readSlideNotes(deckWithNote, 1)).toBe("note B");
+  });
+});
+
 describe("replaceSlideNotes — out-of-range indices", () => {
   test("idx ≥ slideCount returns original markdown unchanged", () => {
     expect(replaceSlideNotes(DECK, 99, "x")).toBe(DECK);
