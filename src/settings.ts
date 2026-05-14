@@ -127,6 +127,30 @@ export interface SlidesNGSettings {
    * follows the plugin across vault sync.
    */
   speakerVisualNextHeightPx: number | null;
+
+  /**
+   * Timer mode (v0.10.0+):
+   * - `"elapsed"` — counts up from zero (original behaviour)
+   * - `"countdown"` — counts DOWN from `speakerTimerCountdownMinutes`;
+   *   goes negative when overrun so the presenter can see the deficit
+   * - `"lap"` — slide-elapsed; resets to zero every time the active
+   *   slide changes. Useful for keeping per-slide pace.
+   */
+  speakerTimerMode: "elapsed" | "countdown" | "lap";
+
+  /**
+   * Target duration in minutes for the countdown timer mode. Default
+   * 30 (typical conference talk). Ignored in `elapsed` / `lap` modes.
+   */
+  speakerTimerCountdownMinutes: number;
+
+  /**
+   * When true and the speaker pane is wide enough (~900px container
+   * width), panels flow into a 2-column auto-fit grid. When false,
+   * panels always stack vertically regardless of width. Default
+   * `true`. v0.10.0+.
+   */
+  speakerPanelsMultiColumn: boolean;
 }
 
 /** All draggable/toggleable speaker-view panels. */
@@ -141,9 +165,9 @@ export type SpeakerPanelId =
   | "picker";
 
 export const SPEAKER_PANEL_LABELS: Record<SpeakerPanelId, string> = {
-  status: "Status bar (slide N of M + timer)",
-  controls: "Navigation controls (First / Prev / Next / Last / Grid)",
-  timer: "Timer controls (Start, Reset)",
+  status: "Status bar (slide N of M)",
+  controls: "Navigation controls (First / Prev / Next / Last)",
+  timer: "Timer (elapsed / countdown / lap)",
   nextLine: "Next-slide title line",
   visualNext: "Visual next-slide preview",
   scenes: "Scenes (overlay slides)",
@@ -184,6 +208,12 @@ export interface SceneDefinition {
    * all-black blackout (no content rendered, just the dark overlay).
    */
   content: string;
+  /**
+   * Lucide icon name (e.g. `"monitor-off"`, `"coffee"`). Optional —
+   * if omitted, the speaker view falls back to a generic icon. Any
+   * lucide name works; see https://lucide.dev/icons. v0.10.0+.
+   */
+  icon?: string;
 }
 
 export const REVEAL_TRANSITIONS = [
@@ -216,21 +246,25 @@ export const DEFAULT_SCENES: SceneDefinition[] = [
     id: "blackout",
     label: "Blackout",
     content: "",
+    icon: "monitor-off",
   },
   {
     id: "brb",
     label: "Be right back",
     content: "# Be right back\n\nBack in a few minutes.",
+    icon: "coffee",
   },
   {
     id: "qa",
     label: "Q & A",
     content: "# Q & A\n\nQuestions?",
+    icon: "message-circle-question",
   },
   {
     id: "standby",
     label: "Stand by",
     content: "# Stand by",
+    icon: "pause-circle",
   },
 ];
 
@@ -254,4 +288,7 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   speakerPanelVisibility: { ...DEFAULT_SPEAKER_PANEL_VISIBILITY },
   speakerPanelOrder: [...DEFAULT_SPEAKER_PANEL_ORDER],
   speakerVisualNextHeightPx: null,
+  speakerTimerMode: "elapsed",
+  speakerTimerCountdownMinutes: 30,
+  speakerPanelsMultiColumn: true,
 };

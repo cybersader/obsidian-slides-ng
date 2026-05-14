@@ -112,7 +112,19 @@ export class SlidesNGSpeakerView extends ItemView {
     if (mainIframe && event.source && event.source !== mainIframe.contentWindow) {
       return;
     }
+    const prev = this.state;
     this.state = data as PreviewState;
+    // Lap-mode timer: reset on every slide change (only the
+    // horizontal-slide index, not initial state arrival).
+    if (
+      this.getSettings?.()?.speakerTimerMode === "lap" &&
+      prev !== null &&
+      typeof prev.currentIdx === "number" &&
+      prev.currentIdx !== this.state.currentIdx
+    ) {
+      this.lapResetTimer();
+    }
+    this.lastSeenSlideIdx = this.state.currentIdx ?? null;
     this.applyState();
   };
 
@@ -120,6 +132,8 @@ export class SlidesNGSpeakerView extends ItemView {
   private resizeObserver?: ResizeObserver;
   private notesWrapEl?: HTMLElement;
   private notesEditing = false;
+  /** Most recently observed slide index — for lap-mode timer reset on slide change. */
+  private lastSeenSlideIdx: number | null = null;
   /** Drop-position indicator line (DnD). Shows where the dragged panel will land. */
   private dropIndicatorEl?: HTMLElement;
   /** True = drop ABOVE the current hover target; false = drop BELOW. */
@@ -158,6 +172,12 @@ export class SlidesNGSpeakerView extends ItemView {
     const container = this.contentEl;
     container.empty();
     container.addClass("slides-ng-speaker");
+    // Apply the multi-column class if the user wants 2-col flow at wide
+    // widths. CSS does the actual layout via a container-query.
+    container.toggleClass(
+      "slides-ng-speaker-multicolumn",
+      settings?.speakerPanelsMultiColumn !== false
+    );
 
     // Panel visibility: each panel is shown only if its visibility flag
     // is true. Hidden panels are still mounted (display:none) so
@@ -177,7 +197,8 @@ export class SlidesNGSpeakerView extends ItemView {
     };
 
     // Status bar — clickable as a whole to open the Grid (slide N of M
-    // acts like a "jump to any slide" affordance).
+    // acts like a "jump to any slide" affordance). Timer display moved
+    // out into its own panel in v0.10.0 so this is now just position.
     const status = container.createDiv({ cls: "slides-ng-speaker-status" });
     setPanelVisible(status, "status");
     const statusBtn = status.createEl("button", {
@@ -187,7 +208,6 @@ export class SlidesNGSpeakerView extends ItemView {
     setTooltip(statusBtn, "Open the slide grid");
     this.statusEl = statusBtn.createSpan({ cls: "slides-ng-speaker-position", text: "Slide — of —" });
     statusBtn.addEventListener("click", () => this.send("toggleOverview"));
-    this.timerEl = status.createSpan({ cls: "slides-ng-speaker-timer", text: "00:00:00" });
 
     // Control bar — connected nav pill + utility buttons
     const controls = container.createDiv({ cls: "slides-ng-speaker-controls" });
@@ -219,30 +239,63 @@ export class SlidesNGSpeakerView extends ItemView {
       onClick: () => this.send("last"),
     });
 
-    const utilGroup = controls.createDiv({ cls: "slides-ng-speaker-util-group" });
-    this.addControlButton(utilGroup, {
-      icon: "grid-3x3",
-      label: "Grid",
-      tooltip: "Toggle the slide-grid overview",
-      onClick: () => this.send("toggleOverview"),
-    });
-    // Note: the Blackout button used to live here but it was duplicated
-    // with the Scenes row's Blackout default. Now blackout is a scene
-    // accessed via Scenes; this util-group keeps just the Grid action.
+    // v0.10.0: Grid moved out of speaker controls and into the preview
+    // toolbar (where Menu / Use current already live). The status bar
+    // is still clickable as a shortcut.
 
-    // Timer controls
-    const timerCtrls = container.createDiv({ cls: "slides-ng-speaker-timer-ctrls" });
-    setPanelVisible(timerCtrls, "timer");
-    this.timerToggleBtn = this.addControlButton(timerCtrls, {
+    // Timer panel — self-contained: big display + mode dropdown +
+    // Start/Reset buttons. v0.10.0+. Replaces the v0.8.x split where
+    // the timer DISPLAY lived in the status bar and the BUTTONS lived
+    // in a separate slim row.
+    const timerPanel = container.createDiv({ cls: "slides-ng-speaker-timer-panel" });
+    setPanelVisible(timerPanel, "timer");
+    timerPanel.createEl("div", {
+      cls: "slides-ng-speaker-section-title",
+      text: "Timer",
+    });
+    this.timerEl = timerPanel.createEl("div", {
+      cls: "slides-ng-speaker-timer-display",
+      text: "00:00:00",
+    });
+    const timerRow = timerPanel.createDiv({
+      cls: "slides-ng-speaker-timer-row",
+    });
+    const modeSelect = timerRow.createEl("select", {
+      cls: "dropdown slides-ng-speaker-timer-mode",
+      attr: { "aria-label": "Timer mode" },
+    });
+    const modes: Array<{ value: SlidesNGSettings["speakerTimerMode"]; label: string }> = [
+      { value: "elapsed", label: "Elapsed" },
+      { value: "countdown", label: "Countdown" },
+      { value: "lap", label: "Slide (lap)" },
+    ];
+    for (const m of modes) {
+      const opt = modeSelect.createEl("option", { value: m.value, text: m.label });
+      if ((this.getSettings?.()?.speakerTimerMode ?? "elapsed") === m.value) {
+        opt.selected = true;
+      }
+    }
+    modeSelect.addEventListener("change", () => {
+      const s = this.getSettings?.();
+      if (!s) return;
+      s.speakerTimerMode = modeSelect.value as SlidesNGSettings["speakerTimerMode"];
+      void this.saveSettings?.();
+      this.resetTimer();
+    });
+    setTooltip(
+      modeSelect,
+      "Elapsed counts up; Countdown counts down from the configured minutes; Lap resets per slide"
+    );
+    this.timerToggleBtn = this.addControlButton(timerRow, {
       icon: "play",
       label: "Start",
-      tooltip: "Start the elapsed timer",
+      tooltip: "Start the timer",
       onClick: () => this.toggleTimer(),
     });
-    this.addControlButton(timerCtrls, {
+    this.addControlButton(timerRow, {
       icon: "rotate-ccw",
       label: "Reset",
-      tooltip: "Reset the elapsed timer to zero",
+      tooltip: "Reset the timer to zero",
       onClick: () => this.resetTimer(),
     });
 
@@ -500,24 +553,40 @@ export class SlidesNGSpeakerView extends ItemView {
       void this.saveSettings?.();
       this.applyPanelOrder();
     });
-    // Placement: inline next to the section title when there is one
-    // (so the handle sits with the panel's label text), otherwise
-    // floating at top-left for title-less panels (status, controls,
-    // timer, nextLine).
+    // Placement (v0.10.0 rewrite):
+    //   - If the section title sits inside an existing `*-header` div
+    //     (notesHeader, pickerHeader — both already row-flex), insert
+    //     the handle BEFORE the title in that header.
+    //   - If the section title is a direct child of the panel (visualNext,
+    //     scenes, picker without header), wrap the title in a NEW
+    //     `panel-header` sub-div and put the handle next to it. This
+    //     avoids mutating the panel's own flex-direction (which used to
+    //     accidentally center the panel's other children horizontally).
+    //   - Title-less panels (status, controls, timer, nextLine) get a
+    //     floating handle at top-left.
     const title = panel.querySelector<HTMLElement>(
       ":scope > .slides-ng-speaker-section-title, " +
         ":scope > [class*='-header'] > .slides-ng-speaker-section-title"
     );
-    if (title) {
-      const titleParent = title.parentElement;
-      if (titleParent) {
-        titleParent.classList.add("slides-ng-speaker-panel-header");
-        titleParent.insertBefore(handle, title);
-      } else {
-        panel.insertBefore(handle, panel.firstChild);
-      }
-    } else {
+    if (!title) {
       handle.classList.add("slides-ng-speaker-panel-handle--floating");
+      panel.insertBefore(handle, panel.firstChild);
+      return;
+    }
+    const titleParent = title.parentElement;
+    const titleParentIsHeader =
+      !!titleParent && /-header\b/.test(titleParent.className);
+    if (titleParentIsHeader) {
+      titleParent!.insertBefore(handle, title);
+    } else if (titleParent) {
+      // Wrap title in a new header div so the handle + title sit on a
+      // row without forcing row-direction on the panel itself.
+      const header = document.createElement("div");
+      header.className = "slides-ng-speaker-panel-header";
+      titleParent.insertBefore(header, title);
+      header.appendChild(handle);
+      header.appendChild(title);
+    } else {
       panel.insertBefore(handle, panel.firstChild);
     }
   }
@@ -650,17 +719,21 @@ export class SlidesNGSpeakerView extends ItemView {
     const sceneRow = wrap.createDiv({ cls: "slides-ng-speaker-scenes" });
     this.sceneButtons.clear();
     for (const scene of scenes) {
-      // Icon lookup: a few well-known scene ids get a dedicated icon;
-      // anything else gets a generic "layers" icon.
-      const icon = scene.id === "blackout"
-        ? "monitor-off"
-        : scene.id === "brb"
-          ? "coffee"
-          : scene.id === "qa"
-            ? "message-circle-question"
-            : scene.id === "standby"
-              ? "pause-circle"
-              : "layers";
+      // Icon priority: explicit `scene.icon` (v0.10.0+ user-customisable
+      // via settings tab) → well-known scene id fallback → generic
+      // "layers" icon. Stays backwards-compatible with the v0.7.x
+      // default-scenes-without-icon shape.
+      const fallback =
+        scene.id === "blackout"
+          ? "monitor-off"
+          : scene.id === "brb"
+            ? "coffee"
+            : scene.id === "qa"
+              ? "message-circle-question"
+              : scene.id === "standby"
+                ? "pause-circle"
+                : "layers";
+      const icon = scene.icon && scene.icon.trim().length > 0 ? scene.icon : fallback;
       const btn = this.addControlButton(sceneRow, {
         icon,
         label: scene.label,
@@ -985,12 +1058,12 @@ export class SlidesNGSpeakerView extends ItemView {
         });
         row.addEventListener("click", () => this.send("goto", s.idx));
       }
-      // Footer: "View all" button to open the Grid for jumping outside
-      // the compact window. Saves users from switching to list mode
-      // just to find a specific slide.
+      // Footer link to open the Grid for jumping outside the compact
+      // window. Styled as a small text-link (v0.10.0+) so it's
+      // visually distinct from the slide-row buttons above.
       const footer = summary.createEl("button", {
         cls: "slides-ng-speaker-compact-all",
-        text: `View all ${slides.length} slides …`,
+        text: `Show all ${slides.length} slides →`,
         attr: { type: "button" },
       });
       footer.addEventListener("click", () => this.send("toggleOverview"));
@@ -1037,7 +1110,10 @@ export class SlidesNGSpeakerView extends ItemView {
     this.timerStartMs = null;
     this.timerPausedMs = 0;
     this.stopTimerTick();
-    if (this.timerEl) this.timerEl.setText("00:00:00");
+    if (this.timerEl) {
+      this.timerEl.setText("00:00:00");
+      this.timerEl.classList.remove("warning", "overrun");
+    }
     this.applyTimerBtnState();
   }
 
@@ -1065,18 +1141,48 @@ export class SlidesNGSpeakerView extends ItemView {
 
   private applyTimerLabel(): void {
     if (!this.timerEl) return;
-    const ms =
+    const settings = this.getSettings?.();
+    const mode = settings?.speakerTimerMode ?? "elapsed";
+    const elapsed =
       this.timerStartMs === null ? this.timerPausedMs : Date.now() - this.timerStartMs;
-    this.timerEl.setText(formatMs(ms));
+    if (mode === "countdown") {
+      const targetMs = (settings?.speakerTimerCountdownMinutes ?? 30) * 60 * 1000;
+      const remaining = targetMs - elapsed;
+      this.timerEl.setText(formatMs(Math.abs(remaining), remaining < 0));
+      // Warning state once 80% consumed; overrun state once past target.
+      const pct = elapsed / targetMs;
+      this.timerEl.classList.toggle("warning", pct >= 0.8 && pct < 1);
+      this.timerEl.classList.toggle("overrun", remaining < 0);
+    } else {
+      // elapsed + lap render identically; lap just resets on slide change.
+      this.timerEl.setText(formatMs(elapsed, false));
+      this.timerEl.classList.remove("warning", "overrun");
+    }
+  }
+
+  /**
+   * Reset the timer to zero AND keep it running if it was running.
+   * Used by lap mode on every slide change so the timer always reflects
+   * "time spent on the current slide."
+   */
+  private lapResetTimer(): void {
+    const wasRunning = this.timerStartMs !== null;
+    this.timerStartMs = wasRunning ? Date.now() : null;
+    this.timerPausedMs = 0;
+    this.applyTimerLabel();
   }
 }
 
-function formatMs(ms: number): string {
+/**
+ * Format a millisecond duration as `HH:MM:SS`. Prefix with `-` when
+ * `negative` is true (used by countdown overrun rendering).
+ */
+function formatMs(ms: number, negative: boolean): string {
   const total = Math.floor(ms / 1000);
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(
+  return `${negative ? "-" : ""}${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(
     2,
     "0"
   )}`;

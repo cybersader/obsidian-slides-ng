@@ -264,7 +264,7 @@ describe("slides-ng speaker view drives the preview", function () {
     // Find the timer toggle button (the one starting with "Start").
     const initial = await browser.execute(() => {
       const btns = Array.from(
-        document.querySelectorAll(".slides-ng-speaker-timer-ctrls .slides-ng-speaker-btn")
+        document.querySelectorAll(".slides-ng-speaker-timer-row .slides-ng-speaker-btn")
       ) as HTMLButtonElement[];
       const btn = btns.find((b) => (b.textContent ?? "").trim() === "Start");
       return {
@@ -280,7 +280,7 @@ describe("slides-ng speaker view drives the preview", function () {
     // Click Start.
     await browser.execute(() => {
       const btns = Array.from(
-        document.querySelectorAll(".slides-ng-speaker-timer-ctrls .slides-ng-speaker-btn")
+        document.querySelectorAll(".slides-ng-speaker-timer-row .slides-ng-speaker-btn")
       ) as HTMLButtonElement[];
       btns.find((b) => (b.textContent ?? "").trim() === "Start")?.click();
     });
@@ -289,7 +289,7 @@ describe("slides-ng speaker view drives the preview", function () {
       async () => {
         const txt = await browser.execute(() => {
           const btns = Array.from(
-            document.querySelectorAll(".slides-ng-speaker-timer-ctrls .slides-ng-speaker-btn")
+            document.querySelectorAll(".slides-ng-speaker-timer-row .slides-ng-speaker-btn")
           ) as HTMLButtonElement[];
           // After click the label flips to "Pause" — find by that text.
           return btns.find((b) => (b.textContent ?? "").trim() === "Pause") ? "Pause" : "";
@@ -301,7 +301,7 @@ describe("slides-ng speaker view drives the preview", function () {
 
     const running = await browser.execute(() => {
       const btns = Array.from(
-        document.querySelectorAll(".slides-ng-speaker-timer-ctrls .slides-ng-speaker-btn")
+        document.querySelectorAll(".slides-ng-speaker-timer-row .slides-ng-speaker-btn")
       ) as HTMLButtonElement[];
       const btn = btns.find((b) => (b.textContent ?? "").trim() === "Pause");
       return {
@@ -316,16 +316,26 @@ describe("slides-ng speaker view drives the preview", function () {
     // subsequent specs).
     await browser.execute(() => {
       const btns = Array.from(
-        document.querySelectorAll(".slides-ng-speaker-timer-ctrls .slides-ng-speaker-btn")
+        document.querySelectorAll(".slides-ng-speaker-timer-row .slides-ng-speaker-btn")
       ) as HTMLButtonElement[];
       btns.find((b) => (b.textContent ?? "").trim() === "Pause")?.click();
     });
   });
 
-  it("Grid button opens the custom slides-picker overlay", async () => {
-    // v0.7.3+ — Grid uses a custom overlay (#slides-ng-grid) instead
-    // of reveal's stock overview.
-    await clickSpeakerButtonByText("Grid");
+  it("Grid toolbar button opens the custom slides-picker overlay", async () => {
+    // v0.10.0+ — Grid moved from the speaker view util-group into the
+    // PREVIEW toolbar (left group, next to Menu / Use current). The
+    // speaker view's "Slide N of M" status-bar bar still toggles the
+    // same overlay, but Grid lives in the toolbar now.
+    const clickPreviewGrid = (): Promise<unknown> =>
+      browser.execute(() => {
+        const btns = Array.from(
+          document.querySelectorAll<HTMLButtonElement>(".slides-ng-toolbar-btn")
+        );
+        btns.find((b) => (b.textContent ?? "").trim().startsWith("Grid"))?.click();
+      });
+
+    await clickPreviewGrid();
     await switchToSlideFrame();
     try {
       await browser.waitUntil(
@@ -338,7 +348,7 @@ describe("slides-ng speaker view drives the preview", function () {
     }
 
     // Toggle off so subsequent tests aren't affected.
-    await clickSpeakerButtonByText("Grid");
+    await clickPreviewGrid();
   });
 
   it("captures speaker + preview screenshot", async () => {

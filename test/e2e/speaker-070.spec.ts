@@ -112,9 +112,11 @@ describe("v0.7.0 — speaker UX overhaul + scenes", function () {
     // had irreconcilable CSS-transform/clipping issues). Instead it
     // opens a custom overlay div (#slides-ng-grid) with one text tile
     // per slide.
+    // v0.10.0: Grid lives in the preview toolbar (left group), not the
+    // speaker view. Click via .slides-ng-toolbar-btn instead.
     await browser.execute(() => {
       const btns = Array.from(
-        document.querySelectorAll(".slides-ng-speaker-util-group .slides-ng-speaker-btn")
+        document.querySelectorAll(".slides-ng-toolbar-btn")
       ) as HTMLButtonElement[];
       btns.find((b) => (b.textContent ?? "").trim().startsWith("Grid"))?.click();
     });
@@ -143,9 +145,11 @@ describe("v0.7.0 — speaker UX overhaul + scenes", function () {
     }
 
     // Toggle off so subsequent tests aren't affected.
+    // v0.10.0: Grid lives in the preview toolbar (left group), not the
+    // speaker view. Click via .slides-ng-toolbar-btn instead.
     await browser.execute(() => {
       const btns = Array.from(
-        document.querySelectorAll(".slides-ng-speaker-util-group .slides-ng-speaker-btn")
+        document.querySelectorAll(".slides-ng-toolbar-btn")
       ) as HTMLButtonElement[];
       btns.find((b) => (b.textContent ?? "").trim().startsWith("Grid"))?.click();
     });

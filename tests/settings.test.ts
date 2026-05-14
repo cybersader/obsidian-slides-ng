@@ -18,6 +18,18 @@ describe("settings defaults", () => {
   test("default transition is 'slide'", () => {
     expect(DEFAULT_SETTINGS.defaultTransition).toBe("slide");
   });
+
+  test("v0.10.0: speakerTimerMode defaults to 'elapsed'", () => {
+    expect(DEFAULT_SETTINGS.speakerTimerMode).toBe("elapsed");
+  });
+
+  test("v0.10.0: speakerTimerCountdownMinutes defaults to 30", () => {
+    expect(DEFAULT_SETTINGS.speakerTimerCountdownMinutes).toBe(30);
+  });
+
+  test("v0.10.0: speakerPanelsMultiColumn defaults to true", () => {
+    expect(DEFAULT_SETTINGS.speakerPanelsMultiColumn).toBe(true);
+  });
 });
 
 describe("availableThemes / getTheme", () => {

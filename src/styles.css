@@ -156,23 +156,62 @@
 .slides-ng-speaker-position {
   font-weight: 600;
 }
-.slides-ng-speaker-timer {
-  font-family: var(--font-monospace);
-  font-size: 1.05em;
-}
 .slides-ng-speaker-controls {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
 }
-.slides-ng-speaker-nav-group,
-.slides-ng-speaker-util-group,
-.slides-ng-speaker-timer-ctrls {
+.slides-ng-speaker-nav-group {
   display: flex;
   gap: 0.3rem;
   align-items: center;
   flex-wrap: wrap;
+}
+/* ===== Timer panel (v0.10.0 unified design) =====
+ * Replaces the v0.8.x split where the timer DISPLAY lived in the
+ * status bar and the BUTTONS lived in a tiny separate row. Now
+ * it's one self-contained panel: title, big digits, controls row. */
+.slides-ng-speaker-timer-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--background-secondary);
+  border-radius: 8px;
+}
+.slides-ng-speaker-timer-display {
+  font-family: var(--font-monospace);
+  font-size: 2em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: var(--text-normal);
+}
+/* Countdown warning (≥80% consumed): amber. */
+.slides-ng-speaker-timer-display.warning {
+  color: var(--color-orange, #d4843a);
+}
+/* Countdown overrun: red + slight pulse to draw the presenter's eye. */
+.slides-ng-speaker-timer-display.overrun {
+  color: var(--color-red, #d44a4a);
+  animation: slides-ng-speaker-timer-pulse 1.6s ease-in-out infinite;
+}
+@keyframes slides-ng-speaker-timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.slides-ng-speaker-timer-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.slides-ng-speaker-timer-mode {
+  /* Use Obsidian's standard dropdown sizing. The .dropdown class
+   * applied in code handles most of the visual; this just adds a
+   * sensible width cap. */
+  max-width: 12em;
 }
 .slides-ng-speaker-nav-group {
   /* Connected pill for the four navigation buttons (First / Prev /
@@ -258,6 +297,18 @@
 .slides-ng-speaker {
   container-type: inline-size;
 }
+/* v0.10.0: multi-column panel flow at wide widths. Opt-out via the
+ * `slides-ng-speaker-multicolumn` class on the root (defaults on; the
+ * `speakerPanelsMultiColumn` setting flips it). Below ~900px the
+ * panels stack vertically (single column auto-fit fallback). */
+@container (min-width: 900px) {
+  .slides-ng-speaker.slides-ng-speaker-multicolumn {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 0.75rem;
+    align-items: start;
+  }
+}
 
 /* Speaker panels need position:relative for the absolute drop-indicator
  * line + the absolute drag handle. */
@@ -298,11 +349,18 @@
   left: 0;
   z-index: 6;
 }
-/* When inline alongside a title, the title's parent becomes a flex
- * row. Add a small gap between handle and title text. */
+/* Title + handle sit on a row. v0.10.0: this used to be applied
+ * directly to the panel root, which forced any column-flex panels
+ * (visualNext, scenes wrap, picker wrap) to center their other
+ * children horizontally. Now attachDragHandle wraps title+handle in
+ * a fresh `panel-header` sub-div so the panel root keeps its own
+ * layout intact. `justify-content:flex-start` is explicit so the
+ * header never accidentally centers its contents. */
 .slides-ng-speaker-panel-header {
   display: flex;
+  flex-direction: row;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.35rem;
 }
 /* Show only when hovering THIS panel specifically. While dragging,
@@ -353,9 +411,19 @@
   /* Aspect-ratio box (default) — padding-top creates a responsive
    * 16:9-ish frame proportional to width. When the user drag-resizes
    * the bottom edge, JS swaps `padding-top` to `0` + sets an explicit
-   * `height` and persists it via settings. */
+   * `height` and persists it via settings.
+   *
+   * v0.10.0: cap max-width so the preview doesn't stretch infinitely
+   * wide on wide viewports (it used to look "really long horizontally"
+   * because reveal's slide aspect is fixed). Centered when narrower
+   * than the panel. The 900px cap pairs naturally with the 2-column
+   * panel breakpoint below: at wider widths the panel itself sits in
+   * a 2-col grid, so the iframe never needs to grow past one column. */
   position: relative;
   width: 100%;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
   padding-top: 56%;
   background: #000;
   border-radius: 6px;
@@ -398,14 +466,39 @@
   margin-top: 0.5rem;
 }
 .slides-ng-scene-editor-row {
+  /* v0.10.0: 4 columns — label, icon-with-preview, content, remove. */
   display: grid;
-  grid-template-columns: 1fr 2fr auto;
+  grid-template-columns: minmax(120px, 1fr) minmax(160px, 1fr) minmax(200px, 2fr) auto;
   gap: 0.5rem;
   align-items: start;
   padding: 0.5rem;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
   background: var(--background-secondary);
+}
+.slides-ng-scene-editor-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.slides-ng-scene-editor-icon input {
+  flex: 1 1 auto;
+}
+.slides-ng-scene-editor-icon-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 4px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  color: var(--text-normal);
+}
+.slides-ng-scene-editor-icon-preview .svg-icon {
+  width: 16px;
+  height: 16px;
 }
 .slides-ng-scene-editor-row input,
 .slides-ng-scene-editor-row textarea {
@@ -437,6 +530,7 @@
   letter-spacing: 0.06em;
   color: var(--text-muted);
   margin-top: 0.25rem;
+  text-align: left;
 }
 .slides-ng-speaker-notes-wrap {
   flex: 0 0 auto;
@@ -566,22 +660,29 @@
   white-space: nowrap;
 }
 .slides-ng-speaker-compact-all {
+  /* v0.10.0: text-link style instead of a dashed-border tile, so it
+   * reads as a SECONDARY action rather than another slide row. */
   appearance: none;
   margin-top: 0.4rem;
-  padding: 0.35rem 0.5rem;
-  border: 1px dashed var(--background-modifier-border);
+  padding: 0.25rem 0.3rem;
+  border: 0;
   background: transparent;
   color: var(--text-muted);
   font: inherit;
   font-size: 0.82em;
-  border-radius: 4px;
   cursor: pointer;
-  text-align: center;
-  transition: background 80ms ease, color 80ms ease;
+  text-align: left;
+  text-decoration: none;
+  transition: color 80ms ease;
 }
 .slides-ng-speaker-compact-all:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+.slides-ng-speaker-compact-all:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 
 /* Full-list picker rows */

@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, setIcon } from "obsidian";
 import type SlidesNGPlugin from "./main";
 import {
   REVEAL_TRANSITIONS,
@@ -249,6 +249,57 @@ export class SlidesNGSettingTab extends PluginSettingTab {
         );
       });
 
+    new Setting(containerEl)
+      .setName("Timer default mode")
+      .setDesc(
+        "`Elapsed` counts up; `countdown` counts down from the configured minutes and goes negative on overrun; `lap` resets every slide change."
+      )
+      .addDropdown((d) => {
+        d.addOption("elapsed", "Elapsed");
+        d.addOption("countdown", "Countdown");
+        d.addOption("lap", "Slide (lap)");
+        d.setValue(this.plugin.settings.speakerTimerMode ?? "elapsed").onChange(
+          async (v) => {
+            this.plugin.settings.speakerTimerMode = v as
+              | "elapsed"
+              | "countdown"
+              | "lap";
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
+    new Setting(containerEl)
+      .setName("Countdown target (minutes)")
+      .setDesc(
+        "Total duration for the countdown timer mode. Ignored in elapsed/lap modes."
+      )
+      .addText((t) => {
+        t.setValue(
+          String(this.plugin.settings.speakerTimerCountdownMinutes ?? 30)
+        ).onChange(async (v) => {
+          const n = parseFloat(v);
+          if (Number.isFinite(n) && n > 0 && n <= 600) {
+            this.plugin.settings.speakerTimerCountdownMinutes = n;
+            await this.plugin.saveSettings();
+          }
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Multi-column panels at wide widths")
+      .setDesc(
+        "When the speaker pane is at least 900 pixels wide, flow panels into a 2-column grid instead of stacking them all vertically."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.speakerPanelsMultiColumn !== false).onChange(
+          async (v) => {
+            this.plugin.settings.speakerPanelsMultiColumn = v;
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
     // ---------- Speaker panels ----------
     new Setting(containerEl).setName("Speaker panels").setHeading();
     new Setting(containerEl)
@@ -309,6 +360,35 @@ export class SlidesNGSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
 
+        // Icon column: text input + live preview swatch. Any Lucide
+        // name from https://lucide.dev/icons works (e.g. monitor-off,
+        // coffee, message-circle-question, layers).
+        const iconWrap = row.createDiv({ cls: "slides-ng-scene-editor-icon" });
+        const iconPreview = iconWrap.createSpan({
+          cls: "slides-ng-scene-editor-icon-preview",
+        });
+        const iconInput = iconWrap.createEl("input", {
+          attr: {
+            type: "text",
+            placeholder: "Lucide icon (e.g. coffee)",
+            value: scene.icon ?? "",
+            title:
+              "Pick any icon from https://lucide.dev/icons. Empty = automatic fallback.",
+          },
+        });
+        const repaintIcon = (name: string): void => {
+          iconPreview.empty();
+          if (name && name.trim().length > 0) {
+            setIcon(iconPreview, name.trim());
+          }
+        };
+        repaintIcon(scene.icon ?? "");
+        iconInput.addEventListener("input", () => repaintIcon(iconInput.value));
+        iconInput.addEventListener("change", async () => {
+          scenes[i] = { ...scene, icon: iconInput.value || undefined };
+          await this.plugin.saveSettings();
+        });
+
         const contentInput = row.createEl("textarea", {
           attr: { placeholder: "Markdown content (empty = blackout)" },
         });
@@ -333,7 +413,12 @@ export class SlidesNGSettingTab extends PluginSettingTab {
       });
       addBtn.addEventListener("click", async () => {
         const newId = `scene-${Date.now().toString(36)}`;
-        const newScene: SceneDefinition = { id: newId, label: "New scene", content: "" };
+        const newScene: SceneDefinition = {
+          id: newId,
+          label: "New scene",
+          content: "",
+          icon: "layers",
+        };
         this.plugin.settings.scenes.push(newScene);
         await this.plugin.saveSettings();
         refresh();

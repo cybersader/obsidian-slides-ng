@@ -41,6 +41,21 @@ describe("Scenes defaults", () => {
     const unique = new Set(ids);
     expect(unique.size).toBe(ids.length);
   });
+
+  test("v0.10.0: every default scene ships with an icon", () => {
+    for (const s of DEFAULT_SCENES) {
+      expect(typeof s.icon).toBe("string");
+      expect((s.icon ?? "").length).toBeGreaterThan(0);
+    }
+  });
+
+  test("v0.10.0: well-known scenes get sensible default icons", () => {
+    const byId = Object.fromEntries(DEFAULT_SCENES.map((s) => [s.id, s.icon]));
+    expect(byId.blackout).toBe("monitor-off");
+    expect(byId.brb).toBe("coffee");
+    expect(byId.qa).toBe("message-circle-question");
+    expect(byId.standby).toBe("pause-circle");
+  });
 });
 
 describe("Iframe bridge wires scene commands", () => {

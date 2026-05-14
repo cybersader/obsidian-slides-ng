@@ -6,6 +6,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-05-14
+
+### Added
+
+- **Dedicated Timer panel with 3 modes** — replaces the v0.8.x split
+  where the timer DISPLAY lived in the status bar and the BUTTONS
+  lived in a tiny separate row.
+  - **Elapsed** — counts up from zero (original behaviour, default)
+  - **Countdown** — counts down from a configurable target (default
+    30 min); shows an amber warning at 80% consumed and a red
+    pulsing overrun once past zero
+  - **Slide (lap)** — auto-resets every time the active slide
+    changes; useful for keeping per-slide pace
+  - Mode selectable inline via a dropdown in the panel and via two
+    new settings: `Timer default mode` and `Countdown target
+    (minutes)`.
+- **Multi-column panel flow at wide widths** — when the speaker
+  pane is ≥ 900 px wide, panels flow into a 2-column auto-fit grid
+  (`grid-template-columns: repeat(auto-fit, minmax(420px, 1fr))`)
+  instead of stacking infinitely vertically. Opt out via the new
+  `Multi-column panels at wide widths` setting.
+- **Grid in preview toolbar** — Grid moved out of the speaker
+  view's util-group and into the PREVIEW toolbar (left group, next
+  to Menu / Use current). The status bar's "Slide N of M" button
+  still toggles the same overlay, so speaker users keep a
+  one-click route to it.
+- **Per-scene icon customisation** — `SceneDefinition` gains an
+  optional `icon: string` field that any Lucide icon name fills
+  (`monitor-off`, `coffee`, `message-circle-question`, etc.). The
+  settings tab's scene editor adds an icon column with a live
+  preview swatch next to a text input — paste any name from
+  lucide.dev and it renders immediately. The 4 default scenes ship
+  with their previous icons made explicit.
+
+### Changed
+
+- **Visual next-slide preview width capped at 900 px**, centered
+  inside its panel. At very wide viewports the iframe used to grow
+  proportionally wider while reveal's slide aspect stayed fixed —
+  the result looked "really long horizontally" even when it had
+  plenty of room. Now it stops growing past 900 px and the side
+  space goes into the multi-column panel flow.
+- **"View all N slides" picker footer restyled as a text-link**
+  (was: dashed-border tile that read as another slide row). Now
+  reads as `Show all 7 slides →` and uses muted-text-with-accent-on-
+  hover styling so it's visually distinct from the slide rows above.
+- **Drag-handle inline placement now wraps title + handle in a
+  fresh sub-div** instead of mutating the panel's own flex layout.
+  v0.8.4's attempt to add the `panel-header` class directly to a
+  panel root (like `visualNext-wrap` or `picker-wrap`, which are
+  themselves column-flex containers) was forcing `align-items:center`
+  on the whole panel — that's why the user reported "the text is
+  being centered for some reason" in v0.9.0. The new sub-div
+  contains only handle + title and stays explicitly
+  `flex-direction:row, justify-content:flex-start`.
+- **Status bar no longer shows the timer** — moved into its own
+  panel. The "Slide N of M" button gets the full status-bar width.
+- **Speaker controls panel description** updated: was "First /
+  Prev / Next / Last / Grid", now "First / Prev / Next / Last"
+  (Grid moved to toolbar).
+
+### Why
+
+The user's v0.9.0 polish review surfaced six distinct UX issues
+that clustered naturally:
+1. Drag handle + section-title alignment looked wrong
+2. Visual next-slide stretched too wide on wide viewports
+3. "View all N slides" looked like another slide row
+4. Grid button placement felt random in the speaker view
+5. Start/Reset alone with no timer-mode controls felt half-baked
+6. Scene icons appeared hard-coded (they were)
+
+Fixing them one at a time would have shipped 6 minor releases.
+Bundling solves the related concerns at once and lets the
+multi-column panel idea pay for the visual-next-slide width cap —
+since the iframe stops growing, the side space becomes useful.
+
+### Technical
+
+- `src/settings.ts` — `SceneDefinition.icon?: string`;
+  `speakerTimerMode: "elapsed" | "countdown" | "lap"`;
+  `speakerTimerCountdownMinutes: number`; `speakerPanelsMultiColumn:
+  boolean`. `DEFAULT_SCENES` updated with explicit icons. Panel-
+  label descriptions reflect the new "Grid moved to toolbar"
+  arrangement.
+- `src/SlidesNGSpeakerView.ts` — timer panel rewrite (title +
+  big display + mode dropdown + Start/Reset row); status bar no
+  longer mounts the timer span; util-group removed; scene-button
+  icon prefers `scene.icon` over the hard-coded id fallback;
+  `attachDragHandle` wraps title + handle in a fresh `panel-header`
+  sub-div; lap-mode timer resets in the postMessage handler when
+  `currentIdx` changes; `applyTimerLabel` branches per mode (with
+  `warning` / `overrun` CSS classes for countdown).
+- `src/SlidesNGView.ts` — Grid toolbar button (left group, after
+  Menu), posts `toggleOverview` to the iframe bridge.
+- `src/SlidesNGSettingTab.ts` — Timer default mode, Countdown
+  target (minutes), Multi-column panels; scene editor now has an
+  icon column with live `setIcon` preview swatch.
+- `src/styles.css` — new `.slides-ng-speaker-timer-panel` /
+  `-display` / `-row` / `-mode` rules; countdown warning/overrun
+  states with a 1.6s pulse keyframe; `.slides-ng-speaker-compact-all`
+  restyled as text-link; visual-next-frame-wrap `max-width: 900px`
+  + auto margins; `.slides-ng-scene-editor-row` grid now 4 columns
+  (label / icon / content / remove); `.slides-ng-scene-editor-icon`
+  + `-icon-preview` for the picker swatch; container-query
+  `(min-width: 900px)` opt-in 2-column grid via
+  `.slides-ng-speaker-multicolumn` class.
+- `tests/scenes.test.ts` — icon field defaults asserted;
+  `tests/settings.test.ts` — three new defaults asserted (timer
+  mode, countdown minutes, multi-column).
+- `test/e2e/speaker-view.spec.ts` + `speaker-070.spec.ts` — Grid
+  click selectors updated to the toolbar; timer-ctrls renamed to
+  timer-row.
+
+### Bundle size
+
+2.01 MB → 2.02 MB (+7 KB for all 6 features).
+
 ## [0.9.0] — 2026-05-13
 
 ### Added

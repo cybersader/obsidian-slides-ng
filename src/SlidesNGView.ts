@@ -120,6 +120,13 @@ export class SlidesNGView extends ItemView {
       onClick: () => this.postIframeCommand("toggleMenu"),
     });
 
+    this.addToolbarButton(leftGroup, {
+      icon: "grid-3x3",
+      label: "Grid",
+      tooltip: "Toggle the slide-grid overview",
+      onClick: () => this.postIframeCommand("toggleOverview"),
+    });
+
     this.addToolbarButton(rightGroup, {
       icon: "monitor-play",
       label: "Speaker",
