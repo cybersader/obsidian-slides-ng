@@ -445,22 +445,18 @@ export class SlidesNGView extends ItemView {
         magicMoveDurationMs: settings.magicMoveDurationMs,
         resolveImage: (raw) => this.resolveImageAttachment(raw, file.path),
       });
-      // v0.10.5: defer setting srcdoc until the iframe element has
-      // non-zero dimensions. Reveal.initialize() inside the iframe
-      // reads document.documentElement.clientWidth/Height and bakes
-      // those into the slide-stage transform — if it runs at 0x0,
-      // the slides are sized to nothing and the pane stays black,
-      // no amount of subsequent Reveal.layout() calls can fully
-      // recover.
+      // v0.10.7: set srcdoc immediately (no more wait-for-size
+      // blocking). If the iframe is currently 0x0, Reveal will
+      // initialise into 0x0 and bake that into its slide-stage
+      // transform — but we mark `renderedAtZeroSize` so the
+      // parent-side ResizeObserver re-triggers `refresh()` on the
+      // first non-zero resize. Reveal then initialises fresh.
       //
-      // v0.10.6: if waitForIframeSize times out at 0x0 (rare but
-      // observed via command-palette open: iframe stayed at 0x0 for
-      // ~1.5s, then resized AFTER timeout fired), we set srcdoc
-      // anyway as a fallback BUT mark the view so the parent-side
-      // ResizeObserver knows to re-trigger refresh() when the iframe
-      // finally gets real dimensions.
-      await this.waitForIframeSize();
-      if (!this.iframeEl) return; // view closed during wait
+      // Why drop the wait: the v0.10.5 wait-for-size helper added
+      // up to 3s of perceived latency on opens where the iframe
+      // started 0x0 (any sidebar/tab-not-yet-visible path). With
+      // the re-render-on-resize path proven in v0.10.6, the wait
+      // is redundant — and it was making opens feel laggy.
       const stillZero =
         this.iframeEl.clientWidth === 0 || this.iframeEl.clientHeight === 0;
       this.renderedAtZeroSize = stillZero;
@@ -478,67 +474,6 @@ export class SlidesNGView extends ItemView {
       this.showPlaceholder(`Render error: ${msg}`);
       new Notice(`slides-ng render error: ${msg}`);
     }
-  }
-
-  /**
-   * v0.10.5: wait (up to ~1.5s) until the iframe element has non-zero
-   * clientWidth and clientHeight before resolving. Used to defer
-   * setting `srcdoc` until Reveal.js can initialise into a real-sized
-   * viewport — initialising at 0x0 left the pane black even after
-   * later `Reveal.layout()` calls.
-   *
-   * Falls back after the timeout to set srcdoc anyway, so a pane
-   * that genuinely never gains size (e.g. collapsed sidebar) still
-   * gets some content. The user can drag the divider to reveal it
-   * and the v0.10.4 parent-side ResizeObserver will fire the
-   * relayout burst as before.
-   */
-  private async waitForIframeSize(timeoutMs = 3000): Promise<void> {
-    const iframe = this.iframeEl;
-    if (!iframe) return;
-    if (iframe.clientWidth > 0 && iframe.clientHeight > 0) return;
-    this.debug?.log("view/wait-for-size/start", {
-      clientW: iframe.clientWidth,
-      clientH: iframe.clientHeight,
-    });
-    await new Promise<void>((resolve) => {
-      let resolved = false;
-      const done = (): void => {
-        if (resolved) return;
-        resolved = true;
-        if (timer !== null) window.clearTimeout(timer);
-        if (ro) ro.disconnect();
-        resolve();
-      };
-      let ro: ResizeObserver | null = null;
-      const timer: number | null = window.setTimeout(() => {
-        this.debug?.log("view/wait-for-size/timeout", {
-          clientW: iframe.clientWidth,
-          clientH: iframe.clientHeight,
-        });
-        done();
-      }, timeoutMs);
-      if (typeof ResizeObserver === "function") {
-        ro = new ResizeObserver(() => {
-          if (iframe.clientWidth > 0 && iframe.clientHeight > 0) {
-            this.debug?.log("view/wait-for-size/ready", {
-              clientW: iframe.clientWidth,
-              clientH: iframe.clientHeight,
-            });
-            done();
-          }
-        });
-        ro.observe(iframe);
-      } else {
-        // No ResizeObserver — poll.
-        const poll = window.setInterval(() => {
-          if (iframe.clientWidth > 0 && iframe.clientHeight > 0) {
-            window.clearInterval(poll);
-            done();
-          }
-        }, 50);
-      }
-    });
   }
 
   private showPlaceholder(message: string): void {

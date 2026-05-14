@@ -6,6 +6,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.7] — 2026-05-14
+
+### Fixed
+
+- **"Black for a second then pops in" perceived latency** —
+  v0.10.5's `waitForIframeSize` was blocking `refresh()` for up
+  to 3 seconds while the iframe was at 0×0, which made every
+  open feel laggy. The helper is gone; `refresh()` now sets
+  srcdoc immediately. The v0.10.6 `renderedAtZeroSize` + parent
+  ResizeObserver re-render path catches the 0×0 case without
+  the wait — once the iframe gets real dimensions, refresh is
+  re-triggered automatically.
+- **Ribbon click doesn't focus the preview leaf** — `revealLeaf`
+  expands the sidebar containing the leaf but doesn't transfer
+  keyboard focus to it in newer Obsidian. Added an explicit
+  `workspace.setActiveLeaf(leaf, { focus: true })` after
+  `revealLeaf`, so keyboard navigation goes to the deck
+  immediately on open (matches the pre-v0.10.x behaviour the
+  user remembered).
+
+### Technical
+
+- `src/SlidesNGView.ts` — `waitForIframeSize` helper deleted;
+  `refresh()` sets srcdoc immediately and only logs whether the
+  iframe was at 0×0 (the resize-driven re-render handles
+  recovery).
+- `src/main.ts` — `setActiveLeaf(leaf, { focus: true })` after
+  both `revealLeaf` paths in `activatePreviewLeaf`.
+
 ## [0.10.6] — 2026-05-14
 
 ### Fixed

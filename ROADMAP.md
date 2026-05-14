@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.10.7** — patch: dropped the 3s wait-for-size that made opens feel laggy (the v0.10.6 re-render-on-resize path covers the 0×0 case without blocking); explicit `setActiveLeaf({focus:true})` after revealLeaf so the preview pane actually gets focused on open.
 - **0.10.6** — patch: intermittent black-pane fix. `waitForIframeSize` timeout 1.5s → 3s; when it times out at 0×0, view marks itself `renderedAtZeroSize` and the parent-side ResizeObserver re-triggers `refresh()` on the first non-zero resize so Reveal initialises fresh into the real viewport.
 - **0.10.5** — defer srcdoc until iframe has non-zero dimensions (waitForIframeSize helper).
 - **0.10.4** — patch: parent-side ResizeObserver on the iframe element posts `relayout` burst to the iframe bridge (now+60ms+180ms+400ms+900ms); iframe bridge handles `relayout` by calling `Reveal.layout()`+`sync()`; belt-and-suspenders `Reveal.layout()` inside the iframe's `Reveal.on('ready')` hook. Together these defeat the ribbon-open-blank-pane bug that v0.10.2's in-iframe observer couldn't catch in Electron.

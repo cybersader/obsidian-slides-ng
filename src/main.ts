@@ -270,6 +270,12 @@ export default class SlidesNGPlugin extends Plugin {
         state: { filePath },
       });
       workspace.revealLeaf(leaf);
+      // v0.10.7: explicit focus. revealLeaf brings the leaf into view
+      // (expands sidebar if needed) but doesn't necessarily focus it
+      // in newer Obsidian — user reported "doesn't automatically go
+      // to it like it used to." setActiveLeaf with focus:true gives
+      // the leaf keyboard focus so navigation keys go to the deck.
+      workspace.setActiveLeaf(leaf, { focus: true });
       return;
     }
 
@@ -288,6 +294,7 @@ export default class SlidesNGPlugin extends Plugin {
       state: { filePath: activeFile?.path },
     });
     workspace.revealLeaf(leaf);
+    workspace.setActiveLeaf(leaf, { focus: true });
     this.debug.log("activatePreviewLeaf/exit");
   }
 
