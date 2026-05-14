@@ -6,6 +6,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.34] — 2026-05-14
+
+### Fixed
+
+- **Hamburger button contrast.** The reveal-menu button's
+  default style was nearly transparent and disappeared against
+  light slide backgrounds (user-reported). Added a solid
+  translucent dark backdrop + subtle border so the button is
+  visible regardless of theme. Hover boosts to full opacity.
+- **G key now toggles the Grid overview.** Pressing G when
+  the grid is already open closes it (the existing
+  toggleOverview function handles open/close, but the
+  Esc/G key listener only handled Esc). The keydown handler
+  now uses capture-phase to beat reveal's own Esc handler
+  (which was triggering reveal's slide-selector overlay and
+  making it look like Esc did nothing).
+- **Speaker-popup sync.** The popup's inner iframes need to
+  finish loading the deck before they can respond to goto
+  postMessages. The first 100ms poke fired BEFORE the
+  iframes were ready, and the goto commands were dropped.
+  Fix: track iframe load state; queue pending state if it
+  arrives early; replay once both iframes report `load`.
+  Plus a `goto` burst (now / 100 / 300 / 700 ms) into each
+  iframe so the bridge listener race is defeated. Poke
+  schedule extended to 5 attempts over 5 s.
+
+### Technical
+
+- `src/render/revealTemplate.ts`:
+  - `.reveal .slide-menu-button` CSS overrides for visibility
+    (rgba(0,0,0,0.55) bg, 1 px border, soft shadow, 0.85
+    opacity at rest, 1.0 on hover).
+  - Grid overlay's keydown listener uses capture phase + handles
+    both Escape and G. preventDefault + stopPropagation prevent
+    reveal from also seeing the key. MutationObserver
+    auto-removes the listener when the overlay is closed by a
+    click.
+  - Popup HTML now has `iframesLoaded` state tracking,
+    `pendingState` queue, and the `markLoaded` helper. Goto
+    posts are a 4-shot burst (now / 100 / 300 / 700 ms).
+  - Popup poke schedule: 100 / 400 / 1000 / 2500 / 5000 ms.
+
 ## [0.11.33] — 2026-05-14
 
 ### Added

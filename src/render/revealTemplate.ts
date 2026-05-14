@@ -560,6 +560,24 @@ export function buildIframeHtml(
       line-height: 1;
       color: white;
     }
+    /* v0.11.34: hamburger button contrast. The default reveal-menu
+     * button is too transparent and disappears against light slide
+     * backgrounds (user-reported). Give it a solid translucent
+     * backdrop + a soft border so it stays visible regardless of
+     * slide bg. Hover boosts the bg to full opacity. */
+    .reveal .slide-menu-button {
+      background: rgba(0, 0, 0, 0.55) !important;
+      border: 1px solid rgba(255, 255, 255, 0.25) !important;
+      border-radius: 6px !important;
+      padding: 6px 8px !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+      transition: background 80ms ease, opacity 80ms ease !important;
+      opacity: 0.85 !important;
+    }
+    .reveal .slide-menu-button:hover {
+      background: rgba(0, 0, 0, 0.85) !important;
+      opacity: 1 !important;
+    }
   </style>` : ""}
   ${customCss ? `<style>
     /* customCSS from deck headmatter — last block, so it overrides
@@ -751,13 +769,35 @@ ${sectionsHtml}
                   '  if (paused) { start = Date.now() - (pausedAt - start); paused = false; this.textContent = "Pause"; }',
                   '  else { pausedAt = Date.now(); paused = true; this.textContent = "Resume"; }',
                   '};',
-                  '/* Tell the two iframes to navigate to their target slide. */',
+                  '/* v0.11.34: iframe-load gating. The popup\\'s inner',
+                  ' * iframes need to finish loading the deck before they can',
+                  ' * respond to postMessage goto commands. We queue any',
+                  ' * pending state and replay once both iframes report load.',
+                  ' * Also poke more aggressively + on iframe load events. */',
+                  'var iframesLoaded = { current: false, next: false };',
+                  'var pendingState = null;',
+                  'function applyPending() {',
+                  '  if (!pendingState) return;',
+                  '  if (!iframesLoaded.current || !iframesLoaded.next) return;',
+                  '  var d = pendingState;',
+                  '  pendingState = null;',
+                  '  gotoFrame("current-frame", d.idx);',
+                  '  gotoFrame("next-frame", Math.min(d.idx + 1, d.totalSlides - 1));',
+                  '}',
                   'function gotoFrame(id, idx) {',
                   '  var f = document.getElementById(id);',
                   '  if (!f || !f.contentWindow) return;',
-                  '  try {',
-                  '    f.contentWindow.postMessage({ type: "slides-ng-cmd", cmd: "goto", idx: idx }, "*");',
-                  '  } catch (_) {}',
+                  '  /* Burst — bridge listener inside iframe may install on',
+                  '   * a delayed tick. Cheap. */',
+                  '  function post() {',
+                  '    try {',
+                  '      f.contentWindow.postMessage({ type: "slides-ng-cmd", cmd: "goto", idx: idx }, "*");',
+                  '    } catch (_) {}',
+                  '  }',
+                  '  post();',
+                  '  setTimeout(post, 100);',
+                  '  setTimeout(post, 300);',
+                  '  setTimeout(post, 700);',
                   '}',
                   '/* Receive state from the opener (main deck window). */',
                   'window.addEventListener("message", function (e) {',
@@ -771,18 +811,31 @@ ${sectionsHtml}
                   '  var nxt = document.getElementById("next-counter");',
                   '  if (cur) cur.textContent = (d.idx + 1) + " / " + d.totalSlides;',
                   '  if (nxt) nxt.textContent = d.idx + 2 > d.totalSlides ? "end" : ((d.idx + 2) + " / " + d.totalSlides);',
-                  '  gotoFrame("current-frame", d.idx);',
-                  '  gotoFrame("next-frame", Math.min(d.idx + 1, d.totalSlides - 1));',
+                  '  pendingState = d;',
+                  '  applyPending();',
                   '});',
-                  '/* Ask the opener for a refresh on load. */',
+                  '/* Mark iframes as loaded so applyPending can fire. */',
+                  'function markLoaded(id, key) {',
+                  '  var f = document.getElementById(id);',
+                  '  if (!f) return;',
+                  '  f.addEventListener("load", function () {',
+                  '    iframesLoaded[key] = true;',
+                  '    setTimeout(function () { poke(); applyPending(); }, 200);',
+                  '  });',
+                  '}',
+                  'markLoaded("current-frame", "current");',
+                  'markLoaded("next-frame", "next");',
+                  '/* Ask the opener for a refresh repeatedly until we have state. */',
                   'function poke() {',
                   '  if (window.opener) {',
                   '    try { window.opener.postMessage({ type: "slides-ng-speaker-poke" }, "*"); } catch (_) {}',
                   '  }',
                   '}',
                   'setTimeout(poke, 100);',
-                  'setTimeout(poke, 800);',
-                  'setTimeout(poke, 2000);',
+                  'setTimeout(poke, 400);',
+                  'setTimeout(poke, 1000);',
+                  'setTimeout(poke, 2500);',
+                  'setTimeout(poke, 5000);',
                   '<\\/script>',
                   '</body></html>',
                 ].join('\\n');
@@ -1704,13 +1757,32 @@ ${sectionsHtml}
                   overlay.remove();
                 }
               });
+              /* v0.11.34: capture-phase listener so we beat reveal's
+               * own Esc handler (which used to trigger reveal's
+               * slide-selector overlay and made it look like Esc did
+               * nothing). preventDefault + stopPropagation block any
+               * other handlers from also seeing the key. Also remove
+               * the listener when the overlay is closed by a click
+               * (not just by Esc) so we don't leave stale handlers. */
               var escHandler = function (e) {
-                if (e.key === 'Escape') {
-                  overlay.remove();
-                  document.removeEventListener('keydown', escHandler);
+                if (e.key === 'Escape' || e.key === 'g' || e.key === 'G') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (overlay.parentNode) overlay.remove();
+                  document.removeEventListener('keydown', escHandler, true);
                 }
               };
-              document.addEventListener('keydown', escHandler);
+              document.addEventListener('keydown', escHandler, true);
+              /* When the overlay is removed by a click, also detach
+               * the keydown listener so the next G keypress doesn't
+               * find a stale ghost. */
+              var observer = new MutationObserver(function () {
+                if (!document.body.contains(overlay)) {
+                  document.removeEventListener('keydown', escHandler, true);
+                  observer.disconnect();
+                }
+              });
+              observer.observe(document.body, { childList: true });
               document.body.appendChild(overlay);
 
               // v0.11.14: after the grid is in the DOM, recompute the
