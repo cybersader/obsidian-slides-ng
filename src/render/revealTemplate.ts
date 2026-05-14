@@ -602,6 +602,25 @@ ${sectionsHtml}
     (function () {
       try {
         var initOpts = ${initConfig};
+        /* v0.11.35: when the URL has ?print-pdf, switch to reveal's
+         * print view (each slide → a page with proper card styling +
+         * optional notes layout). We hardcode view:'presentation'
+         * elsewhere to defeat reveal's small-viewport auto-scroll,
+         * but in print mode the explicit override was preventing
+         * print-pdf detection from working. */
+        if (typeof location !== 'undefined' && /print-pdf/i.test(location.search)) {
+          initOpts.view = 'print';
+          /* Match the showNotes URL param to the config option so
+           * reveal lays out speaker notes underneath each printed
+           * page. URL value is the layout string ('inline' is the
+           * common one) or boolean — both accepted. */
+          var notesMatch = location.search.match(/[?&]showNotes(?:=([^&]+))?/i);
+          if (notesMatch) {
+            initOpts.showNotes = notesMatch[1] && notesMatch[1] !== 'true'
+              ? decodeURIComponent(notesMatch[1])
+              : true;
+          }
+        }
         ${showMenu ? `if (typeof RevealMenu !== 'undefined') {
           initOpts.plugins = (initOpts.plugins || []).concat([RevealMenu]);
         }` : ""}
@@ -716,8 +735,14 @@ ${sectionsHtml}
                   '<title>Slides NG — Speaker view</title>',
                   '<style>',
                   'html, body { margin: 0; height: 100%; background: #1a1a1a; color: #fff; font-family: sans-serif; }',
-                  'body { display: grid; grid-template-rows: 1fr 1fr; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; box-sizing: border-box; }',
-                  '.panel { background: #0a0a0a; border: 1px solid #333; overflow: hidden; display: flex; flex-direction: column; border-radius: 6px; }',
+                  'body { display: grid; grid-template-rows: auto 1fr 1fr; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; box-sizing: border-box; }',
+                  '.scenes-bar { grid-column: 1 / -1; background: #0a0a0a; border: 1px solid #333; border-radius: 6px; padding: 0.4rem 0.6rem; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }',
+                  '.scenes-bar .scene-label { font-size: 0.75em; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.4rem; }',
+                  '.scene-btn { background: #2a2a2a; color: #e0e0e0; border: 1px solid #444; border-radius: 4px; padding: 0.3rem 0.6rem; cursor: pointer; font-size: 0.85em; transition: background 80ms ease, border-color 80ms ease; }',
+                  '.scene-btn:hover { background: #3a3a3a; border-color: #555; }',
+                  '.scene-btn.active { background: var(--r-link-color, #42affa); color: #fff; border-color: var(--r-link-color, #42affa); }',
+                  '.scene-btn.clear { margin-left: auto; background: transparent; border-color: #555; }',
+                  '.panel { background: #0a0a0a; border: 1px solid #333; overflow: hidden; display: flex; flex-direction: column; border-radius: 6px; min-height: 0; }',
                   '.label { font-size: 0.75em; color: #999; padding: 0.3rem 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; flex: 0 0 auto; }',
                   '.frame-wrap { position: relative; flex: 1 1 auto; }',
                   '.frame-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }',
@@ -731,6 +756,14 @@ ${sectionsHtml}
                   '.timer-controls button:hover { background: #333; }',
                   '.slide-counter { position: absolute; top: 6px; left: 8px; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px; font-size: 0.75em; }',
                   '</style></head><body>',
+                  '<div class="scenes-bar" id="scenes-bar">',
+                  '  <span class="scene-label">Scenes</span>',
+                  '  <button class="scene-btn" data-scene-id="blackout" data-scene-content="">Blackout</button>',
+                  '  <button class="scene-btn" data-scene-id="brb" data-scene-html="<h1>Be right back</h1><p>Back in a few minutes.</p>">Be right back</button>',
+                  '  <button class="scene-btn" data-scene-id="qa" data-scene-html="<h1>Q &amp; A</h1><p>Questions?</p>">Q &amp; A</button>',
+                  '  <button class="scene-btn" data-scene-id="standby" data-scene-html="<h1>Stand by</h1>">Stand by</button>',
+                  '  <button class="scene-btn clear" id="scene-clear">Clear</button>',
+                  '</div>',
                   '<div class="panel">',
                   '  <div class="label">Current slide</div>',
                   '  <div class="frame-wrap"><iframe id="current-frame" src="' + deckUrl + '" sandbox="allow-scripts allow-same-origin"></iframe><div class="slide-counter" id="current-counter">—</div></div>',
@@ -765,6 +798,41 @@ ${sectionsHtml}
                   '  t.textContent = fmt(paused ? pausedAt - start : Date.now() - start);',
                   '}, 250);',
                   'document.getElementById("timer-reset").onclick = function () { start = Date.now(); paused = false; pausedAt = 0; document.getElementById("timer-pause").textContent = "Pause"; };',
+                  '/* v0.11.35: scene buttons. Click → postMessage to',
+                  ' * opener with the matching setScene cmd. Clear button',
+                  ' * sends clearScene. Visual state: clicked button gets',
+                  ' * .active until Clear is pressed. */',
+                  'var activeSceneBtn = null;',
+                  'function sendScene(cmd, payload) {',
+                  '  if (!window.opener) return;',
+                  '  try {',
+                  '    var msg = { type: "slides-ng-cmd", cmd: cmd };',
+                  '    if (payload && payload.id !== undefined) msg.id = payload.id;',
+                  '    if (payload && payload.html !== undefined) msg.html = payload.html;',
+                  '    window.opener.postMessage(msg, "*");',
+                  '  } catch (_) {}',
+                  '}',
+                  'document.querySelectorAll(".scene-btn[data-scene-id]").forEach(function (btn) {',
+                  '  btn.addEventListener("click", function () {',
+                  '    if (activeSceneBtn === btn) {',
+                  '      sendScene("clearScene");',
+                  '      btn.classList.remove("active");',
+                  '      activeSceneBtn = null;',
+                  '      return;',
+                  '    }',
+                  '    if (activeSceneBtn) activeSceneBtn.classList.remove("active");',
+                  '    btn.classList.add("active");',
+                  '    activeSceneBtn = btn;',
+                  '    sendScene("setScene", {',
+                  '      id: btn.getAttribute("data-scene-id"),',
+                  '      html: btn.getAttribute("data-scene-html") || ""',
+                  '    });',
+                  '  });',
+                  '});',
+                  'document.getElementById("scene-clear").addEventListener("click", function () {',
+                  '  sendScene("clearScene");',
+                  '  if (activeSceneBtn) { activeSceneBtn.classList.remove("active"); activeSceneBtn = null; }',
+                  '});',
                   'document.getElementById("timer-pause").onclick = function () {',
                   '  if (paused) { start = Date.now() - (pausedAt - start); paused = false; this.textContent = "Pause"; }',
                   '  else { pausedAt = Date.now(); paused = true; this.textContent = "Resume"; }',

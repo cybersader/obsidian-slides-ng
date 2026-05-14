@@ -6,6 +6,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.35] — 2026-05-14
+
+### Fixed
+
+- **PDF export now actually renders slide cards + speaker
+  notes.** The exported HTML hardcoded `view: "presentation"`
+  in `Reveal.initialize`, which overrode reveal's
+  auto-detection of `?print-pdf`. Print mode never activated
+  → each slide rendered as plain text on a page with no
+  card boundary and no notes, even with "Show notes" ticked.
+  Now: at runtime, if `?print-pdf` is in the URL, set
+  `initOpts.view = "print"` (reveal then lays out each
+  slide as a card-styled print page). Also parse the
+  `?showNotes=...` URL param and set `initOpts.showNotes`
+  so reveal includes the notes layout under each slide.
+
+### Added
+
+- **Scenes in the speaker-view popup.** Top toolbar with
+  Blackout / Be right back / Q & A / Stand by / Clear
+  buttons. Clicking sends `setScene` (with id + html) via
+  `window.opener.postMessage` to the main deck window;
+  Clear sends `clearScene`. Same overlay mechanism the
+  embedded speaker view uses (the `ensureSceneEl` /
+  `setScene` / `clearScene` handlers in the iframe were
+  already there for the in-Obsidian flow — popup now hooks
+  them too). Active scene's button gets the accent
+  treatment; clicking it again is also a toggle-off.
+
+### Technical
+
+- `src/render/revealTemplate.ts`:
+  - In the init script, runtime-detect
+    `/print-pdf/i.test(location.search)` and override
+    `view` + `showNotes` before calling
+    `Reveal.initialize`.
+  - Popup template grows a `.scenes-bar` row at the top
+    (grid `auto / 1fr / 1fr` row template). Buttons carry
+    `data-scene-id` + `data-scene-html`. Click handler
+    forwards via `window.opener.postMessage`. Active state
+    toggle on the button.
+
 ## [0.11.34] — 2026-05-14
 
 ### Fixed
