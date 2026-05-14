@@ -256,3 +256,41 @@ const x = 1
     });
   });
 });
+
+describe("renderDeck — multi-line speaker notes (v0.11.18)", () => {
+  test("notes with newlines render with <br> via breaks:true marked", () => {
+    const md = [
+      "# A",
+      "",
+      "body",
+      "",
+      "<!--",
+      "line one",
+      "line two",
+      "-->",
+    ].join("\n");
+    const html = renderDeck(md);
+    // The notes HTML lives in a data-notes attribute on the section.
+    // With breaks:true the single \n between lines becomes <br>.
+    expect(html).toContain("line one");
+    expect(html).toContain("line two");
+    expect(html).toContain("<br");
+  });
+
+  test("slide body still uses CommonMark single-newline-as-space (no breaks:true regression)", () => {
+    const md = [
+      "# B",
+      "",
+      "first line",
+      "second line",
+    ].join("\n");
+    const html = renderDeck(md);
+    // The body should NOT contain <br> between the two lines because
+    // marked's default joins them with a space inside <p>...</p>.
+    // We isolate body by stripping any data-notes attributes (they
+    // shouldn't exist here anyway — no <!-- ... --> in this deck).
+    expect(html).toContain("first line");
+    expect(html).toContain("second line");
+    expect(html).not.toContain("first line<br");
+  });
+});

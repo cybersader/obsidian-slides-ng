@@ -634,6 +634,16 @@ ${sectionsHtml}
                 Reveal.sync();
               }
             } catch (_) { /* swallow — non-fatal */ }
+            // v0.11.18: also re-apply the picker strip layout when
+            // the iframe resizes. The auto-fill grid needs its inner
+            // tile scale recomputed because the actual cell width
+            // changes with container width.
+            try {
+              var pickerStrip = document.getElementById('slides-ng-picker-strip');
+              if (pickerStrip && typeof applyPickerStripLayout === 'function') {
+                applyPickerStripLayout(pickerStrip);
+              }
+            } catch (_) { /* swallow — non-fatal */ }
           });
         }
         try {
@@ -975,33 +985,47 @@ ${sectionsHtml}
         var stripInnerW = strip.clientWidth - 16;
         var stripInnerH = strip.clientHeight - 16;
 
-        // v0.11.15: "auto" picks based on container shape.
-        // - wide enough for 2 horizontal slides → 'horizontal'
-        // - wider than tall by 1.2x+ AND fits 2 tiles → 'vertical-2'
-        // - otherwise → 'vertical-1'
-        if (orientation === 'auto') {
-          var preferTileW = tileWidthAttr > 0 ? tileWidthAttr : 200;
-          var canFit2 = stripInnerW > preferTileW * 2 + 6;
-          var wideEnoughForHorizontal = stripInnerW > stripInnerH * 1.8;
-          orientation = wideEnoughForHorizontal
-            ? 'horizontal'
-            : (canFit2 ? 'vertical-2' : 'vertical-1');
-        }
+        // v0.11.18 layout rewrite. Layout semantics:
+        //   vertical-1   exactly 1 column; tile FILLS the strip width
+        //   vertical-2   exactly 2 columns; tile fills each column
+        //   horizontal   row; tile height = strip height, width by aspect
+        //   auto         CSS grid auto-fill; user tile-width preset =
+        //                MINIMUM cell size; columns fill the strip
+        //                (this is the "maximize columns" mode)
+        //
+        // Previously vertical-1 / vertical-2 / horizontal accepted
+        // tileWidthAttr as a hard pin, which caused tiles to be
+        // smaller than their cells in fixed-column modes and left a
+        // lot of empty black space (user-reported bug v0.11.17).
+        // The magnifier still persists a tile-width preset, but in
+        // fixed-column modes it's deliberately ignored — only auto
+        // mode honours it (as MIN cell width).
 
         // Base strip styles per orientation.
         var stripBase =
           'position:fixed;inset:0;background:#0a0a0a;color:#fff;' +
           'z-index:5;padding:8px;box-sizing:border-box;' +
           'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);';
+        var minCellPx = tileWidthAttr > 0 ? tileWidthAttr : 160;
         if (orientation === 'horizontal') {
           strip.style.cssText = stripBase +
             'display:flex;gap:6px;align-items:center;' +
             'flex-direction:row;overflow-x:auto;overflow-y:hidden;';
         } else if (orientation === 'vertical-2') {
-          // Two-column grid; rows auto-flow.
           strip.style.cssText = stripBase +
             'display:grid;grid-template-columns:1fr 1fr;gap:6px;' +
             'align-content:start;overflow-y:auto;overflow-x:hidden;';
+        } else if (orientation === 'auto') {
+          // Auto-fill grid. minmax(min(100%, MIN_CELL_PX), 1fr) is
+          // the magic incantation: at least MIN_CELL_PX wide
+          // (unless that's wider than the whole strip, in which case
+          // a single column) and otherwise fills the available
+          // width with 1+ cells.
+          strip.style.cssText = stripBase +
+            'display:grid;' +
+            'grid-template-columns:repeat(auto-fill, minmax(min(100%, ' + minCellPx + 'px), 1fr));' +
+            'gap:6px;align-content:start;' +
+            'overflow-y:auto;overflow-x:hidden;';
         } else {
           // vertical-1 (default)
           strip.style.cssText = stripBase +
@@ -1012,34 +1036,46 @@ ${sectionsHtml}
         // Tile dimensions per orientation.
         var tileW, tileH;
         if (orientation === 'horizontal') {
+          // Fill the strip height; width derives from aspect. User's
+          // tile-width preset is ignored to avoid the v0.11.17
+          // empty-space bug.
           tileH = stripInnerH > 0 ? stripInnerH - 8 : 80;
           tileW = Math.round(tileH / aspect);
-          if (tileWidthAttr > 0) {
-            tileW = tileWidthAttr;
-            tileH = Math.round(tileW * aspect);
-          }
         } else if (orientation === 'vertical-2') {
-          // Each grid column is half the strip width (minus gap).
+          // Each grid column = half strip width minus gap. Tile FILLS
+          // the column.
           var colW = Math.floor((stripInnerW - 6) / 2);
-          tileW = tileWidthAttr > 0 ? Math.min(tileWidthAttr, colW) : colW;
+          tileW = colW > 0 ? colW : 100;
+          tileH = Math.round(tileW * aspect);
+        } else if (orientation === 'auto') {
+          // For auto-fill grid we don't pin the tile to a pixel value
+          // — width:100% lets CSS grid decide. We compute a
+          // representative tileW for the inner scale transform only,
+          // assuming the cell will be the MIN size at minimum and
+          // sometimes wider. Using minCellPx as the representative
+          // pinch-point keeps the scale calc consistent.
+          tileW = minCellPx;
           tileH = Math.round(tileW * aspect);
         } else {
-          // vertical-1
-          if (tileWidthAttr > 0) {
-            tileW = tileWidthAttr;
-          } else if (stripInnerW > 0) {
-            tileW = Math.min(stripInnerW, 240);
-          } else {
-            tileW = 200;
-          }
+          // vertical-1: fill strip width. User pref ignored.
+          tileW = stripInnerW > 0 ? stripInnerW : 200;
           tileH = Math.round(tileW * aspect);
         }
-        var scale = tileW / slideW;
+        // v0.11.18: in flex/grid vertical modes use width:100% plus
+        // aspect-ratio:SLIDE_W/SLIDE_H so tiles fill their cell and
+        // height tracks aspect. In horizontal mode we still pin pixel
+        // width because the row flexbox needs intrinsic widths to lay
+        // tiles out side-by-side.
         var tiles = strip.querySelectorAll('.slides-ng-picker-tile');
+        var verticalFillMode = orientation !== 'horizontal';
+        var scale = tileW / slideW;
         tiles.forEach(function (t) {
+          var sizeCss = verticalFillMode
+            ? 'width:100%;aspect-ratio:' + slideW + '/' + slideH + ';'
+            : 'width:' + tileW + 'px;height:' + tileH + 'px;flex:0 0 auto;';
           t.style.cssText =
-            'position:relative;width:' + tileW + 'px;height:' + tileH + 'px;' +
-            'flex:0 0 auto;background:' + stripBodyBg + ';border:2px solid rgba(255,255,255,0.18);' +
+            'position:relative;' + sizeCss +
+            'background:' + stripBodyBg + ';border:2px solid rgba(255,255,255,0.18);' +
             'border-radius:6px;padding:0;cursor:pointer;overflow:hidden;color:#fff;' +
             'font:inherit;';
           var thumb = t.querySelector('.slides-ng-picker-thumb');
@@ -1077,6 +1113,25 @@ ${sectionsHtml}
             applyCurrentTileStyle(t);
           }
         });
+        // v0.11.18: in vertical fill modes the tiles use width:100% +
+        // aspect-ratio, so the actual rendered width isn't known until
+        // CSS lays out the grid/flex container. Re-measure on the next
+        // animation frame and recompute the inner scale so the cloned
+        // section content matches the tile size. Same trick the Grid
+        // overlay uses (v0.11.14). Without this, auto-fill rendered
+        // at minCellPx scale even when each cell ended up much wider.
+        if (verticalFillMode) {
+          requestAnimationFrame(function () {
+            var firstTile = strip.querySelector('.slides-ng-picker-tile');
+            if (!firstTile) return;
+            var actualW = firstTile.clientWidth;
+            if (!(actualW > 0)) return;
+            var actualScale = actualW / slideW;
+            strip.querySelectorAll('.slides-ng-picker-thumb-content').forEach(function (c) {
+              c.style.transform = 'scale(' + actualScale + ')';
+            });
+          });
+        }
       }
 
       // v0.11.13: when true (default), scenes inherit the theme's

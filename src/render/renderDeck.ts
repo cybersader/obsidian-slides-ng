@@ -51,6 +51,18 @@ function buildMarked(codeTheme: string | undefined): Marked {
 }
 
 /**
+ * v0.11.18: separate marked instance for speaker notes. Uses
+ * `breaks: true` so single newlines in multi-line `<!--\n...\n-->`
+ * notes render as `<br>` — matches what users type in the
+ * speaker-view notes editor. Slide BODY rendering keeps CommonMark
+ * default (single newline = space) because most decks already
+ * expect that.
+ */
+function buildNotesMarked(): Marked {
+  return new Marked({ breaks: true, gfm: true });
+}
+
+/**
  * High-level renderer: takes raw markdown source and returns a complete
  * iframe-srcdoc HTML document. This is what the view assigns to its
  * `<iframe srcdoc=...>` attribute.
@@ -157,7 +169,8 @@ export function renderDeckFromAst(
   defaults: RenderDefaults = {}
 ): string {
   const md = buildMarked(defaults.codeTheme);
-  const slides = deck.slides.map((s) => slideToHtml(s, md, defaults));
+  const notesMd = buildNotesMarked();
+  const slides = deck.slides.map((s) => slideToHtml(s, md, notesMd, defaults));
   const defaultLayer: Partial<DeckRenderOptions> = {};
   if (defaults.defaultTheme) defaultLayer.theme = defaults.defaultTheme;
   if (defaults.defaultTransition) defaultLayer.transition = defaults.defaultTransition;
@@ -236,6 +249,7 @@ function resolveBackgroundAttrs(
 function slideToHtml(
   slide: Slide,
   md: Marked,
+  notesMd: Marked,
   defaults: RenderDefaults = {}
 ): SlideHtml {
   // 1. Extract Slides-Extended-style slide annotations from the raw
@@ -298,7 +312,11 @@ function slideToHtml(
 
   const body = applyLayout(layoutName, slotHtml);
 
-  const noteHtml = slide.note ? (md.parse(slide.note, { async: false }) as string) : undefined;
+  // v0.11.18: notes use a separate marked instance with breaks:true
+  // so multi-line speaker notes (written by the speaker-view editor
+  // as `<!--\nline1\nline2\n-->`) render with `<br>` between lines.
+  // The slide-body marked stays CommonMark-default.
+  const noteHtml = slide.note ? (notesMd.parse(slide.note, { async: false }) as string) : undefined;
 
   // v0.11.15: per-slide panel-visibility override. Emit a
   // `data-hide-panels="picker,scenes"` attribute on the section

@@ -6,6 +6,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.18] — 2026-05-14
+
+### Fixed
+
+- **Speaker notes box renders newlines after save.** The notes
+  panel showed the file-write content correctly on the markdown
+  side but rendered as a single space-joined paragraph after
+  the iframe re-rendered. Cause: `renderDeck` used a `Marked`
+  instance with the CommonMark default (single `\n` → space),
+  so the multi-line note that the v0.11.16 writer puts into the
+  file (slidev `<!--\n...\n-->` format) lost its `<br>`s. Fix:
+  notes now use a separate `Marked({ breaks: true, gfm: true })`
+  instance; slide-body rendering keeps CommonMark default so no
+  existing deck's body rendering changes.
+- **Picker tile sizing: no more empty black space.** In
+  fixed-column orientations (vertical-1, vertical-2,
+  horizontal) the tile width used to be a hard pin from the
+  magnifier preset, even when the cell was wider — so picking
+  "compact" in 2-col mode left a lot of empty space inside each
+  column. Tiles now FILL their cell in fixed-column modes; the
+  magnifier preset is ignored there (it's still persisted; it
+  controls auto-fit mode only).
+- **auto orientation is now actually responsive.** Previously
+  it picked a fixed sub-mode at build time based on container
+  shape; resizing the speaker pane didn't update it. Now it's a
+  proper CSS-grid `auto-fill` with
+  `minmax(min(100%, MIN_CELL), 1fr)` — tiles fill the strip
+  with as many columns as fit at the magnifier's MIN cell
+  size. Live-resizes via the existing iframe ResizeObserver.
+
+### Changed
+
+- **Magnifier preset semantics**: the preset now means
+  "minimum cell size" and only takes effect when orientation =
+  auto-fit. Tooltips reworded to say so explicitly so the
+  control's effect is never a guess.
+- **Orientation `auto` icon** updated to `layout-grid` to
+  match its new "fill with columns" behavior (was `monitor`).
+
+### Technical
+
+- `src/render/renderDeck.ts` — new `buildNotesMarked()`
+  factory returning a `Marked({ breaks: true, gfm: true })`
+  instance. `slideToHtml` takes both `md` (body) and `notesMd`
+  (notes) and parses `slide.note` with the breaks-aware one.
+- `src/render/revealTemplate.ts` — `applyPickerStripLayout`
+  rewritten. Fixed-column modes now use `width:100%;
+  aspect-ratio:SLIDE_W/SLIDE_H` on tiles + a post-rAF measure
+  to compute actual scale (same trick the Grid overlay uses
+  since v0.11.14). Auto mode uses
+  `grid-template-columns:repeat(auto-fill, minmax(min(100%,
+  MIN_CELL_PX), 1fr))`. The existing iframe `ResizeObserver`
+  relayout hook now also re-applies the picker layout so
+  container resizes recompute the cell scale.
+- 2 new unit tests pin the notes-breaks contract in renderDeck.
+
 ## [0.11.17] — 2026-05-14
 
 ### Added

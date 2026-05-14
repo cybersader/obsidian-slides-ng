@@ -1499,22 +1499,28 @@ export class SlidesNGSpeakerView extends ItemView {
       cls: "slides-ng-speaker-btn-icon",
     });
     // v0.11.15: per-mode icon + tooltip; click cycles to the next.
+    // v0.11.18: auto = CSS grid auto-fill — fills the strip with as
+    // many columns as fit at the magnifier's MIN cell size. (Was:
+    // 'auto picks between vertical-1 / vertical-2 / horizontal at
+    // build time' — that flavour wasn't actually responsive.)
     const meta: Record<PickerOrientation, { icon: string; tip: string }> = {
       "vertical-1": {
         icon: "rows",
-        tip: "Picker: 1-column. Click for 2-column.",
+        tip: "Picker: 1-column (tile fills width). Click for 2-column.",
       },
       "vertical-2": {
         icon: "columns-2",
-        tip: "Picker: 2-column. Click for horizontal.",
+        tip: "Picker: 2-column (tiles fill each column). Click for horizontal.",
       },
       horizontal: {
         icon: "panel-right",
         tip: "Picker: horizontal strip. Click for auto-fit.",
       },
       auto: {
-        icon: "monitor",
-        tip: "Picker: auto-fit (chosen by panel size). Click for 1-column.",
+        icon: "layout-grid",
+        tip:
+          "Picker: auto-fit — fills with as many columns as fit at the " +
+          "magnifier's min size. Click for 1-column.",
       },
     };
     const m = meta[orientation];
@@ -1567,31 +1573,45 @@ export class SlidesNGSpeakerView extends ItemView {
     const iconEl = this.pickerSizeBtn.createSpan({
       cls: "slides-ng-speaker-btn-icon",
     });
+    // v0.11.18: tooltips clarify that the preset = MINIMUM cell size
+    // and only meaningfully affects layout in "auto-fit" orientation.
+    // Fixed-column modes (1-col / 2-col) ignore it because tiles fill
+    // their cell; horizontal mode ignores it because tiles fill the
+    // strip height. Same persisted preset applies the next time the
+    // user switches to auto-fit.
     const meta: Record<
       keyof typeof PICKER_TILE_PRESETS | "auto" | "custom",
       { icon: string; tip: string }
     > = {
       auto: {
         icon: "zoom-in",
-        tip: "Picker tiles: auto. Click for compact.",
+        tip:
+          "Tile min size: auto (~160 px). Click for compact. " +
+          "Only takes effect in auto-fit orientation.",
       },
       compact: {
         icon: "zoom-out",
-        tip: "Picker tiles: compact. Click for comfortable.",
+        tip:
+          "Tile min size: compact (100 px). Click for comfortable. " +
+          "Only takes effect in auto-fit orientation.",
       },
       comfortable: {
         icon: "search",
-        tip: "Picker tiles: comfortable. Click for big.",
+        tip:
+          "Tile min size: comfortable (180 px). Click for big. " +
+          "Only takes effect in auto-fit orientation.",
       },
       big: {
         icon: "zoom-in",
-        tip: "Picker tiles: big. Click for compact.",
+        tip:
+          "Tile min size: big (280 px). Click for compact. " +
+          "Only takes effect in auto-fit orientation.",
       },
       custom: {
         icon: "search",
         tip:
-          "Picker tiles: custom (set in Settings or deck frontmatter). " +
-          "Click to enter preset cycle.",
+          "Tile min size: custom (set in Settings or deck frontmatter). " +
+          "Click to enter preset cycle. Only takes effect in auto-fit.",
       },
     };
     const m = meta[preset];
