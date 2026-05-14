@@ -300,6 +300,84 @@ describe("v0.11.20 picker sizing — every orientation × magnifier combo", func
     }
   }
 
+  // v0.11.30: scroll-jitter check. After clicking a tile the parent
+  // schedules a burst of 7 setPickerCurrent posts over 2.5 s. The
+  // bug: each post called scrollIntoView, so if the user scrolled
+  // the picker meanwhile, every subsequent burst post yanked them
+  // back to the clicked tile. Fix: only scroll on the first
+  // successful post per idx. This test clicks a tile, scrolls the
+  // strip far from it, waits past the burst window, then asserts
+  // the manual scroll position survived.
+  describe("picker scroll jitter after tile click", function () {
+    it("manual scroll is not reset by the setPickerCurrent burst", async () => {
+      // Force a vertical orientation so the strip scrolls in y.
+      await setSettings("vertical-1", 0);
+      await rebuildPicker();
+      // Click tile 0 to start a burst. (Speaker navigates to slide 1.)
+      await browser.execute(() => {
+        window.postMessage(
+          { type: "slides-ng-picker", event: "click", idx: 0 },
+          "*"
+        );
+      });
+      // Wait briefly for the first burst post to land + initial scroll.
+      await new Promise((r) => setTimeout(r, 200));
+      // Enter the picker iframe and scroll it far away from tile 0.
+      const iframe = await browser.$(".slides-ng-speaker-picker-iframe");
+      await browser.switchFrame(iframe);
+      let scrollAfterManual = 0;
+      try {
+        scrollAfterManual = await browser.execute(() => {
+          const strip = document.getElementById("slides-ng-picker-strip");
+          if (!strip) return -1;
+          // Scroll deep into the strip so tile 0 is out of view.
+          strip.scrollTop = 800;
+          return strip.scrollTop;
+        });
+      } finally {
+        await browser.switchFrame(null);
+      }
+      // Wait for the rest of the burst window to elapse.
+      await new Promise((r) => setTimeout(r, 2800));
+      // Re-enter iframe and read final scroll.
+      await browser.switchFrame(iframe);
+      let scrollFinal = 0;
+      try {
+        scrollFinal = await browser.execute(() => {
+          const strip = document.getElementById("slides-ng-picker-strip");
+          return strip ? strip.scrollTop : -1;
+        });
+      } finally {
+        await browser.switchFrame(null);
+      }
+      // eslint-disable-next-line no-console
+      console.log(
+        `[picker-scroll-jitter] manual=${scrollAfterManual}, final=${scrollFinal}`
+      );
+      // The strip may not actually allow 800 scroll (depends on content
+      // height). Whatever the manual landed at, the final should be
+      // within a small tolerance of that value — NOT back at 0 (which
+      // is what the jitter bug produced).
+      if (scrollAfterManual <= 0) {
+        // Content was shorter than expected — test can't verify jitter
+        // because there's nothing to scroll. Skip rather than fail.
+        // eslint-disable-next-line no-console
+        console.log(
+          "[picker-scroll-jitter] strip too short to scroll — skipped"
+        );
+        return;
+      }
+      const drift = Math.abs(scrollFinal - scrollAfterManual);
+      if (drift > 100) {
+        throw new Error(
+          `Picker scroll-jitter regression: scrollTop reset from ` +
+            `${scrollAfterManual} to ${scrollFinal} after the burst ` +
+            `window. Expected the manual scroll to survive.`
+        );
+      }
+    });
+  });
+
   // v0.11.25: picker custom drag handle. Verifies the handle exists
   // (replaces the broken native CSS resize:vertical) and that
   // pointerdown + pointermove + pointerup actually resizes the

@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.30] — 2026-05-14
+
+### Fixed
+
+- **Picker no longer jitters back to the clicked tile for 2.5 s
+  after a click.** The parent's burst of 7 `setPickerCurrent`
+  posts (v0.11.21, to defeat bridge-install races) called
+  `scrollIntoView` on every post. If the user scrolled the
+  picker between bursts, each subsequent post yanked them
+  back to the just-clicked tile — visible as ~5 s of
+  jittering / forced auto-scroll. Now `scrollIntoView` only
+  runs when the tile wasn't already marked `.current` — i.e.
+  on the first successful burst post per idx. The remaining
+  burst posts still confirm the `.current` class lands
+  correctly but don't compete with the user's manual scroll.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — `setPickerCurrent`
+  handler now checks `wasAlreadyCurrent` before calling
+  `t.scrollIntoView`. Same flow as before, just gated.
+- `test/e2e/picker-sizing.spec.ts` — new
+  `picker scroll jitter after tile click` test: clicks a
+  tile, scrolls the strip 800 px deep inside the iframe,
+  waits past the burst window (2.8 s), and asserts the
+  manual scroll position survives (drift ≤ 100 px). Skips
+  if the strip is too short to scroll in the test viewport.
+
 ## [0.11.29] — 2026-05-14
 
 ### Added

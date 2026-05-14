@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.11.30** — picker no longer jitters back to the clicked tile for 2.5 s after a click. The setPickerCurrent burst (7 posts over 2.5 s, defeats bridge-install races) used to call scrollIntoView every time, so user scrolling between bursts kept getting yanked back. Now scrollIntoView only runs on the first successful post per idx; subsequent burst posts just confirm the `.current` class. WDIO spec adds a scroll-jitter test that scrolls the strip 800 px after a click and asserts the manual scroll position survives the burst window.
 - **0.11.29** — frontmatter ref card gets per-section copy buttons + a "Copy all sections" button for one-click sharing with an AI agent. Plus icon-tool button border rules use `!important` to defeat opinionated theme overrides (Minimal, Things, etc.) — vanilla Obsidian was already clean per WDIO screenshots.
 - **0.11.28** — picker header buttons no longer touch the iframe container below. Added `margin-bottom: 0.4rem` on the header (the picker-wrap uses block flow, not flex with gap, so without this the borderless icon buttons sat flush against the picker container's top edge).
 - **0.11.27** — panel-header icons are now truly borderless at rest (was `border-color: transparent`, still allocated 1 px width). Hover gives a soft rounded-square (6 px radius) background — the only visual affordance. Notes Edit becomes icon-only (pencil + tooltip) to match the picker chrome.

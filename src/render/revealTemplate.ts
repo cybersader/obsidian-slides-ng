@@ -1576,9 +1576,21 @@ ${sectionsHtml}
                 tiles.forEach(function (t) {
                   var tIdx = parseInt(t.getAttribute('data-slide-idx') || '0', 10);
                   if (tIdx === data.idx) {
+                    // v0.11.30: only scroll into view when this tile
+                    // wasn't already marked current. The parent's
+                    // burst of 7 setPickerCurrent posts (over 2.5 s,
+                    // see v0.11.21) used to call scrollIntoView every
+                    // time, which yanked the picker back to the
+                    // clicked tile for the whole burst window if the
+                    // user tried to scroll elsewhere meanwhile.
+                    // First successful post does the scroll; the
+                    // rest of the burst just confirms .current.
+                    var wasAlreadyCurrent = t.classList.contains('current');
                     t.classList.add('current');
                     applyCurrentTileStyle(t);
-                    t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    if (!wasAlreadyCurrent) {
+                      t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    }
                   } else if (t.classList.contains('current')) {
                     t.classList.remove('current');
                     clearCurrentTileStyle(t);
