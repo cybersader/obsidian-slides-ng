@@ -615,6 +615,9 @@ export class SlidesNGView extends ItemView {
       magicMoveDurationMs: s.magicMoveDurationMs,
       autoH1Breaks: s.autoH1Breaks,
       sceneInheritThemeBg: s.sceneInheritThemeBg,
+      // v0.11.36: scenes for the standalone speaker-view popup. The
+      // markdown content gets rendered to HTML at export time.
+      scenes: s.scenes,
       // showRevealControlsEmbedded + showRevealMenuEmbedded intentionally
       // not threaded into standalone exports — standalone mode shows
       // controls + menu regardless.

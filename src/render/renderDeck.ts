@@ -117,6 +117,23 @@ export interface RenderDefaults {
    */
   sceneInheritThemeBg?: boolean;
   /**
+   * v0.11.36: scenes (overlay slides) to expose in the standalone
+   * export's speaker-view popup. Each entry's `content` is markdown;
+   * the renderer converts it to HTML at export time. The standalone
+   * export emits `window.__slidesNgScenes` with the pre-rendered
+   * shape, and the speaker popup reads it via `window.opener` to
+   * build its scene-button toolbar dynamically — matching whatever
+   * scenes the user has configured in plugin settings.
+   * Ignored in embedded mode.
+   */
+  scenes?: Array<{
+    id: string;
+    label: string;
+    /** Markdown source. Rendered at export time. */
+    content: string;
+    icon?: string;
+  }>;
+  /**
    * Optional image-attachment resolver. Called with the raw `image:`
    * frontmatter value; returns a fully-qualified URL (data: URI,
    * file://, https://, etc.) or null if the resolver couldn't find
@@ -204,6 +221,21 @@ export function renderDeckFromAst(
   }
   if (typeof defaults.sceneInheritThemeBg === "boolean") {
     defaultLayer.sceneInheritThemeBg = defaults.sceneInheritThemeBg;
+  }
+  // v0.11.36: render each scene's markdown content to HTML at
+  // export time. The standalone speaker-view popup reads the
+  // resulting array via window.opener to build its scene buttons.
+  if (Array.isArray(defaults.scenes) && defaults.scenes.length > 0) {
+    defaultLayer.scenes = defaults.scenes.map((s) => ({
+      id: s.id,
+      label: s.label,
+      icon: s.icon,
+      // Empty content stays empty (blackout). Otherwise: render via
+      // the same breaks-aware marked instance the speaker view uses.
+      contentHtml: s.content
+        ? (notesMd.parse(s.content, { async: false }) as string)
+        : "",
+    }));
   }
 
   const opts: DeckRenderOptions = {

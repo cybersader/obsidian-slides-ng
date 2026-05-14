@@ -61,6 +61,18 @@ export interface DeckRenderOptions {
    * to the v0.7-era hardcoded black-on-white. v0.11.13+.
    */
   sceneInheritThemeBg?: boolean;
+  /**
+   * v0.11.36: pre-rendered scenes for the standalone speaker-view
+   * popup. Each entry's `contentHtml` is the markdown rendered to
+   * HTML at export time. Emitted as `window.__slidesNgScenes` in
+   * the standalone HTML. Ignored in embedded mode.
+   */
+  scenes?: Array<{
+    id: string;
+    label: string;
+    icon?: string;
+    contentHtml: string;
+  }>;
   // Pass-through reveal.js Reveal.initialize() options if the caller
   // wants to override anything specific.
   revealOptions?: Record<string, unknown>;
@@ -97,6 +109,9 @@ export function buildIframeHtml(
   // matching plugin setting, to force a black overlay (the v0.7-era
   // default).
   const sceneInheritThemeBg = options.sceneInheritThemeBg ?? true;
+  const scenesJson = Array.isArray(options.scenes)
+    ? JSON.stringify(options.scenes)
+    : "[]";
   // Reveal's controls + progress bar visibility. Standalone mode always
   // shows them (helps presenters drive in a browser); embedded mode hides
   // by default but the user can opt in via setting.
@@ -658,7 +673,12 @@ ${sectionsHtml}
             setTimeout(callInit, 200);
           }
         })();` : ""}
-        ${!embedded ? `/* v0.11.33: standalone-only enhancements —
+        ${!embedded ? `/* v0.11.36: expose configured scenes on window
+         * so the speaker-view popup can build its toolbar buttons
+         * dynamically from whatever the user has in plugin settings
+         * (rather than the hardcoded 4 defaults from v0.11.35). */
+        try { window.__slidesNgScenes = ${scenesJson}; } catch (_) {}
+        /* v0.11.33: standalone-only enhancements —
          * (a) Grid button in the top-right corner that opens the
          *     thumbnail-grid overlay (same as the embedded preview's
          *     Grid toolbar button + the G keyboard shortcut).
@@ -758,10 +778,7 @@ ${sectionsHtml}
                   '</style></head><body>',
                   '<div class="scenes-bar" id="scenes-bar">',
                   '  <span class="scene-label">Scenes</span>',
-                  '  <button class="scene-btn" data-scene-id="blackout" data-scene-content="">Blackout</button>',
-                  '  <button class="scene-btn" data-scene-id="brb" data-scene-html="<h1>Be right back</h1><p>Back in a few minutes.</p>">Be right back</button>',
-                  '  <button class="scene-btn" data-scene-id="qa" data-scene-html="<h1>Q &amp; A</h1><p>Questions?</p>">Q &amp; A</button>',
-                  '  <button class="scene-btn" data-scene-id="standby" data-scene-html="<h1>Stand by</h1>">Stand by</button>',
+                  '  <!-- scene buttons injected at runtime from window.opener.__slidesNgScenes -->',
                   '  <button class="scene-btn clear" id="scene-clear">Clear</button>',
                   '</div>',
                   '<div class="panel">',
@@ -798,10 +815,10 @@ ${sectionsHtml}
                   '  t.textContent = fmt(paused ? pausedAt - start : Date.now() - start);',
                   '}, 250);',
                   'document.getElementById("timer-reset").onclick = function () { start = Date.now(); paused = false; pausedAt = 0; document.getElementById("timer-pause").textContent = "Pause"; };',
-                  '/* v0.11.35: scene buttons. Click → postMessage to',
-                  ' * opener with the matching setScene cmd. Clear button',
-                  ' * sends clearScene. Visual state: clicked button gets',
-                  ' * .active until Clear is pressed. */',
+                  '/* v0.11.36: scene buttons built dynamically from',
+                  ' * window.opener.__slidesNgScenes. Click sends setScene',
+                  ' * (id + pre-rendered html) to the opener via',
+                  ' * window.opener.postMessage. Clear sends clearScene. */',
                   'var activeSceneBtn = null;',
                   'function sendScene(cmd, payload) {',
                   '  if (!window.opener) return;',
@@ -812,23 +829,51 @@ ${sectionsHtml}
                   '    window.opener.postMessage(msg, "*");',
                   '  } catch (_) {}',
                   '}',
-                  'document.querySelectorAll(".scene-btn[data-scene-id]").forEach(function (btn) {',
-                  '  btn.addEventListener("click", function () {',
-                  '    if (activeSceneBtn === btn) {',
-                  '      sendScene("clearScene");',
-                  '      btn.classList.remove("active");',
-                  '      activeSceneBtn = null;',
-                  '      return;',
+                  'function buildSceneButtons() {',
+                  '  var bar = document.getElementById("scenes-bar");',
+                  '  if (!bar) return;',
+                  '  var clearBtn = document.getElementById("scene-clear");',
+                  '  /* Read scenes from opener at runtime so customized',
+                  '   * scenes from plugin settings reflect immediately. */',
+                  '  var scenes = [];',
+                  '  try {',
+                  '    if (window.opener && window.opener.__slidesNgScenes) {',
+                  '      scenes = window.opener.__slidesNgScenes;',
                   '    }',
-                  '    if (activeSceneBtn) activeSceneBtn.classList.remove("active");',
-                  '    btn.classList.add("active");',
-                  '    activeSceneBtn = btn;',
-                  '    sendScene("setScene", {',
-                  '      id: btn.getAttribute("data-scene-id"),',
-                  '      html: btn.getAttribute("data-scene-html") || ""',
+                  '  } catch (_) {}',
+                  '  /* Strip any previously-built scene buttons (skip the',
+                  '   * label span + Clear). */',
+                  '  Array.from(bar.querySelectorAll(".scene-btn:not(.clear)")).forEach(function (b) { b.remove(); });',
+                  '  if (!Array.isArray(scenes) || scenes.length === 0) {',
+                  '    /* No scenes configured — hide the bar entirely',
+                  '     * (the Clear button would be alone otherwise). */',
+                  '    bar.style.display = "none";',
+                  '    return;',
+                  '  }',
+                  '  scenes.forEach(function (sc) {',
+                  '    if (!sc || !sc.id) return;',
+                  '    var btn = document.createElement("button");',
+                  '    btn.className = "scene-btn";',
+                  '    btn.setAttribute("data-scene-id", sc.id);',
+                  '    btn.textContent = sc.label || sc.id;',
+                  '    btn.addEventListener("click", function () {',
+                  '      if (activeSceneBtn === btn) {',
+                  '        sendScene("clearScene");',
+                  '        btn.classList.remove("active");',
+                  '        activeSceneBtn = null;',
+                  '        return;',
+                  '      }',
+                  '      if (activeSceneBtn) activeSceneBtn.classList.remove("active");',
+                  '      btn.classList.add("active");',
+                  '      activeSceneBtn = btn;',
+                  '      sendScene("setScene", { id: sc.id, html: sc.contentHtml || "" });',
                   '    });',
+                  '    /* Insert before the Clear button so Clear stays',
+                  '     * pinned to the right. */',
+                  '    bar.insertBefore(btn, clearBtn);',
                   '  });',
-                  '});',
+                  '}',
+                  'buildSceneButtons();',
                   'document.getElementById("scene-clear").addEventListener("click", function () {',
                   '  sendScene("clearScene");',
                   '  if (activeSceneBtn) { activeSceneBtn.classList.remove("active"); activeSceneBtn = null; }',

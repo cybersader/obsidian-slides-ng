@@ -162,6 +162,7 @@ export default class SlidesNGPlugin extends Plugin {
       const result = await exportAndOpen(this.app, file, undefined, {
         defaultTheme: this.settings.defaultTheme,
         defaultTransition: this.settings.defaultTransition,
+        scenes: this.settings.scenes,
       });
       if (result.opened) {
         new Notice(`Opened ${result.vaultRelativePath} in your default browser.`);
@@ -206,6 +207,7 @@ export default class SlidesNGPlugin extends Plugin {
         {
           defaultTheme: this.settings.defaultTheme,
           defaultTransition: this.settings.defaultTransition,
+          scenes: this.settings.scenes,
         },
         pdfOptions
       );

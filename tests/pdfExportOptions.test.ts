@@ -93,6 +93,24 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain("Speaker notes");
   });
 
+  test("scenes from settings are emitted as window.__slidesNgScenes in the standalone HTML (v0.11.36)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {
+      scenes: [
+        { id: "blackout", label: "Blackout", content: "" },
+        { id: "custom-coffee", label: "Coffee break", content: "# Coffee\n\nBack in 15.", icon: "coffee" },
+      ],
+    });
+    expect(html).toContain("window.__slidesNgScenes");
+    // The scene ids should be in the emitted JSON.
+    expect(html).toContain('"id":"blackout"');
+    expect(html).toContain('"id":"custom-coffee"');
+    expect(html).toContain('"label":"Coffee break"');
+    // Content was rendered to HTML, not left as markdown.
+    expect(html).toContain("<h1");
+    expect(html).toContain("Coffee");
+    expect(html).toContain("Back in 15");
+  });
+
   test("standalone enhancements are SKIPPED in embedded mode", () => {
     // renderDeck (not renderDeckStandalone) uses embedded:true by
     // default — the Grid button + popup should NOT appear.

@@ -6,6 +6,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.36] — 2026-05-14
+
+### Changed
+
+- **Speaker-popup scene buttons now match your configured
+  scenes** (rather than the 4 hardcoded defaults from
+  v0.11.35). The render pipeline now threads
+  `settings.scenes` through `RenderDefaults`, renders each
+  scene's markdown `content` to HTML at export time, and
+  emits the array as `window.__slidesNgScenes` in the
+  standalone HTML. The speaker popup reads that array via
+  `window.opener.__slidesNgScenes` at load time and builds
+  its toolbar buttons dynamically — including any
+  custom scenes you've added in Settings → Slides NG →
+  Scenes. The "Clear" button stays pinned to the right.
+  If you have zero scenes configured, the toolbar hides
+  entirely.
+
+### Technical
+
+- `src/render/renderDeck.ts` — `RenderDefaults.scenes`
+  field added. `renderDeckFromAst` maps each entry through
+  the breaks-aware notes-marked instance so the
+  `contentHtml` is ready for `setScene`.
+- `src/render/revealTemplate.ts` —
+  `DeckRenderOptions.scenes` (pre-rendered shape).
+  Standalone init block emits
+  `window.__slidesNgScenes = <json>`. Popup template
+  removes the hardcoded scene buttons and ships a
+  `buildSceneButtons()` helper that reads from
+  `window.opener.__slidesNgScenes`.
+- `src/SlidesNGView.ts` + `src/main.ts` — `renderDefaults`
+  / the inline default objects now include
+  `scenes: settings.scenes` so both the `Open in browser`
+  and `Export for PDF` paths carry the same set the speaker
+  view uses.
+- `tests/pdfExportOptions.test.ts` — new unit test
+  asserting custom scenes + their rendered HTML reach the
+  standalone export.
+
 ## [0.11.35] — 2026-05-14
 
 ### Fixed
