@@ -1105,7 +1105,7 @@ ${sectionsHtml}
               // 220/960 ≈ 0.229 always exactly fills the tile. Larger
               // viewports just fit more tiles per row.
               grid.style.cssText =
-                'display:grid;grid-template-columns:repeat(auto-fill, 220px);' +
+                'display:grid;grid-template-columns:repeat(auto-fill, 320px);' +
                 'justify-content:start;gap:0.85rem;';
               overlay.appendChild(grid);
               var currentIdx = (Reveal.getIndices() || {}).h || 0;
@@ -1116,7 +1116,12 @@ ${sectionsHtml}
               var revealConfig = (typeof Reveal.getConfig === 'function' ? Reveal.getConfig() : {}) || {};
               var SLIDE_W = typeof revealConfig.width === 'number' && revealConfig.width > 0 ? revealConfig.width : 960;
               var SLIDE_H = typeof revealConfig.height === 'number' && revealConfig.height > 0 ? revealConfig.height : 700;
-              var TILE_W = 220;
+              // v0.11.3: bumped from 220 to 320 so text inside the
+              // cloned slide thumbnails is legible. Picker tiles
+              // (up to 240px) had the same issue and that fix
+              // (v0.11.0+) made them readable; Grid was still on
+              // the 220px setting. Scale factor 320/960 ≈ 0.333.
+              var TILE_W = 320;
               var THUMB_SCALE = TILE_W / SLIDE_W;
               meta.forEach(function (s) {
                 // Prefer the pre-warmed clone (populated at idle time
@@ -1213,33 +1218,44 @@ ${sectionsHtml}
               break;
             }
             case 'toggleMenu': {
-              // v0.10.2: the reveal-menu plugin exposes its API
-              // through Reveal.getPlugin('menu') with methods
-              // .toggle(), .openMenu(), .closeMenu(), .isOpen().
-              // Programmatic .slide-menu-button.click() (the
-              // previous strategy) appeared to work but the click
-              // handler is bound late and silently no-ops if the
-              // plugin instance hasn't finished init. Going through
-              // getPlugin is the documented path.
+              // v0.11.3: try DOM-button click FIRST (the strategy
+              // that originally worked in v0.7.0-0.10.1), then fall
+              // back to plugin-API calls. v0.10.2 tried Reveal.getPlugin
+              // first because it's the "documented" path, but in
+              // practice the menu plugin's .toggle() seemed to no-op
+              // silently in some states. The .slide-menu-button click
+              // is the most reliable trigger across plugin versions.
               try {
-                var menuPlugin = typeof Reveal.getPlugin === 'function'
-                  ? Reveal.getPlugin('menu')
-                  : null;
-                if (menuPlugin && typeof menuPlugin.toggle === 'function') {
-                  menuPlugin.toggle();
-                } else if (menuPlugin && typeof menuPlugin.openMenu === 'function') {
-                  /* Older builds without .toggle: emulate it. */
-                  if (menuPlugin.isOpen && menuPlugin.isOpen()) {
-                    menuPlugin.closeMenu();
-                  } else {
-                    menuPlugin.openMenu();
+                var menuBtn = document.querySelector('.slide-menu-button');
+                if (menuBtn) {
+                  menuBtn.click();
+                } else if (typeof Reveal.getPlugin === 'function') {
+                  var menuPlugin = Reveal.getPlugin('menu');
+                  if (menuPlugin) {
+                    if (typeof menuPlugin.toggle === 'function') {
+                      menuPlugin.toggle();
+                    } else if (typeof menuPlugin.openMenu === 'function') {
+                      if (menuPlugin.isOpen && menuPlugin.isOpen()) {
+                        menuPlugin.closeMenu();
+                      } else {
+                        menuPlugin.openMenu();
+                      }
+                    }
                   }
-                } else {
-                  /* Last-ditch fallback: click the hamburger button. */
-                  var menuBtn = document.querySelector('.slide-menu-button');
-                  if (menuBtn) menuBtn.click();
                 }
-              } catch (_) { /* swallow — non-fatal */ }
+                // Diagnostic — visible in devtools if the user opens
+                // Ctrl+Shift+I and clicks Menu. Helps figure out why
+                // it might not be working on their setup.
+                console.log('[slides-ng] toggleMenu fired', {
+                  hadButton: !!menuBtn,
+                  hasGetPlugin: typeof Reveal.getPlugin === 'function',
+                  hasMenuPlugin: typeof Reveal.getPlugin === 'function'
+                    ? !!Reveal.getPlugin('menu')
+                    : false,
+                });
+              } catch (e) {
+                console.warn('[slides-ng] toggleMenu error', e);
+              }
               break;
             }
             case 'toggleBlackout': {

@@ -6,6 +6,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.3] — 2026-05-14
+
+### Changed
+
+- **Grid tile size bumped 220 → 320 px.** The Grid overlay
+  (toolbar button) used 220 px tiles, scaling slide content by
+  0.229 — text inside the thumbnails was hard to read ("super
+  zoomed out" per user). 320 px tiles give a 0.333 scale,
+  ~45 % bigger text. Matches the visual density of the v0.11.0
+  picker thumbnails. Tile aspect ratio still derived from
+  Reveal's configured slide dimensions.
+
+### Fixed
+
+- **Menu toolbar button strategy reverted to "click DOM button
+  first."** v0.10.2 switched the bridge to call
+  `Reveal.getPlugin('menu').toggle()` first because it's the
+  "documented" path, but user testing shows it silently no-ops
+  in some plugin states. v0.11.3 goes back to clicking
+  `.slide-menu-button` FIRST (the v0.7.0–0.10.1 strategy that
+  was working), with the plugin API as fallback. Also adds a
+  `console.log('[slides-ng] toggleMenu fired', {...})` diagnostic
+  so users can `Ctrl+Shift+I` and see why it might still not
+  work on their setup (which DOM element was found, whether
+  getPlugin returned something).
+
+### Technical
+
+- `src/render/revealTemplate.ts` — `case 'toggleMenu'` reordered;
+  Grid `TILE_W = 220` → `320`; Grid CSS grid-template-columns
+  `220px` → `320px`.
+
 ## [0.11.2] — 2026-05-14
 
 ### Fixed
