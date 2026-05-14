@@ -83,6 +83,25 @@ export async function exportDeckToFile(
 }
 
 /**
+ * v0.11.31: convert an absolute filesystem path to a `file:///` URL.
+ * On Windows `C:\path\file.html` must become `file:///C:/path/file.html`
+ * (three slashes, forward slashes only). On Unix `/home/.../file.html`
+ * already starts with `/`, so `file://` + path naturally produces
+ * `file:///home/...`. Previously we naively did `"file://" + absolutePath`,
+ * which on Windows produced `file://C:\path\file.html?print-pdf` —
+ * malformed URL → browsers ignore the query string → PDF print mode
+ * never triggered (and "showNotes=true" never landed). This was the
+ * user-reported "PDF options don't persist in the opened browser" bug.
+ */
+export function pathToFileUrl(absolutePath: string): string {
+  const normalized = absolutePath.replace(/\\/g, "/");
+  if (normalized.startsWith("/")) {
+    return "file://" + normalized;
+  }
+  return "file:///" + normalized;
+}
+
+/**
  * Open a `file://` URL in the user's default browser via Electron's
  * `shell.openExternal`. Pure-IPC, no spawned process, no listening port.
  * Returns true on success, false if Electron isn't available (e.g. in
@@ -105,7 +124,7 @@ export async function openExternalInBrowser(
     const electron: { shell?: { openExternal: (url: string) => Promise<void> } } =
       require(electronModuleName);
     if (!electron.shell) return false;
-    await electron.shell.openExternal("file://" + absolutePath + urlSuffix);
+    await electron.shell.openExternal(pathToFileUrl(absolutePath) + urlSuffix);
     return true;
   } catch {
     return false;

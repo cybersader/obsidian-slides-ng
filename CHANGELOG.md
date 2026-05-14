@@ -6,6 +6,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.31] — 2026-05-14
+
+### Fixed
+
+- **PDF export options now reach the opened browser on Windows.**
+  Root cause: `openExternalInBrowser` did `"file://" + absolutePath`,
+  which on Windows produced URLs like
+  `file://C:\Users\foo\export.html?print-pdf`. Backslash drive paths
+  after `file://` are malformed per RFC 8089 — most browsers parse
+  up to the backslash and drop everything after, including the
+  `?print-pdf` query string. So the browser opened the HTML in
+  presentation mode (not print-PDF mode), notes never appeared, and
+  the aspect-ratio choice was invisible. New `pathToFileUrl()`
+  normalises Windows paths to `file:///C:/Users/foo/export.html`
+  (three slashes, forward slashes only). The query suffix now
+  attaches cleanly and reveal.js receives both `print-pdf` and
+  `showNotes=true`.
+
+### Verified
+
+- **Hamburger menu is bundled + configured in the exported HTML.**
+  Unit test confirms the standalone export contains
+  `slide-menu-button` CSS, the `RevealMenu` plugin UMD body, and a
+  `"menu":` entry in the `Reveal.initialize` config.
+- **PDF aspect ratio choices reach `Reveal.initialize`.** 16:9 →
+  `width:1280, height:720`. 4:3 → `width:1024, height:768`. Default
+  → no override (reveal's 960/700 design canvas).
+- **Speaker notes are rendered into the standalone HTML** as
+  `<aside class="notes">…</aside>` per reveal.js convention. The
+  `?showNotes=true` URL flag is what tells reveal to display them
+  at print time; the notes themselves are always in the file.
+
+### Technical
+
+- `src/export/exportStandalone.ts` — new exported `pathToFileUrl()`
+  helper. `openExternalInBrowser` now calls it instead of naive
+  string concatenation.
+- `tests/pdfExportOptions.test.ts` — new 10-test file covering
+  - PDF aspect ratios persist to `Reveal.initialize` config
+  - showNotes flag is encoded in the URL suffix
+  - notes content is rendered into HTML
+  - hamburger menu is bundled + configured
+  - Windows + Unix path-to-file-URL conversion
+
 ## [0.11.30] — 2026-05-14
 
 ### Fixed
