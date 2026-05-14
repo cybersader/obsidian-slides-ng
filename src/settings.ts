@@ -178,7 +178,10 @@ export const SPEAKER_PANEL_LABELS: Record<SpeakerPanelId, string> = {
   status: "Status bar (slide N of M)",
   controls: "Navigation controls (First / Prev / Next / Last)",
   timer: "Timer (elapsed / countdown / lap)",
-  nextLine: "Next-slide title line",
+  /* `nextLine` (the "Next: …" text panel) was retired in v0.10.3.
+   * Label kept for back-compat with stored visibility settings; the
+   * panel itself is no longer mounted, so toggling does nothing. */
+  nextLine: "Next-slide title line (retired in v0.10.3)",
   visualNext: "Visual next-slide preview",
   scenes: "Scenes (overlay slides)",
   notes: "Speaker notes",

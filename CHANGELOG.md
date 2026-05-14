@@ -6,6 +6,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.3] — 2026-05-14
+
+### Changed
+
+- **Slide picker rebuilt as a single scrollable column.** The
+  compact-vs-list mode toggle is gone; the "Show all N slides →"
+  footer link is gone; the `speakerPickerDefaultMode` setting UI
+  is gone. The picker is now one scrolling list of numbered slide
+  rows. Past slides are faded, the current slide is accent-
+  highlighted, and the panel auto-scrolls to keep the current row
+  in view (`scrollIntoView({block: 'nearest', behavior: 'smooth'})`).
+  Native mouse-wheel scroll because it's just `overflow-y: auto`.
+- **Inline countdown-target input.** The timer panel grows a small
+  `[N] min` input next to the mode dropdown when mode is
+  "countdown" — hidden in elapsed / lap mode. Live-edits the
+  target without bouncing to settings. The countdown setting in
+  the settings tab still works as the default.
+- **"Next: …" text panel (`nextLine`) retired.** It's redundant
+  now that the picker shows the next slide(s) inline + the visual
+  next-slide preview iframe shows the actual rendering. The
+  visibility-toggle entry stays in settings (labelled "retired in
+  v0.10.3") for back-compat — toggling it does nothing.
+
+### Fixed
+
+- **Mermaid blocks in two example decks** (`01-conference-talk.md`
+  and `04-project-demo.md`) replaced with ASCII representations.
+  Slides-NG doesn't bundle Mermaid (it's ~700 KB and would blow
+  past the 2 MB bundle soft cap); the previous decks rendered
+  fenced ` ```mermaid ` blocks as raw code instead of diagrams.
+  Mermaid added to the idea jar with the bundling tradeoff
+  spelled out.
+
+### Idea jar (added)
+
+- **Mermaid diagram support** — would require either accepting a
+  much larger bundle or rendering Mermaid out-of-iframe and
+  injecting SVG (with no network access at render time).
+
+### Technical
+
+- `src/SlidesNGSpeakerView.ts` — `pickerMode` field + mode
+  toggle button removed; `nextLineEl` reference + applyState
+  branch removed; `renderPicker` collapsed to a single
+  `for (const s of slides)` loop with auto-scroll-into-view;
+  inline countdown-input + `syncCountdownVisibility` helper
+  added to the timer panel; status bar no longer rendered with
+  the timer span.
+- `src/SlidesNGSettingTab.ts` — "Slide picker mode" Setting row
+  removed; `PICKER_MODES` import dropped.
+- `src/settings.ts` — `SPEAKER_PANEL_LABELS.nextLine` labelled
+  "retired in v0.10.3".
+- `src/styles.css` — all `.slides-ng-speaker-compact*` rules
+  deleted; `.slides-ng-speaker-next` rule deleted;
+  `.slides-ng-speaker-list-item` got `.past` opacity treatment +
+  current-hover state + bigger numbered badge;
+  `.slides-ng-speaker-picker` got `max-height: 50vh` so it
+  scrolls inside its cap rather than pushing other panels off
+  the page; new `.slides-ng-speaker-timer-countdown[-label]`
+  rules for the inline countdown input.
+
 ## [0.10.2] — 2026-05-14
 
 ### Fixed

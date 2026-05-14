@@ -80,17 +80,14 @@ export class SlidesNGSpeakerView extends ItemView {
   private timerStartMs: number | null = null;
   private timerPausedMs = 0;
   private timerTickHandle: number | null = null;
-  private pickerMode: "compact" | "list" = "compact";
   private getSettings?: SpeakerSettingsAccessor;
 
   // DOM refs populated in onOpen.
   private statusEl?: HTMLElement;
   private timerEl?: HTMLElement;
   private timerToggleBtn?: HTMLButtonElement;
-  private nextLineEl?: HTMLElement;
   private notesEl?: HTMLElement;
   private pickerEl?: HTMLElement;
-  private modeToggleBtn?: HTMLButtonElement;
   private sceneButtons = new Map<string, HTMLButtonElement>();
   /** Visual next-slide preview mini-iframe (v0.7.0). */
   private nextSlideIframe?: HTMLIFrameElement;
@@ -165,11 +162,10 @@ export class SlidesNGSpeakerView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
-    // Resolve initial picker mode from settings (if available).
+    // v0.10.3: picker rebuild — single scrollable list, no mode
+    // toggle; `speakerPickerDefaultMode` setting is now ignored and
+    // will be removed entirely in a future release.
     const settings = this.getSettings?.();
-    if (settings?.speakerPickerDefaultMode) {
-      this.pickerMode = settings.speakerPickerDefaultMode;
-    }
 
     const container = this.contentEl;
     container.empty();
@@ -277,11 +273,50 @@ export class SlidesNGSpeakerView extends ItemView {
         opt.selected = true;
       }
     }
+    // v0.10.3: inline countdown-target input. Visible only when the
+    // timer mode is "countdown" — hidden otherwise to keep the row
+    // tidy. Live-edit the target without bouncing to settings.
+    const countdownInput = timerRow.createEl("input", {
+      cls: "slides-ng-speaker-timer-countdown",
+      attr: {
+        type: "number",
+        min: "1",
+        max: "600",
+        step: "1",
+        "aria-label": "Countdown target (minutes)",
+      },
+    });
+    countdownInput.value = String(
+      this.getSettings?.()?.speakerTimerCountdownMinutes ?? 30
+    );
+    setTooltip(countdownInput, "Countdown target (minutes)");
+    const minutesLabel = timerRow.createSpan({
+      cls: "slides-ng-speaker-timer-countdown-label",
+      text: "min",
+    });
+    const syncCountdownVisibility = (): void => {
+      const isCountdown =
+        (this.getSettings?.()?.speakerTimerMode ?? "elapsed") === "countdown";
+      countdownInput.style.display = isCountdown ? "" : "none";
+      minutesLabel.style.display = isCountdown ? "" : "none";
+    };
+    syncCountdownVisibility();
+    countdownInput.addEventListener("input", () => {
+      const n = parseFloat(countdownInput.value);
+      if (!Number.isFinite(n) || n <= 0 || n > 600) return;
+      const s = this.getSettings?.();
+      if (!s) return;
+      s.speakerTimerCountdownMinutes = n;
+      void this.saveSettings?.();
+      this.applyTimerLabel();
+    });
+
     modeSelect.addEventListener("change", () => {
       const s = this.getSettings?.();
       if (!s) return;
       s.speakerTimerMode = modeSelect.value as SlidesNGSettings["speakerTimerMode"];
       void this.saveSettings?.();
+      syncCountdownVisibility();
       this.resetTimer();
     });
     setTooltip(
@@ -301,15 +336,11 @@ export class SlidesNGSpeakerView extends ItemView {
       onClick: () => this.resetTimer(),
     });
 
-    // Next-slide preview line (text). Use a child span for the
-    // actual text so we can call setText on it without wiping the
-    // drag handle (which setPanelVisible inserts as a sibling).
-    const nextLineWrap = container.createDiv({ cls: "slides-ng-speaker-next" });
-    this.nextLineEl = nextLineWrap.createSpan({
-      cls: "slides-ng-speaker-next-text",
-      text: "Next: —",
-    });
-    setPanelVisible(nextLineWrap, "nextLine");
+    // v0.10.3: the "Next: …" text line was deleted in favour of
+    // the rebuilt picker (which shows the next slides inline) +
+    // the visual next-slide preview iframe below. The `nextLine`
+    // panel id is still recognised in settings for back-compat
+    // but the panel itself is no longer mounted.
 
     // Visual next-slide preview — a second iframe rendering the same
     // deck pinned to currentIdx + 1. Synced via postMessage on every
@@ -369,22 +400,16 @@ export class SlidesNGSpeakerView extends ItemView {
     this.notesEl = notesWrap.createDiv({ cls: "slides-ng-speaker-notes" });
     this.notesWrapEl = notesWrap;
 
-    // Picker — header + content. setPanelVisible wraps both so they hide together.
+    // Picker — header + content. setPanelVisible wraps both so they
+    // hide together. v0.10.3: dropped the compact/list mode toggle
+    // (and the corresponding "Show all N slides →" footer link).
+    // The picker is now a single scrollable column of slide rows
+    // (numbered badge + title), auto-scrolled to keep the current
+    // slide in view.
     const pickerWrap = container.createDiv({ cls: "slides-ng-speaker-picker-wrap" });
     setPanelVisible(pickerWrap, "picker");
     const pickerHeader = pickerWrap.createDiv({ cls: "slides-ng-speaker-picker-header" });
     pickerHeader.createEl("div", { cls: "slides-ng-speaker-section-title", text: "Slides" });
-    this.modeToggleBtn = pickerHeader.createEl("button", {
-      cls: "slides-ng-speaker-btn slides-ng-speaker-mode-toggle",
-      text: `Mode: ${this.pickerMode}`,
-    });
-    this.modeToggleBtn.addEventListener("click", () => {
-      this.pickerMode = this.pickerMode === "compact" ? "list" : "compact";
-      this.modeToggleBtn!.setText(`Mode: ${this.pickerMode}`);
-      this.renderPicker();
-    });
-
-    // Slide picker
     this.pickerEl = pickerWrap.createDiv({ cls: "slides-ng-speaker-picker" });
 
     // Visual-next-preview height: apply the user's persisted height
@@ -1087,11 +1112,6 @@ export class SlidesNGSpeakerView extends ItemView {
         `Slide ${this.state.currentIdx + 1} of ${this.state.totalSlides}`
       );
     }
-    if (this.nextLineEl) {
-      this.nextLineEl.setText(
-        this.state.nextTitle ? `Next: ${this.state.nextTitle}` : "Next: (end)"
-      );
-    }
     if (this.notesEl && !this.notesEditing) {
       this.notesEl.innerHTML = this.state.notesHtml || "<em>No notes</em>";
     }
@@ -1108,69 +1128,50 @@ export class SlidesNGSpeakerView extends ItemView {
     this.renderPicker();
   }
 
+  /**
+   * Render the slide picker (v0.10.3 rebuild): a single scrollable
+   * column of slide rows. Each row is a button with a numbered badge
+   * on the left + the slide title on the right. Current slide gets
+   * the accent treatment and auto-scrolls into view.
+   *
+   * No more compact/list mode toggle. The "Show all N slides →"
+   * footer link is gone too — the full list is right there. Thumbnail
+   * support is queued for a follow-up release; for now this is text-
+   * based.
+   */
   private renderPicker(): void {
     if (!this.pickerEl || !this.state) return;
     this.pickerEl.empty();
     const { slides, currentIdx } = this.state;
-    if (this.pickerMode === "compact") {
-      // Compact: previous (faded) + current (accent) + next 3
-      // (upcoming). Each row is clickable to jump to that slide.
-      // Number-badge on the left, title on the right, all rows fixed-
-      // height for at-a-glance readability during a live presentation.
-      const summary = this.pickerEl.createDiv({ cls: "slides-ng-speaker-compact" });
-      const start = Math.max(0, currentIdx - 1);
-      const end = Math.min(slides.length, currentIdx + 4);
-      for (let i = start; i < end; i++) {
-        const s = slides[i];
-        const isCurrent = i === currentIdx;
-        const isPast = i < currentIdx;
-        const row = summary.createEl("button", {
-          cls: [
-            "slides-ng-speaker-compact-row",
-            isCurrent ? "current" : "",
-            isPast ? "past" : "",
-          ]
-            .filter(Boolean)
-            .join(" "),
-          attr: { type: "button" },
-        });
-        row.createSpan({
-          cls: "slides-ng-speaker-compact-num",
-          text: String(s.idx + 1),
-        });
-        row.createSpan({
-          cls: "slides-ng-speaker-compact-title",
-          text: s.title || "(untitled)",
-        });
-        row.addEventListener("click", () => this.send("goto", s.idx));
-      }
-      // Footer link to open the Grid for jumping outside the compact
-      // window. Styled as a small text-link (v0.10.0+) so it's
-      // visually distinct from the slide-row buttons above.
-      const footer = summary.createEl("button", {
-        cls: "slides-ng-speaker-compact-all",
-        text: `Show all ${slides.length} slides →`,
+    let currentEl: HTMLElement | null = null;
+    for (const s of slides) {
+      const isCurrent = s.idx === currentIdx;
+      const isPast = s.idx < currentIdx;
+      const item = this.pickerEl.createEl("button", {
+        cls: [
+          "slides-ng-speaker-list-item",
+          isCurrent ? "current" : "",
+          isPast ? "past" : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
         attr: { type: "button" },
       });
-      footer.addEventListener("click", () => this.send("toggleOverview"));
-    } else {
-      for (const s of slides) {
-        const item = this.pickerEl.createEl("button", {
-          cls:
-            "slides-ng-speaker-list-item" +
-            (s.idx === currentIdx ? " current" : ""),
-          attr: { type: "button" },
-        });
-        item.createSpan({
-          cls: "slides-ng-speaker-list-num",
-          text: String(s.idx + 1),
-        });
-        item.createSpan({
-          cls: "slides-ng-speaker-list-title",
-          text: s.title || "(untitled)",
-        });
-        item.addEventListener("click", () => this.send("goto", s.idx));
-      }
+      item.createSpan({
+        cls: "slides-ng-speaker-list-num",
+        text: String(s.idx + 1),
+      });
+      item.createSpan({
+        cls: "slides-ng-speaker-list-title",
+        text: s.title || "(untitled)",
+      });
+      item.addEventListener("click", () => this.send("goto", s.idx));
+      if (isCurrent) currentEl = item;
+    }
+    // Auto-scroll the current slide into view (block: nearest avoids
+    // unnecessary scroll when the slide is already in the viewport).
+    if (currentEl) {
+      currentEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }
 

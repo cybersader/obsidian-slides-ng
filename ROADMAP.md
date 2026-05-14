@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.10.3** — picker rebuilt as single scrollable column (compact/list toggle gone, "Show all N" footer gone); inline countdown-target input on the timer panel; `nextLine` ("Next: …" text) panel retired; mermaid blocks in two example decks replaced with ASCII (mermaid bundling added to idea jar).
 - **0.10.2** — patch: iframe ResizeObserver-driven relayout guard fixes "black pane on initial open, wrong size after tab switch"; Menu toolbar button uses `Reveal.getPlugin('menu').toggle()` (was clicking the menu plugin's button programmatically and silently no-op'ing); Grid icon switched from `grid-3x3` to `layout-grid` (former wasn't bundled); visual-next-slide goto retries to defeat the bridge-not-yet-listening race; file-based debug logger added.
 - **0.10.1** — patch: ribbon-button auto-render fix (Shiki cold-start blocked the first render; setState/active-leaf race left filePath null); title-centering fix (drag handle inserted into space-between header now wraps in a sub-div); drop-indicator no-op suppression; Grid tile dimensions read from Reveal config instead of hard-coded.
 - **0.10.0** — speaker-view polish bundle: unified Timer panel with elapsed/countdown/lap modes (warning + overrun colours); 2-column auto-fit panel flow at ≥ 900 px container width; visual-next-slide width capped + centred; "Show all N slides" picker footer restyled as text-link; Grid moved from speaker view to preview toolbar; per-scene Lucide icon customisation via settings; drag-handle layout no longer accidentally centres adjacent panel content.
@@ -69,6 +70,7 @@ ballpark.
 | Per-slide `customCSS:` (scoped via generated `[data-slide-uid]` selectors) | Medium | 2 hr — needs slide-uid assignment in parseDeck |
 | Code-fence line numbers (Shiki transformer) | Low | 1 hr |
 | More Shiki languages on-demand | Deferred | Static-bundle pattern locks at build time; dynamic loading breaks the sync `highlight()` contract — significant refactor for marginal value |
+| **Mermaid diagram support** (NEW, v0.10.3 user-noticed) — render ` ```mermaid ` fences as actual diagrams. Big — mermaid is ~700 KB minified. Would blow past our 2 MB soft cap unless lazy-loaded (and lazy-loading breaks the iframe-srcdoc no-network promise). Practical option: render mermaid OUTSIDE the iframe, inject SVG, and bundle a smaller subset of diagram types. | Medium-High | 6-8 hr — non-trivial because of bundle-size constraint |
 
 ### Authoring / workflow
 

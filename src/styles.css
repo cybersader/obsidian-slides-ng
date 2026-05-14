@@ -213,6 +213,28 @@
    * sensible width cap. */
   max-width: 12em;
 }
+.slides-ng-speaker-timer-countdown {
+  /* Inline countdown-target input — visible only when mode ===
+   * countdown. Tight width: 4 ch covers up to "600" min. */
+  width: 5em;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.slides-ng-speaker-timer-countdown:focus {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -1px;
+}
+.slides-ng-speaker-timer-countdown-label {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  margin-left: -0.15rem;
+  margin-right: 0.15rem;
+}
 .slides-ng-speaker-nav-group {
   /* Connected pill for the four navigation buttons (First / Prev /
    * Next / Last). Buttons sit adjacent; outer corners are rounded
@@ -531,12 +553,9 @@
   color: var(--text-normal);
   cursor: pointer;
 }
-.slides-ng-speaker-next {
-  padding: 0.3rem 0.6rem;
-  border-left: 3px solid var(--interactive-accent);
-  color: var(--text-muted);
-  font-style: italic;
-}
+/* `.slides-ng-speaker-next` rule deleted in v0.10.3 — the "Next: …"
+ * text panel was retired in favour of the rebuilt picker which shows
+ * the next slides inline. */
 .slides-ng-speaker-section-title {
   font-size: 0.75em;
   text-transform: uppercase;
@@ -608,129 +627,73 @@
   justify-content: space-between;
 }
 .slides-ng-speaker-picker {
+  /* v0.10.3: single scrollable column of slide rows. Capped height
+   * so a 100-slide deck doesn't push every other panel off-screen;
+   * inside the cap it scrolls (mouse wheel works natively). */
   flex: 1 1 auto;
   min-height: 4rem;
-  padding: 0.4rem 0.6rem;
+  max-height: 50vh;
+  padding: 0.4rem 0.5rem;
   background: var(--background-secondary);
   border-radius: 6px;
   overflow-y: auto;
-}
-/* Compact picker: previous (faded) + current (accent) + next 3
- * (normal). Each row is a clickable button. */
-.slides-ng-speaker-compact {
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.15rem;
+  /* Smooth scroll for auto-scroll-into-view of current slide. */
+  scroll-behavior: smooth;
 }
-.slides-ng-speaker-compact-row {
-  appearance: none;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.4rem 0.5rem;
-  border: 0;
-  border-radius: 4px;
-  background: var(--background-primary);
-  color: var(--text-normal);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background 80ms ease;
-}
-.slides-ng-speaker-compact-row:hover {
-  background: var(--background-modifier-hover);
-}
-.slides-ng-speaker-compact-row.past {
-  opacity: 0.5;
-}
-.slides-ng-speaker-compact-row.current {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  font-weight: 600;
-}
-.slides-ng-speaker-compact-row.current:hover {
-  background: var(--interactive-accent-hover);
-}
-.slides-ng-speaker-compact-num {
-  flex: 0 0 auto;
-  min-width: 1.5em;
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.18);
-  font-size: 0.85em;
-  font-weight: 600;
-  text-align: center;
-}
-.slides-ng-speaker-compact-row.current .slides-ng-speaker-compact-num {
-  background: rgba(255, 255, 255, 0.25);
-}
-.slides-ng-speaker-compact-title {
-  flex: 1 1 auto;
-  font-size: 0.9em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.slides-ng-speaker-compact-all {
-  /* v0.10.0: text-link style instead of a dashed-border tile, so it
-   * reads as a SECONDARY action rather than another slide row. */
-  appearance: none;
-  margin-top: 0.4rem;
-  padding: 0.25rem 0.3rem;
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 0.82em;
-  cursor: pointer;
-  text-align: left;
-  text-decoration: none;
-  transition: color 80ms ease;
-}
-.slides-ng-speaker-compact-all:hover {
-  color: var(--text-accent);
-  text-decoration: underline;
-}
-.slides-ng-speaker-compact-all:focus-visible {
-  outline: 2px solid var(--interactive-accent);
-  outline-offset: 2px;
-  border-radius: 3px;
-}
+/* v0.10.3: compact-row + compact-all CSS rules deleted along with
+ * the picker's compact/list mode toggle and "Show all N slides →"
+ * footer link. The picker is now a single scrollable column of
+ * `.slides-ng-speaker-list-item` rows — see below for that styling.
+ */
 
-/* Full-list picker rows */
+/* Full-list picker rows — v0.10.3 picker is just this. */
 .slides-ng-speaker-list-item {
   appearance: none;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
   width: 100%;
-  padding: 0.3rem 0.5rem;
+  padding: 0.4rem 0.55rem;
   border: 0;
-  border-radius: 3px;
+  border-radius: 4px;
   background: transparent;
   color: var(--text-normal);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 80ms ease, color 80ms ease;
 }
 .slides-ng-speaker-list-item:hover {
   background: var(--background-modifier-hover);
+}
+/* v0.10.3: past slides faded (matches the old compact-row.past
+ * treatment so the eye still tracks pacing). */
+.slides-ng-speaker-list-item.past {
+  opacity: 0.55;
 }
 .slides-ng-speaker-list-item.current {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
   font-weight: 600;
+  opacity: 1; /* override .past if both ever apply */
+}
+.slides-ng-speaker-list-item.current:hover {
+  background: var(--interactive-accent-hover);
 }
 .slides-ng-speaker-list-num {
   flex: 0 0 auto;
-  min-width: 1.5em;
-  padding: 0.1rem 0.4rem;
+  min-width: 1.8em;
+  padding: 0.15rem 0.45rem;
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.18);
   font-size: 0.85em;
   font-weight: 600;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .slides-ng-speaker-list-item.current .slides-ng-speaker-list-num {
   background: rgba(255, 255, 255, 0.25);
@@ -740,6 +703,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.92em;
 }
 
 /* ===== Export-for-PDF options modal ===== */

@@ -3,7 +3,6 @@ import type SlidesNGPlugin from "./main";
 import {
   REVEAL_TRANSITIONS,
   IMAGE_LAYOUT_SPLITS,
-  PICKER_MODES,
   BUNDLED_CODE_THEMES,
   TRANSITION_SPEEDS,
   DEFAULT_SCENES,
@@ -217,20 +216,10 @@ export class SlidesNGSettingTab extends PluginSettingTab {
     // ---------- Speaker ----------
     new Setting(containerEl).setName("Speaker").setHeading();
 
-    new Setting(containerEl)
-      .setName("Slide picker mode")
-      .setDesc(
-        "Initial mode for the speaker view's slide list. `Compact` shows current + next 3; `list` shows all."
-      )
-      .addDropdown((d) => {
-        for (const m of PICKER_MODES) d.addOption(m, m);
-        d.setValue(this.plugin.settings.speakerPickerDefaultMode).onChange(
-          async (v) => {
-            this.plugin.settings.speakerPickerDefaultMode = v as "compact" | "list";
-            await this.plugin.saveSettings();
-          }
-        );
-      });
+    // v0.10.3: removed the "Slide picker mode" setting — the picker
+    // is now a single scrollable column (no compact/list toggle).
+    // The `speakerPickerDefaultMode` field stays on the settings
+    // type for back-compat read, but the UI is gone.
 
     new Setting(containerEl)
       .setName("Timer tick interval (ms)")
