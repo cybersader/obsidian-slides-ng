@@ -35,6 +35,38 @@ export interface Deck {
  */
 const RECLASSIFY_NOTE_RE = /^\s*(slide|element)\s+([\s\S]*?)\s*$/;
 
+/**
+ * v0.11.5: cheap regex peek into the top-of-file frontmatter to find
+ * a boolean-ish value for a single named key. Avoids parsing the
+ * whole YAML for a single override flag during the pre-parse step
+ * (we'd be paying that cost on EVERY render). Returns `undefined`
+ * when the key is absent so callers can distinguish "not set" from
+ * "set to false."
+ */
+export function peekFrontmatterFlag(
+  markdown: string,
+  key: string
+): boolean | undefined {
+  if (!(markdown.startsWith("---\n") || markdown.startsWith("---\r\n"))) {
+    return undefined;
+  }
+  const end = markdown.indexOf("\n---", 4);
+  if (end === -1) return undefined;
+  const fm = markdown.slice(0, end);
+  // Match key: value at the start of a line. Boolean truthy/falsy
+  // values + quoted/unquoted strings handled.
+  const re = new RegExp(
+    `^${key.replace(/[-/\\^$*+?.()|[\\]{}]/g, "\\$&")}\\s*:\\s*(.*)$`,
+    "m"
+  );
+  const m = re.exec(fm);
+  if (!m) return undefined;
+  const val = m[1].trim().toLowerCase().replace(/^["']|["']$/g, "");
+  if (val === "true" || val === "yes" || val === "1") return true;
+  if (val === "false" || val === "no" || val === "0") return false;
+  return undefined;
+}
+
 function reclassifyNote(slide: SourceSlideInfo): {
   content: string;
   note: string | undefined;
@@ -54,13 +86,87 @@ function reclassifyNote(slide: SourceSlideInfo): {
 }
 
 /**
+ * v0.11.5: pre-parse step that turns every top-level `#` heading into
+ * the start of a new slide. Lets users author decks as plain markdown
+ * outlines without remembering the `---` separator convention. The
+ * frontmatter block (first `---\n…\n---` pair at the very top) is
+ * NOT touched. Existing `---` separators are preserved — they aren't
+ * doubled-up if a `#` heading already follows one.
+ *
+ * Pure function so it can be unit-tested in isolation.
+ */
+export function injectH1SlideBreaks(markdown: string): string {
+  // Detect + skip the frontmatter block (if any) so we don't insert
+  // a break before the very first `#` after frontmatter.
+  let cursor = 0;
+  let body = markdown;
+  if (markdown.startsWith("---\n") || markdown.startsWith("---\r\n")) {
+    const end = markdown.indexOf("\n---", 4);
+    if (end !== -1) {
+      // Include the trailing newline after the closing `---` if present.
+      const next = markdown.indexOf("\n", end + 1);
+      cursor = next === -1 ? markdown.length : next + 1;
+      body = markdown.slice(cursor);
+    }
+  }
+  // Walk lines; on the FIRST `# ` heading we leave it alone (it's the
+  // current first slide). On every subsequent `# ` heading, prefix a
+  // `---` separator unless one already precedes it.
+  const lines = body.split("\n");
+  const out: string[] = [];
+  let seenFirstH1 = false;
+  let inFenced = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Track fenced code blocks so we don't insert breaks inside them.
+    if (/^```/.test(line)) inFenced = !inFenced;
+    const isH1 = !inFenced && /^#\s/.test(line);
+    if (isH1) {
+      if (!seenFirstH1) {
+        seenFirstH1 = true;
+        out.push(line);
+        continue;
+      }
+      // Walk back past blank lines to see if the previous non-blank
+      // line is already a `---` separator.
+      let j = out.length - 1;
+      while (j >= 0 && out[j].trim() === "") j--;
+      const prevNonBlank = j >= 0 ? out[j].trim() : "";
+      if (prevNonBlank === "---") {
+        out.push(line);
+        continue;
+      }
+      // Insert a separator with surrounding blank lines for safety.
+      out.push("", "---", "");
+      out.push(line);
+      continue;
+    }
+    out.push(line);
+  }
+  return markdown.slice(0, cursor) + out.join("\n");
+}
+
+/**
  * Parse a markdown source string into our Deck representation.
  *
  * @param markdown raw markdown source (the file's contents)
  * @param filepath used only for error reporting; can be a virtual path
+ * @param options.autoH1Breaks when true, every top-level `#` heading
+ *   starts a new slide automatically (v0.11.5+). Default false.
  */
-export function parseDeck(markdown: string, filepath = "deck.md"): Deck {
-  const parsed: SlidevMarkdown = parseSync(markdown, filepath);
+export function parseDeck(
+  markdown: string,
+  filepath = "deck.md",
+  options: { autoH1Breaks?: boolean } = {}
+): Deck {
+  // v0.11.5: optional pre-parse to inject `---` before each H1.
+  // Frontmatter override `slides-ng-auto-h1-breaks: true` takes
+  // priority over the setting if either is set — checked here via
+  // a small regex peek so we don't pay for a full YAML parse.
+  const fmOverride = peekFrontmatterFlag(markdown, "slides-ng-auto-h1-breaks");
+  const enabled = fmOverride !== undefined ? fmOverride : !!options.autoH1Breaks;
+  const source = enabled ? injectH1SlideBreaks(markdown) : markdown;
+  const parsed: SlidevMarkdown = parseSync(source, filepath);
 
   const slides: Slide[] = parsed.slides.map((s: SourceSlideInfo) => {
     const { content, note } = reclassifyNote(s);

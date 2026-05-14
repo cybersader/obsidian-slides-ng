@@ -6,6 +6,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.5] — 2026-05-14
+
+### Added
+
+- **Auto-split slides on `#` headings.** New setting (Settings →
+  Slides NG → "Auto-split slides on `#` headings") and matching
+  frontmatter flag `slides-ng-auto-h1-breaks: true|false`. When
+  enabled, every top-level `#` heading begins a new slide
+  automatically — no `---` separator needed. Lets authors write
+  decks as plain markdown outlines.
+  - Default: off (preserves Slidev / reveal compat with existing
+    decks).
+  - Frontmatter override beats the global setting either way.
+  - Pure-function pre-parse step (`injectH1SlideBreaks`)
+    preserves existing `---` separators (no double-up), skips
+    fenced code blocks (`#` inside ``` doesn't break), and
+    ignores `##` / `###` sub-headings.
+
+### Technical
+
+- `src/parser/parseDeck.ts` — new `injectH1SlideBreaks()` +
+  `peekFrontmatterFlag()` helpers, both exported and unit-
+  tested. `parseDeck()` gains an `options.autoH1Breaks`
+  parameter.
+- `src/render/renderDeck.ts` — `RenderDefaults.autoH1Breaks`,
+  threaded into both `renderDeck` and `renderDeckStandalone`
+  call sites.
+- `src/settings.ts` — `autoH1Breaks` field + default `false`.
+- `src/SlidesNGSettingTab.ts` — toggle row under the speaker
+  settings.
+- `src/SlidesNGView.ts` + `SlidesNGSpeakerView.ts` — pass
+  `settings.autoH1Breaks` into every `renderDeck()` call.
+- `tests/autoH1Breaks.test.ts` — 16 new unit tests covering
+  the helper, the frontmatter peek, and the parseDeck
+  integration.
+
 ## [0.11.4] — 2026-05-14
 
 ### Fixed

@@ -255,6 +255,21 @@ export class SlidesNGSettingTab extends PluginSettingTab {
         );
       });
 
+    // v0.11.5: authoring convenience — auto-split on H1.
+    new Setting(containerEl)
+      .setName("Auto-split slides on `#` headings")
+      .setDesc(
+        "Treat every top-level `#` heading as the start of a new slide — no `---` separator needed. Lets you write decks as plain markdown outlines. Override per-deck with `slides-ng-auto-h1-breaks: true` (or `false`) in the file's frontmatter."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.autoH1Breaks ?? false).onChange(
+          async (v) => {
+            this.plugin.settings.autoH1Breaks = v;
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
     new Setting(containerEl)
       .setName("Picker tile width (px)")
       .setDesc(

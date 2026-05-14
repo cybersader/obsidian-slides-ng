@@ -186,6 +186,14 @@ export interface SlidesNGSettings {
    * pin tile dimensions. v0.11.0+.
    */
   speakerPickerTileWidth: number;
+
+  /**
+   * v0.11.5: when true, every top-level `#` heading auto-starts a
+   * new slide — no `---` separator needed. Frontmatter override
+   * `slides-ng-auto-h1-breaks: true|false` takes priority. Default
+   * `false` (Slidev compat — explicit separators only).
+   */
+  autoH1Breaks: boolean;
 }
 
 /** All draggable/toggleable speaker-view panels. */
@@ -333,4 +341,5 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   speakerPickerStyle: "thumbnails",
   speakerPickerOrientation: "vertical",
   speakerPickerTileWidth: 0,
+  autoH1Breaks: false,
 };

@@ -451,6 +451,7 @@ export class SlidesNGView extends ItemView {
         codeBlockOverflowScroll: settings.codeBlockOverflowScroll,
         transitionSpeed: settings.transitionSpeed,
         magicMoveDurationMs: settings.magicMoveDurationMs,
+        autoH1Breaks: settings.autoH1Breaks,
         resolveImage: (raw) => this.resolveImageAttachment(raw, file.path),
       });
       // v0.10.8: queue the HTML as pending instead of setting srcdoc
@@ -590,6 +591,7 @@ export class SlidesNGView extends ItemView {
       codeBlockOverflowScroll: s.codeBlockOverflowScroll,
       transitionSpeed: s.transitionSpeed,
       magicMoveDurationMs: s.magicMoveDurationMs,
+      autoH1Breaks: s.autoH1Breaks,
       // showRevealControlsEmbedded + showRevealMenuEmbedded intentionally
       // not threaded into standalone exports — standalone mode shows
       // controls + menu regardless.

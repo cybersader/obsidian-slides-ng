@@ -1093,6 +1093,7 @@ export class SlidesNGSpeakerView extends ItemView {
         codeBlockOverflowScroll: settings?.codeBlockOverflowScroll,
         transitionSpeed: settings?.transitionSpeed,
         magicMoveDurationMs: settings?.magicMoveDurationMs,
+        autoH1Breaks: settings?.autoH1Breaks,
         // The mini-iframe is a preview, not interactive — controls + menu off.
         showRevealControlsEmbedded: false,
         showRevealMenuEmbedded: false,
@@ -1172,6 +1173,7 @@ export class SlidesNGSpeakerView extends ItemView {
         codeBlockOverflowScroll: settings?.codeBlockOverflowScroll,
         transitionSpeed: settings?.transitionSpeed,
         magicMoveDurationMs: settings?.magicMoveDurationMs,
+        autoH1Breaks: settings?.autoH1Breaks,
         showRevealControlsEmbedded: false,
         showRevealMenuEmbedded: false,
         resolveImage: (raw) => this.resolveDeckImage(raw, file.path),

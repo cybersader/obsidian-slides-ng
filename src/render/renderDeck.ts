@@ -91,6 +91,14 @@ export interface RenderDefaults {
   pdfAspectWidth?: number;
   pdfAspectHeight?: number;
   /**
+   * v0.11.5: when true, every top-level `#` heading begins a new
+   * slide automatically — no `---` separator needed. Lets authors
+   * write decks as plain markdown outlines. Frontmatter
+   * `slides-ng-auto-h1-breaks: true` overrides this setting on a
+   * per-deck basis. Default false (keeps Slidev compat).
+   */
+  autoH1Breaks?: boolean;
+  /**
    * Optional image-attachment resolver. Called with the raw `image:`
    * frontmatter value; returns a fully-qualified URL (data: URI,
    * file://, https://, etc.) or null if the resolver couldn't find
@@ -107,7 +115,9 @@ export function renderDeck(
   filepath = "deck.md",
   defaults: RenderDefaults = {}
 ): string {
-  const deck = parseDeck(markdown, filepath);
+  const deck = parseDeck(markdown, filepath, {
+    autoH1Breaks: defaults.autoH1Breaks,
+  });
   return renderDeckFromAst(deck, {}, defaults);
 }
 
@@ -123,7 +133,9 @@ export function renderDeckStandalone(
   filepath = "deck.md",
   defaults: RenderDefaults = {}
 ): string {
-  const deck = parseDeck(markdown, filepath);
+  const deck = parseDeck(markdown, filepath, {
+    autoH1Breaks: defaults.autoH1Breaks,
+  });
   return renderDeckFromAst(deck, { embedded: false }, defaults);
 }
 
