@@ -13,6 +13,7 @@ import {
 import { SlidesNGSettingTab } from "./SlidesNGSettingTab";
 import { DEFAULT_SETTINGS, type SlidesNGSettings } from "./settings";
 import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
+import { DebugLog } from "./utils/debug";
 import {
   LayoutNameSuggest,
   SlotMarkerSuggest,
@@ -28,9 +29,20 @@ export default class SlidesNGPlugin extends Plugin {
    * markdown view between user intent and callback execution.
    */
   private lastMarkdownFile: TFile | null = null;
+  /** File-based debug logger. Lifecycle events go here for diagnosis. */
+  debug!: DebugLog;
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    this.debug = new DebugLog(this.app, () => this.settings.debugLogging);
+    this.debug.log("plugin/onload", {
+      version: this.manifest.version,
+      settings: {
+        debugLogging: this.settings.debugLogging,
+        defaultTheme: this.settings.defaultTheme,
+        showRevealMenuEmbedded: this.settings.showRevealMenuEmbedded,
+      },
+    });
     this.addSettingTab(new SlidesNGSettingTab(this.app, this));
 
     this.registerView(
@@ -38,7 +50,8 @@ export default class SlidesNGPlugin extends Plugin {
       (leaf) => new SlidesNGView(
         leaf,
         () => this.settings,
-        () => this.resolveActiveDeckFile()
+        () => this.resolveActiveDeckFile(),
+        this.debug
       )
     );
 
@@ -85,7 +98,18 @@ export default class SlidesNGPlugin extends Plugin {
     this.registerEditorSuggest(new VClickSuggest(this.app));
 
     this.addRibbonIcon("presentation", "Open slides preview", () => {
+      this.debug.log("ribbon/click");
       void this.activatePreviewLeaf();
+    });
+
+    this.addCommand({
+      id: "clear-debug-log",
+      name: "Clear debug log",
+      callback: () => {
+        void this.debug.clear().then(() =>
+          new Notice("slides-ng debug log cleared.")
+        );
+      },
     });
 
     this.addCommand({
@@ -223,6 +247,11 @@ export default class SlidesNGPlugin extends Plugin {
     const { workspace } = this.app;
     const activeFile = this.resolveActiveDeckFile();
     const existing = workspace.getLeavesOfType(VIEW_TYPE_SLIDES_NG);
+    this.debug.log("activatePreviewLeaf/enter", {
+      activeFile,
+      existingLeaves: existing.length,
+      lastMarkdownFile: this.lastMarkdownFile,
+    });
 
     if (existing.length > 0) {
       const leaf = existing[0];
@@ -234,6 +263,7 @@ export default class SlidesNGPlugin extends Plugin {
         ? leaf.view.getState()?.filePath
         : undefined;
       const filePath = activeFile?.path ?? existingPath;
+      this.debug.log("activatePreviewLeaf/existing", { filePath });
       await leaf.setViewState({
         type: VIEW_TYPE_SLIDES_NG,
         active: true,
@@ -245,15 +275,20 @@ export default class SlidesNGPlugin extends Plugin {
 
     const leaf: WorkspaceLeaf | null = workspace.getRightLeaf(false);
     if (!leaf) {
+      this.debug.log("activatePreviewLeaf/no-right-leaf");
       new Notice("Could not open a right-pane leaf.");
       return;
     }
+    this.debug.log("activatePreviewLeaf/new-leaf", {
+      filePath: activeFile?.path,
+    });
     await leaf.setViewState({
       type: VIEW_TYPE_SLIDES_NG,
       active: true,
       state: { filePath: activeFile?.path },
     });
     workspace.revealLeaf(leaf);
+    this.debug.log("activatePreviewLeaf/exit");
   }
 
   private async activateSpeakerLeaf(): Promise<void> {

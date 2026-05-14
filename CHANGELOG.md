@@ -6,6 +6,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.10.2] — 2026-05-14
+
+### Fixed
+
+- **Iframe layout race ("black pane on initial open, wrong size
+  after tab switch")**. When the preview opens in a tab that isn't
+  the visible one, the iframe's `documentElement.clientWidth` is 0
+  at `Reveal.initialize()` time and reveal computes a 0×0 slide
+  stage. Switching tabs eventually fires a resize event that
+  reveal's own debounced handler picks up — but not always, and
+  not reliably across viewport changes. Defensive fix in the
+  iframe bootstrap: a `ResizeObserver` on `document.documentElement`
+  calls `Reveal.layout()` + `Reveal.sync()` on every >2px size
+  change, with a per-frame debounce. Also re-fires on
+  `visibilitychange` and on the first animation frame, so the
+  first paint always lands at the right size.
+- **Menu toolbar button did nothing.** The bridge was clicking
+  `.slide-menu-button` as a programmatic-click stand-in; the
+  reveal-menu plugin's click handler is bound late and silently
+  no-ops if the plugin instance hasn't finished init. v0.10.2
+  goes through `Reveal.getPlugin('menu').toggle()` (the documented
+  path) with a fallback to `.openMenu` / `.closeMenu` for older
+  builds and only `.slide-menu-button.click()` as a last resort.
+- **Grid toolbar button rendered as a blank space.** The icon
+  name `grid-3x3` isn't reliably bundled in older Obsidian
+  Lucide sets. Switched to `layout-grid`.
+- **Visual next-slide preview showed the CURRENT slide instead of
+  the next one.** Race: the speaker view posted the `goto` message
+  immediately after setting the mini-iframe's `srcdoc`, but inside
+  the iframe the message listener doesn't get installed until the
+  srcdoc HTML has parsed up to the bridge script — so the first
+  message landed in the void. `driveVisualNextSlideTo` now retries
+  the post at 50 ms / 150 ms / 350 ms / 700 ms after the initial
+  call (cheap, ~5 messages).
+
+### Added
+
+- **File-based debug logger** (`slides-ng-debug.log` in vault
+  root). Captures lifecycle events: ribbon click,
+  `activatePreviewLeaf`, `setState`, `onOpen`, `refresh` (with
+  iframe dimensions, file resolution, render success). Toggleable
+  via the new `Debug → Write debug log` setting (default on for
+  v0.10.2 while we diagnose ribbon-render reports; flip off once
+  your install is stable). New command `Slides NG: Clear debug
+  log` resets the file. Logs include relative-ms timestamps so
+  timing races are obvious from the log.
+
+### Idea jar (added)
+
+- **Multi-next-slide preview** — render the next N slides as a
+  row of thumbnails with corner numbers instead of a single
+  visual-next iframe.
+- **Free-grid panel layout** — beyond vertical-with-DnD and the
+  v0.10.0 2-column flow, let panels dock into arbitrary positions
+  on a 2D grid (size + position both editable). OBS-style.
+
 ## [0.10.1] — 2026-05-14
 
 ### Fixed

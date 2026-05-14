@@ -999,14 +999,36 @@ export class SlidesNGSpeakerView extends ItemView {
     }
   }
 
-  /** Drive the mini-iframe to a specific slide index (clamped to total). */
+  /**
+   * Drive the mini-iframe to a specific slide index (clamped to total).
+   *
+   * v0.10.2: there's a race — the speaker view's first driveTo call
+   * happens immediately after `srcdoc = html` is set, but inside the
+   * iframe the postMessage listener doesn't get installed until the
+   * srcdoc HTML has parsed up to the bridge script. Messages posted
+   * before that point are silently dropped, and the mini gets stuck
+   * showing slide 0 (which equals the main preview's current slide
+   * on initial open). Fix: retry the post until the iframe's reveal
+   * has actually reached the requested index, up to a small cap.
+   */
   private driveVisualNextSlideTo(idx: number): void {
     if (!this.nextSlideIframe?.contentWindow) return;
     const safeIdx = Math.max(0, idx);
-    this.nextSlideIframe.contentWindow.postMessage(
-      { type: "slides-ng-cmd", cmd: "goto", idx: safeIdx },
-      "*"
-    );
+    const post = (): void => {
+      try {
+        this.nextSlideIframe?.contentWindow?.postMessage(
+          { type: "slides-ng-cmd", cmd: "goto", idx: safeIdx },
+          "*"
+        );
+      } catch (_) { /* iframe gone */ }
+    };
+    post();
+    // Retry a few times in the first second to cover the bridge-not-
+    // yet-listening case for fresh iframes. Cheap (~5 messages).
+    const delays = [50, 150, 350, 700];
+    for (const d of delays) {
+      window.setTimeout(post, d);
+    }
   }
 
   /** Image-attachment resolver — mirrors SlidesNGView.resolveImageAttachment. */

@@ -341,6 +341,22 @@ export class SlidesNGSettingTab extends PluginSettingTab {
       );
 
     this.renderSceneEditor(containerEl);
+
+    // ---------- Debug ----------
+    new Setting(containerEl).setName("Debug").setHeading();
+    new Setting(containerEl)
+      .setName("Write debug log")
+      .setDesc(
+        "When on, lifecycle events (ribbon click, view setState, render) are appended to `slides-ng-debug.log` in the vault root. Useful for diagnosing render-on-open issues. Run the `Slides NG: Clear debug log` command to wipe."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.debugLogging !== false).onChange(
+          async (v) => {
+            this.plugin.settings.debugLogging = v;
+            await this.plugin.saveSettings();
+          }
+        );
+      });
   }
 
   private renderSceneEditor(containerEl: HTMLElement): void {

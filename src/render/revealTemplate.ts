@@ -578,6 +578,60 @@ ${sectionsHtml}
       } catch (err) {
         document.body.innerHTML = '<pre style="color:#f99;padding:1em;font-family:monospace;white-space:pre-wrap">slides-ng: reveal.js failed to initialize\\n' + (err && err.stack ? String(err.stack) : String(err)) + '</pre>';
       }
+
+      /* v0.10.2: when the iframe is mounted in a tab that's not the
+         active one, the document body's clientWidth is 0 at the time
+         Reveal.initialize() runs. Reveal computes slide layout from
+         that, so slides render at 0x0 and the user sees a black pane
+         until they switch tabs.
+         Iframes DO get a 'resize' event on their inner window, BUT
+         when the iframe element is resized externally (split-pane
+         drag, tab activation, sidebar toggle) the event sometimes
+         doesn't fire reliably across browsers — and even when it
+         does, reveal's debounced layout can be skipped for
+         small-percentage changes.
+         Defensive fix: observe the document element with
+         ResizeObserver and call Reveal.layout() + Reveal.sync()
+         every time the viewport changes by more than a few pixels.
+         RO fires synchronously on visibility transitions and tracks
+         every meaningful resize, so this catches all the failure
+         modes the user has reported. */
+      (function setupRelayoutGuard() {
+        if (typeof window.ResizeObserver !== 'function') return;
+        var lastW = 0;
+        var lastH = 0;
+        var pending = false;
+        function relayout() {
+          if (pending) return;
+          pending = true;
+          requestAnimationFrame(function () {
+            pending = false;
+            var w = document.documentElement.clientWidth || 0;
+            var h = document.documentElement.clientHeight || 0;
+            if (w === 0 || h === 0) return;
+            /* Skip noise — only relayout if size changed by more
+               than 2px. Reveal's own debounce is 100ms; ours is
+               per-frame. */
+            if (Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 2) return;
+            lastW = w;
+            lastH = h;
+            try {
+              if (typeof Reveal !== 'undefined' && typeof Reveal.layout === 'function') {
+                Reveal.layout();
+                Reveal.sync();
+              }
+            } catch (_) { /* swallow — non-fatal */ }
+          });
+        }
+        try {
+          var ro = new ResizeObserver(relayout);
+          ro.observe(document.documentElement);
+        } catch (_) { /* no-op if RO setup fails */ }
+        document.addEventListener('visibilitychange', relayout);
+        /* First-tick check in case the iframe is ALREADY visible by
+           the time this script runs (most common path). */
+        requestAnimationFrame(relayout);
+      })();
       /* Suppress click on the slide-number anchor. With hash:false the
          href="#/h/v" fragment navigation no-ops but the click can bubble
          into reveal's pause-mode toggle, blacking out the slide window
@@ -947,18 +1001,33 @@ ${sectionsHtml}
               break;
             }
             case 'toggleMenu': {
-              // reveal-menu installs a clickable button in the DOM
-              // (.slide-menu-button). Programmatic click is the most
-              // reliable trigger across plugin versions — the API
-              // surface (Reveal.toggleMenu, RevealMenu.toggle) varies.
-              var menuBtn = document.querySelector('.slide-menu-button');
-              if (menuBtn) {
-                menuBtn.click();
-              } else if (typeof Reveal.toggleMenu === 'function') {
-                Reveal.toggleMenu();
-              } else if (window.RevealMenu && typeof window.RevealMenu.toggle === 'function') {
-                window.RevealMenu.toggle();
-              }
+              // v0.10.2: the reveal-menu plugin exposes its API
+              // through Reveal.getPlugin('menu') with methods
+              // .toggle(), .openMenu(), .closeMenu(), .isOpen().
+              // Programmatic .slide-menu-button.click() (the
+              // previous strategy) appeared to work but the click
+              // handler is bound late and silently no-ops if the
+              // plugin instance hasn't finished init. Going through
+              // getPlugin is the documented path.
+              try {
+                var menuPlugin = typeof Reveal.getPlugin === 'function'
+                  ? Reveal.getPlugin('menu')
+                  : null;
+                if (menuPlugin && typeof menuPlugin.toggle === 'function') {
+                  menuPlugin.toggle();
+                } else if (menuPlugin && typeof menuPlugin.openMenu === 'function') {
+                  /* Older builds without .toggle: emulate it. */
+                  if (menuPlugin.isOpen && menuPlugin.isOpen()) {
+                    menuPlugin.closeMenu();
+                  } else {
+                    menuPlugin.openMenu();
+                  }
+                } else {
+                  /* Last-ditch fallback: click the hamburger button. */
+                  var menuBtn = document.querySelector('.slide-menu-button');
+                  if (menuBtn) menuBtn.click();
+                }
+              } catch (_) { /* swallow — non-fatal */ }
               break;
             }
             case 'toggleBlackout': {

@@ -151,6 +151,16 @@ export interface SlidesNGSettings {
    * `true`. v0.10.0+.
    */
   speakerPanelsMultiColumn: boolean;
+
+  /**
+   * Write lifecycle events (ribbon click → setState → onOpen →
+   * refresh → render) to `slides-ng-debug.log` in the vault root.
+   * Useful for diagnosing render-on-open issues; surface those logs
+   * in bug reports by pasting the file contents. Default `true`
+   * for v0.10.2 while we diagnose ribbon-render regressions — flip
+   * to false in settings once your install is stable. v0.10.2+.
+   */
+  debugLogging: boolean;
 }
 
 /** All draggable/toggleable speaker-view panels. */
@@ -291,4 +301,5 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   speakerTimerMode: "elapsed",
   speakerTimerCountdownMinutes: 30,
   speakerPanelsMultiColumn: true,
+  debugLogging: true,
 };

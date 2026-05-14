@@ -20,6 +20,7 @@ import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
 import { warmHighlighter } from "./render/shiki";
 import { slideIndexFromCursor } from "./parser/slideIndexFromCursor";
 import type { SlidesNGSettings } from "./settings";
+import type { DebugLog } from "./utils/debug";
 
 export const VIEW_TYPE_SLIDES_NG = "slides-ng-preview";
 
@@ -48,15 +49,18 @@ export class SlidesNGView extends ItemView {
   private lastSentSlideIdx: number | null = null;
   private getSettings: SettingsAccessor;
   private resolveDeckFile: DeckFileAccessor;
+  private debug?: DebugLog;
 
   constructor(
     leaf: WorkspaceLeaf,
     getSettings: SettingsAccessor,
-    resolveDeckFile: DeckFileAccessor
+    resolveDeckFile: DeckFileAccessor,
+    debug?: DebugLog
   ) {
     super(leaf);
     this.getSettings = getSettings;
     this.resolveDeckFile = resolveDeckFile;
+    this.debug = debug;
   }
 
   getViewType(): string {
@@ -76,6 +80,11 @@ export class SlidesNGView extends ItemView {
   }
 
   async setState(state: SlidesNGViewState, _result: ViewStateResult): Promise<void> {
+    this.debug?.log("view/setState", {
+      stateFilePath: state.filePath,
+      hadIframe: !!this.iframeEl,
+      prevFilePath: this.filePath,
+    });
     this.filePath = state.filePath;
     if (this.iframeEl) {
       await this.refresh();
@@ -87,6 +96,7 @@ export class SlidesNGView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    this.debug?.log("view/onOpen/enter", { filePath: this.filePath });
     const container = this.contentEl;
     container.empty();
     container.addClass("slides-ng-view");
@@ -121,7 +131,10 @@ export class SlidesNGView extends ItemView {
     });
 
     this.addToolbarButton(leftGroup, {
-      icon: "grid-3x3",
+      // v0.10.2: switched from `grid-3x3` to `layout-grid` — the
+      // former isn't reliably bundled in older Obsidian Lucide sets
+      // and rendered as a blank space in the toolbar.
+      icon: "layout-grid",
       label: "Grid",
       tooltip: "Toggle the slide-grid overview",
       onClick: () => this.postIframeCommand("toggleOverview"),
@@ -204,6 +217,7 @@ export class SlidesNGView extends ItemView {
       }
     });
     await this.refresh();
+    this.debug?.log("view/onOpen/exit", { filePath: this.filePath });
   }
 
   async onClose(): Promise<void> {
@@ -335,15 +349,24 @@ export class SlidesNGView extends ItemView {
   }
 
   private async refresh(): Promise<void> {
-    if (!this.iframeEl) return;
+    this.debug?.log("view/refresh/enter", {
+      hasIframe: !!this.iframeEl,
+      filePath: this.filePath,
+    });
+    if (!this.iframeEl) {
+      this.debug?.log("view/refresh/skip-no-iframe");
+      return;
+    }
 
     if (!this.filePath) {
+      this.debug?.log("view/refresh/skip-no-filepath");
       this.showPlaceholder("Open a markdown file, then run \"Slides NG: open preview\".");
       return;
     }
 
     const file = this.app.vault.getAbstractFileByPath(this.filePath);
     if (!(file instanceof TFile)) {
+      this.debug?.log("view/refresh/file-not-found", { filePath: this.filePath });
       this.showPlaceholder(`File not found: ${this.filePath}`);
       return;
     }
@@ -367,8 +390,15 @@ export class SlidesNGView extends ItemView {
         resolveImage: (raw) => this.resolveImageAttachment(raw, file.path),
       });
       this.iframeEl.srcdoc = html;
+      this.debug?.log("view/refresh/rendered", {
+        filePath: this.filePath,
+        htmlLength: html.length,
+        iframeClientW: this.iframeEl.clientWidth,
+        iframeClientH: this.iframeEl.clientHeight,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      this.debug?.log("view/refresh/error", { error: msg });
       this.showPlaceholder(`Render error: ${msg}`);
       new Notice(`slides-ng render error: ${msg}`);
     }

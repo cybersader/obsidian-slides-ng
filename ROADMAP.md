@@ -17,6 +17,7 @@ move between sections as work happens. Released versions live in
 See [CHANGELOG.md](./CHANGELOG.md) for the full release-by-release delta.
 Most recent:
 
+- **0.10.2** — patch: iframe ResizeObserver-driven relayout guard fixes "black pane on initial open, wrong size after tab switch"; Menu toolbar button uses `Reveal.getPlugin('menu').toggle()` (was clicking the menu plugin's button programmatically and silently no-op'ing); Grid icon switched from `grid-3x3` to `layout-grid` (former wasn't bundled); visual-next-slide goto retries to defeat the bridge-not-yet-listening race; file-based debug logger added.
 - **0.10.1** — patch: ribbon-button auto-render fix (Shiki cold-start blocked the first render; setState/active-leaf race left filePath null); title-centering fix (drag handle inserted into space-between header now wraps in a sub-div); drop-indicator no-op suppression; Grid tile dimensions read from Reveal config instead of hard-coded.
 - **0.10.0** — speaker-view polish bundle: unified Timer panel with elapsed/countdown/lap modes (warning + overrun colours); 2-column auto-fit panel flow at ≥ 900 px container width; visual-next-slide width capped + centred; "Show all N slides" picker footer restyled as text-link; Grid moved from speaker view to preview toolbar; per-scene Lucide icon customisation via settings; drag-handle layout no longer accidentally centres adjacent panel content.
 - **0.9.0** — export-for-PDF options modal: notes on/off, aspect ratio (current/16:9/4:3), theme override, max-pages-per-slide. Aspect/theme flow through RenderDefaults; notes/pages flow through reveal URL params. Modal opens for both the toolbar button and the `export-for-pdf` command.
@@ -48,6 +49,8 @@ ballpark.
 | Idea | Priority | Effort |
 |---|---|---|
 | Reverse follow: preview → editor cursor (only on horizontal `slidechanged`, never on fragment events — that's where Slides-Extended jittered) | High | 1-2 hr |
+| **Multi-next-slide preview** (NEW, v0.10.2 user request) — render the next N slides (e.g. 3) as a row of small thumbnails with corner numbers, instead of a single visual-next iframe. Lets the presenter see what's coming further out. | Medium | 3-4 hr — extend visualNext panel to N mini-iframes or a single iframe driven to multiple positions via screenshot/clone tricks |
+| **Free-grid panel layout** (NEW, v0.10.2 user request) — beyond the current vertical-with-DnD-and-2-col-flow, let the user drop panels into ARBITRARY positions on a 2D grid (size + position both editable). Closer to OBS-style panel docking. | Medium-High | 8-12 hr — big departure from the current 1D list ordering; needs grid-position state per panel, a different drop-zone interaction model, and resize handles. Wait for current modular approach to be exhausted before committing. |
 | Pre-rendered slide thumbnails in speaker picker | Medium | 3-4 hr — Grid overview (fixed in 0.7) covers most of this for free |
 | Per-slide visual overlay tools — drawing layer, laser pointer, color swatches (Extended Slides parity) | Medium-High | Large — 0.9.0 candidate |
 | Hyperlinked slide-web navigation via block IDs | Medium | User-flagged but acknowledged as over-engineering — defer until requested |
