@@ -5,7 +5,7 @@
  * unit-test the option-collection logic.
  */
 
-import { App, Modal, Setting } from "obsidian";
+import { App, DropdownComponent, Modal, Setting } from "obsidian";
 import type { PdfExportOptions } from "./export/exportStandalone";
 import { availableThemes } from "./render/revealAssets";
 
@@ -45,6 +45,13 @@ export class ExportPdfOptionsModal extends Modal {
   /** v0.11.62: experimental iframe preview (opt-in via settings). */
   private experimentalIframe?: HTMLIFrameElement;
   private experimentalIframeEnabled: boolean = false;
+  /** v0.11.71: refs so we can disable settings that are silent no-ops under the current layout. */
+  private aspectSetting?: Setting;
+  private aspectDropdown?: DropdownComponent;
+  private showNotesSetting?: Setting;
+  private showNotesToggleEl?: HTMLInputElement;
+  private maxPagesSetting?: Setting;
+  private maxPagesInputEl?: HTMLInputElement;
 
   constructor(
     app: App,
@@ -117,24 +124,26 @@ export class ExportPdfOptionsModal extends Modal {
         d.addOption("document", "Document (page is the slide + notes panel)");
         d.setValue(this.options.pdfStyle ?? "slides").onChange((v) => {
           this.options.pdfStyle = v as PdfExportOptions["pdfStyle"];
+          this.updateAspectRatioEnabled();
         });
       });
 
-    new Setting(contentEl)
+    this.showNotesSetting = new Setting(contentEl)
       .setName("Include speaker notes")
       .setDesc(
-        "Embed notes alongside each slide in the PDF. Useful for handouts."
+        "Embed notes alongside each slide in the PDF. Useful for handouts. In Slides + notes emphasis this is always on."
       )
       .addToggle((t) => {
         t.setValue(!!this.options.showNotes).onChange((v) => {
           this.options.showNotes = v;
         });
+        this.showNotesToggleEl = t.toggleEl as unknown as HTMLInputElement;
       });
 
-    new Setting(contentEl)
+    const aspectSetting = new Setting(contentEl)
       .setName("Slide aspect ratio")
       .setDesc(
-        "Shape of the slide content itself (the dark slide card in handout mode), NOT the printed page. The page is always determined by 'Page size' below. 'Current' uses the deck's authored dimensions."
+        "Shape of the slide content area. Only meaningful in Slides layout (each page is the slide). In Slides + notes emphasis the slide card is a fixed-height block; in Document mode the page reflows content. 'Current' uses the deck's authored dimensions."
       )
       .addDropdown((d) => {
         d.addOption("current", "Current (deck default)");
@@ -143,7 +152,9 @@ export class ExportPdfOptionsModal extends Modal {
         d.setValue(this.options.aspectRatio ?? "current").onChange((v) => {
           this.options.aspectRatio = v as PdfExportOptions["aspectRatio"];
         });
+        this.aspectDropdown = d;
       });
+    this.aspectSetting = aspectSetting;
 
     new Setting(contentEl)
       .setName("Theme override")
@@ -160,10 +171,10 @@ export class ExportPdfOptionsModal extends Modal {
         });
       });
 
-    new Setting(contentEl)
+    this.maxPagesSetting = new Setting(contentEl)
       .setName("Max pages per slide on overflow")
       .setDesc(
-        "When a slide's content is taller than the page, reveal can split it across multiple pages. Default 1 (clip overflow)."
+        "When a slide's content is taller than the page, reveal can split it across multiple pages. Default 1 (clip overflow). Always 1 in Slides + notes emphasis."
       )
       .addText((t) => {
         t.setValue(String(this.options.maxPagesPerSlide ?? 1)).onChange((v) => {
@@ -172,6 +183,7 @@ export class ExportPdfOptionsModal extends Modal {
             this.options.maxPagesPerSlide = n;
           }
         });
+        this.maxPagesInputEl = t.inputEl;
       });
 
     // ---------- Experimental options (v0.11.46) ----------
@@ -284,6 +296,9 @@ export class ExportPdfOptionsModal extends Modal {
       this.onSubmit(this.options);
       this.close();
     });
+
+    // v0.11.71: sync the aspect-ratio enabled state with the initial layout pick.
+    this.updateAspectRatioEnabled();
   }
 
   onClose(): void {
@@ -301,6 +316,37 @@ export class ExportPdfOptionsModal extends Modal {
    * margins / header / footer / grayscale / slide-number stamp
    * positioned to visualise the chosen layout.
    */
+  /**
+   * v0.11.71: some options become silent no-ops in certain layouts.
+   * Visually disable them so the user knows their pick doesn\'t do
+   * anything in the current mode. Forced by the export pipeline in
+   * exportStandalone.ts (slides-notes-emphasis: showNotes=true,
+   * maxPagesPerSlide=1; aspect ratio only consulted by reveal in
+   * plain slides mode).
+   */
+  private updateAspectRatioEnabled(): void {
+    const isPlainSlides = this.options.pdfStyle === "slides";
+    const isNotesEmphasis = this.options.pdfStyle === "slides-notes";
+
+    // Aspect ratio: only meaningful in plain slides.
+    if (this.aspectDropdown && this.aspectDropdown.selectEl) {
+      this.aspectDropdown.selectEl.disabled = !isPlainSlides;
+    }
+    this.aspectSetting?.settingEl.toggleClass("slides-ng-setting-disabled", !isPlainSlides);
+
+    // Include speaker notes: forced ON in notes-emphasis.
+    if (this.showNotesToggleEl) {
+      this.showNotesToggleEl.toggleAttribute("disabled", isNotesEmphasis);
+    }
+    this.showNotesSetting?.settingEl.toggleClass("slides-ng-setting-disabled", isNotesEmphasis);
+
+    // Max pages per slide: forced to 1 in notes-emphasis.
+    if (this.maxPagesInputEl) {
+      this.maxPagesInputEl.disabled = isNotesEmphasis;
+    }
+    this.maxPagesSetting?.settingEl.toggleClass("slides-ng-setting-disabled", isNotesEmphasis);
+  }
+
   private schedulePreviewRefresh(): void {
     if (!this.previewMockup) return;
     if (this.previewTimer !== null) window.clearTimeout(this.previewTimer);

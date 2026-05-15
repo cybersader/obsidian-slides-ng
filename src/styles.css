@@ -1295,6 +1295,13 @@
   max-width: 90%;
   line-height: 1.4;
 }
+.slides-ng-setting-disabled {
+  opacity: 0.5;
+}
+.slides-ng-setting-disabled .setting-item-control select,
+.slides-ng-setting-disabled .setting-item-control input {
+  pointer-events: none;
+}
 /* v0.11.64: aspect-ratio mockups — use CSS aspect-ratio property
  * with auto width so the card actually changes shape. Centered
  * inside the page outline. Previous max-height approach didn\'t
