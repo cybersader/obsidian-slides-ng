@@ -1350,6 +1350,135 @@ ${sectionsHtml}
             } catch (_) {}
           }, 5000);
         })();
+        ${!embedded && forceNotesEmphasis ? `
+        /* v0.11.55: NUCLEAR option for the notes-emphasis slide-card.
+         * Pure CSS kept failing across versions (variable resolution,
+         * @media print interactions, browser print-snapshot timing).
+         * Instead: walk every .slides-ng-layout and apply inline
+         * styles directly to the element. Inline styles beat ANY CSS
+         * rule, !important or not. Run on DOMContentLoaded so it
+         * fires before reveal\\'s print plugin has a chance to do
+         * anything funky. */
+        function applyNotesEmphasisInline() {
+          try {
+            var layouts = document.querySelectorAll('.slides-ng-layout');
+            for (var li = 0; li < layouts.length; li++) {
+              var el = layouts[li];
+              el.style.setProperty('display', 'flex', 'important');
+              el.style.setProperty('flex-direction', 'column', 'important');
+              el.style.setProperty('justify-content', 'center', 'important');
+              el.style.setProperty('align-items', 'center', 'important');
+              el.style.setProperty('text-align', 'center', 'important');
+              el.style.setProperty('width', '100%', 'important');
+              el.style.setProperty('height', '4in', 'important');
+              el.style.setProperty('min-height', '4in', 'important');
+              el.style.setProperty('max-height', '4in', 'important');
+              el.style.setProperty('background', '#191919', 'important');
+              el.style.setProperty('background-color', '#191919', 'important');
+              el.style.setProperty('color', '#ffffff', 'important');
+              el.style.setProperty('padding', '0.35in 0.5in', 'important');
+              el.style.setProperty('box-sizing', 'border-box', 'important');
+              el.style.setProperty('overflow', 'hidden', 'important');
+              el.style.setProperty('border', '1px solid #444', 'important');
+              el.style.setProperty('border-radius', '4px', 'important');
+              el.style.setProperty('margin', '0 0 0.3in 0', 'important');
+              el.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
+              el.style.setProperty('print-color-adjust', 'exact', 'important');
+              /* Force every heading inside to white + larger size. */
+              var heads = el.querySelectorAll('h1, h2, h3, h4, h5, h6');
+              for (var hi = 0; hi < heads.length; hi++) {
+                heads[hi].style.setProperty('color', '#ffffff', 'important');
+                heads[hi].style.setProperty('margin', '0', 'important');
+                heads[hi].style.setProperty('padding', '0', 'important');
+                heads[hi].style.setProperty('text-shadow', 'none', 'important');
+                heads[hi].style.setProperty('line-height', '1.15', 'important');
+                if (heads[hi].tagName === 'H1') {
+                  heads[hi].style.setProperty('font-size', '28pt', 'important');
+                  heads[hi].style.setProperty('font-weight', '800', 'important');
+                } else if (heads[hi].tagName === 'H2') {
+                  heads[hi].style.setProperty('font-size', '22pt', 'important');
+                  heads[hi].style.setProperty('font-weight', '700', 'important');
+                }
+              }
+              var paras = el.querySelectorAll('p, li, span, strong, em');
+              for (var pi = 0; pi < paras.length; pi++) {
+                paras[pi].style.setProperty('color', '#e8e8e8', 'important');
+                paras[pi].style.setProperty('font-size', '14pt', 'important');
+                paras[pi].style.setProperty('line-height', '1.4', 'important');
+                paras[pi].style.setProperty('margin', '0', 'important');
+              }
+              /* The parent <section> must let our card shape through. */
+              var parent = el.parentElement;
+              if (parent && parent.tagName === 'SECTION') {
+                parent.style.setProperty('position', 'static', 'important');
+                parent.style.setProperty('display', 'block', 'important');
+                parent.style.setProperty('width', '100%', 'important');
+                parent.style.setProperty('height', 'auto', 'important');
+                parent.style.setProperty('min-height', '0', 'important');
+                parent.style.setProperty('max-height', 'none', 'important');
+                parent.style.setProperty('padding', '0', 'important');
+                parent.style.setProperty('margin', '0 0 0.4in 0', 'important');
+                parent.style.setProperty('transform', 'none', 'important');
+                parent.style.setProperty('opacity', '1', 'important');
+                parent.style.setProperty('visibility', 'visible', 'important');
+                parent.style.setProperty('page-break-after', 'always', 'important');
+                parent.style.setProperty('break-after', 'page', 'important');
+                parent.style.setProperty('background', '#ffffff', 'important');
+              }
+              /* The sibling <aside class=notes> — make it flow. */
+              if (parent) {
+                var aside = parent.querySelector('aside.notes');
+                if (aside) {
+                  aside.style.setProperty('position', 'static', 'important');
+                  aside.style.setProperty('display', 'block', 'important');
+                  aside.style.setProperty('visibility', 'visible', 'important');
+                  aside.style.setProperty('width', '100%', 'important');
+                  aside.style.setProperty('height', 'auto', 'important');
+                  aside.style.setProperty('min-height', '0', 'important');
+                  aside.style.setProperty('max-height', 'none', 'important');
+                  aside.style.setProperty('background', 'transparent', 'important');
+                  aside.style.setProperty('color', '#222', 'important');
+                  aside.style.setProperty('padding', '0.25in 0.1in', 'important');
+                  aside.style.setProperty('margin', '0.3in 0 0 0', 'important');
+                  aside.style.setProperty('border-top', '1px solid #ccc', 'important');
+                  aside.style.setProperty('font-size', '11pt', 'important');
+                  aside.style.setProperty('line-height', '1.55', 'important');
+                  aside.style.setProperty('page-break-inside', 'auto', 'important');
+                  aside.style.setProperty('break-inside', 'auto', 'important');
+                }
+              }
+            }
+            /* Also escape reveal\\'s absolute slides positioning. */
+            var slidesEl = document.querySelector('.reveal .slides');
+            if (slidesEl) {
+              slidesEl.style.setProperty('position', 'static', 'important');
+              slidesEl.style.setProperty('display', 'block', 'important');
+              slidesEl.style.setProperty('width', '100%', 'important');
+              slidesEl.style.setProperty('height', 'auto', 'important');
+              slidesEl.style.setProperty('transform', 'none', 'important');
+              slidesEl.style.setProperty('left', '0', 'important');
+              slidesEl.style.setProperty('top', '0', 'important');
+            }
+            var revealEl = document.querySelector('.reveal');
+            if (revealEl) {
+              revealEl.style.setProperty('position', 'static', 'important');
+              revealEl.style.setProperty('background', '#ffffff', 'important');
+            }
+            document.body.style.setProperty('background', '#ffffff', 'important');
+          } catch (err) { console.warn('[slides-ng] notes-emphasis inline failed', err); }
+        }
+        /* Run immediately AND after reveal init, in case reveal mutates
+         * the DOM during its init. */
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', applyNotesEmphasisInline);
+        } else {
+          applyNotesEmphasisInline();
+        }
+        if (revealInit && typeof revealInit.then === 'function') {
+          revealInit.then(function () { setTimeout(applyNotesEmphasisInline, 100); });
+        }
+        setTimeout(applyNotesEmphasisInline, 800);
+        ` : ""}
         ${!embedded && (forceAutoShrink || forceSlideNumberStamp || forceHeaderText || forceFooterText) ? `
         /* v0.11.46: post-init PDF tweaks. Hook into Reveal\\'s 'ready'
          * so slide DOM exists. Cheap — only runs in standalone-export
