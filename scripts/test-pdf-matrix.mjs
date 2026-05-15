@@ -75,6 +75,8 @@ const COMBOS = [
   { name: "grayscale", pdfStyle: "slides-notes", grayscale: true },
   { name: "hideBackgrounds", pdfStyle: "slides-notes", hideBackgrounds: true },
   { name: "slideNumberStamp", pdfStyle: "slides-notes", slideNumberStamp: true },
+  { name: "slideNumberStamp-slides", pdfStyle: "slides", slideNumberStamp: true },
+  { name: "slideNumberStamp-document", pdfStyle: "document", slideNumberStamp: true },
   { name: "headerFooter", pdfStyle: "slides-notes", headerText: "CS-101 · Lecture 5", footerText: "Draft" },
 
   // --- experimental overflow ---

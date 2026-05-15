@@ -977,41 +977,14 @@ export function buildIframeHtml(
     html.pdf-hide-backgrounds body {
       background: #fff !important;
     }
-    /* Slide number stamp. JS sets data-slide-number on each section
-     * (via Reveal slide indices) at render. Pseudo-element prints it
-     * unobtrusively top-right.
-     *
-     * v0.11.56: in notes-emphasis mode, sections are position:static
-     * so an absolutely-positioned ::before has nothing to anchor to.
-     * Force the section to be position:relative for the stamp to
-     * land in the right corner of the slide-card area. */
-    html.pdf-slide-number-stamp .reveal .slides > section {
-      position: relative !important;
-    }
-    html.pdf-slide-number-stamp .reveal .slides > section::before {
-      content: "Slide " attr(data-slide-number) " / " attr(data-slide-total);
-      position: absolute;
-      top: 0.2in;
-      right: 0.25in;
-      font-size: 9pt;
-      color: rgba(0, 0, 0, 0.65);
-      background: rgba(255, 255, 255, 0.9);
-      padding: 2px 8px;
-      border-radius: 3px;
-      border: 1px solid rgba(0, 0, 0, 0.15);
-      font-family: var(--r-main-font, sans-serif);
-      z-index: 5;
-      pointer-events: none;
-    }
-    /* In notes-emphasis, position the stamp INSIDE the dark slide
-     * card (top-right corner) so it's clearly part of the slide. */
-    html.pdf-slide-number-stamp.notes-emphasis .reveal .slides > section::before {
-      top: calc(0.35in + 4px);
-      right: calc(0.5in + 6px);
-      color: rgba(255, 255, 255, 0.85);
-      background: rgba(0, 0, 0, 0.45);
-      border-color: rgba(255, 255, 255, 0.18);
-    }
+    /* v0.11.65 made the slide-number stamp a real DOM badge injected
+     * by pdfPostInit (.slides-ng-slide-number-badge). The legacy
+     * ::before pseudo-element was removed in v0.11.72 because it
+     * duplicated the DOM badge and the section position:relative
+     * rule it required conflicted with print-document\\'s
+     * position:static. The DOM badge handles positioning, theming,
+     * and the print-color-adjust flag inline so it renders
+     * everywhere the JS fires. */
     /* Page header + footer bands. Anchored to the top/bottom of each
      * slide section so they appear on every printed page. */
     html.print-pdf .slides-ng-page-header,
@@ -1613,19 +1586,33 @@ ${sectionsHtml}
                 var badge = document.createElement('div');
                 badge.className = 'slides-ng-slide-number-badge';
                 badge.textContent = 'Slide ' + (si + 1) + ' / ' + total;
+                /* v0.11.72: badge styling adapts to the layout.
+                 *  - notes-emphasis: section is a white page; anchor
+                 *    the badge INSIDE the dark slide-card so it sits
+                 *    over the slide visual. Dark pill, light text.
+                 *  - document / plain slides (page IS slide): section
+                 *    has the theme bg. Use a translucent dark pill
+                 *    with light text — works on any theme bg. */
+                var rootCls = document.documentElement.classList;
+                var inNotesEmphasis = rootCls.contains('notes-emphasis');
+                var anchor = sections[si];
+                if (inNotesEmphasis) {
+                  var layout = sections[si].querySelector('.slides-ng-layout');
+                  if (layout) anchor = layout;
+                }
                 badge.style.cssText =
-                  'position:absolute;top:0.25in;right:0.4in;z-index:50;' +
+                  'position:absolute;top:0.25in;right:0.35in;z-index:50;' +
                   'font-size:9pt;padding:3px 8px;border-radius:3px;' +
-                  'background:rgba(255,255,255,0.92);color:#222;' +
-                  'border:1px solid rgba(0,0,0,0.18);' +
+                  'background:rgba(0,0,0,0.55);color:#fff;' +
+                  'border:1px solid rgba(255,255,255,0.22);' +
                   'font-family:var(--r-main-font, sans-serif);' +
                   'pointer-events:none;' +
                   '-webkit-print-color-adjust:exact;print-color-adjust:exact;';
-                /* Ensure the section can anchor a position:absolute child. */
-                if (getComputedStyle(sections[si]).position === 'static') {
-                  sections[si].style.setProperty('position', 'relative', 'important');
+                /* Ensure the anchor can host a position:absolute child. */
+                if (getComputedStyle(anchor).position === 'static') {
+                  anchor.style.setProperty('position', 'relative', 'important');
                 }
-                sections[si].appendChild(badge);
+                anchor.appendChild(badge);
               }
             }` : ""}
             ${forceHeaderText || forceFooterText ? `for (var hi = 0; hi < sections.length; hi++) {
