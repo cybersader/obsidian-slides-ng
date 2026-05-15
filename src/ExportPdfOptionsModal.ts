@@ -76,14 +76,14 @@ export class ExportPdfOptionsModal extends Modal {
       });
 
     new Setting(contentEl)
-      .setName("Aspect ratio")
+      .setName("Slide aspect ratio")
       .setDesc(
-        "Override the deck's slide dimensions for printing. `Current` uses the deck's own settings."
+        "Shape of the slide content itself (the dark slide card in handout mode), NOT the printed page. The page is always determined by 'Page size' below. 'Current' uses the deck's authored dimensions."
       )
       .addDropdown((d) => {
         d.addOption("current", "Current (deck default)");
-        d.addOption("16:9", "16:9 (widescreen, 1280×720)");
-        d.addOption("4:3", "4:3 (traditional, 1024×768)");
+        d.addOption("16:9", "16:9 widescreen (1280×720)");
+        d.addOption("4:3", "4:3 traditional (1024×768)");
         d.setValue(this.options.aspectRatio ?? "current").onChange((v) => {
           this.options.aspectRatio = v as PdfExportOptions["aspectRatio"];
         });

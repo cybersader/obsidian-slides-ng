@@ -955,20 +955,38 @@ export function buildIframeHtml(
     }
     /* Slide number stamp. JS sets data-slide-number on each section
      * (via Reveal slide indices) at render. Pseudo-element prints it
-     * unobtrusively top-right. */
+     * unobtrusively top-right.
+     *
+     * v0.11.56: in notes-emphasis mode, sections are position:static
+     * so an absolutely-positioned ::before has nothing to anchor to.
+     * Force the section to be position:relative for the stamp to
+     * land in the right corner of the slide-card area. */
+    html.pdf-slide-number-stamp .reveal .slides > section {
+      position: relative !important;
+    }
     html.pdf-slide-number-stamp .reveal .slides > section::before {
       content: "Slide " attr(data-slide-number) " / " attr(data-slide-total);
       position: absolute;
-      top: 0.4rem;
-      right: 0.6rem;
-      font-size: 0.7em;
-      color: rgba(0, 0, 0, 0.55);
-      background: rgba(255, 255, 255, 0.7);
-      padding: 2px 6px;
+      top: 0.2in;
+      right: 0.25in;
+      font-size: 9pt;
+      color: rgba(0, 0, 0, 0.65);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 2px 8px;
       border-radius: 3px;
+      border: 1px solid rgba(0, 0, 0, 0.15);
       font-family: var(--r-main-font, sans-serif);
       z-index: 5;
       pointer-events: none;
+    }
+    /* In notes-emphasis, position the stamp INSIDE the dark slide
+     * card (top-right corner) so it's clearly part of the slide. */
+    html.pdf-slide-number-stamp.notes-emphasis .reveal .slides > section::before {
+      top: calc(0.35in + 4px);
+      right: calc(0.5in + 6px);
+      color: rgba(255, 255, 255, 0.85);
+      background: rgba(0, 0, 0, 0.45);
+      border-color: rgba(255, 255, 255, 0.18);
     }
     /* Page header + footer bands. Anchored to the top/bottom of each
      * slide section so they appear on every printed page. */
@@ -1407,10 +1425,13 @@ ${sectionsHtml}
                 paras[pi].style.setProperty('line-height', '1.4', 'important');
                 paras[pi].style.setProperty('margin', '0', 'important');
               }
-              /* The parent <section> must let our card shape through. */
+              /* The parent <section> must let our card shape through.
+               * v0.11.56: position:relative (not static) so a
+               * pseudo-element like the slide-number-stamp ::before
+               * has the section as its containing block. */
               var parent = el.parentElement;
               if (parent && parent.tagName === 'SECTION') {
-                parent.style.setProperty('position', 'static', 'important');
+                parent.style.setProperty('position', 'relative', 'important');
                 parent.style.setProperty('display', 'block', 'important');
                 parent.style.setProperty('width', '100%', 'important');
                 parent.style.setProperty('height', 'auto', 'important');
