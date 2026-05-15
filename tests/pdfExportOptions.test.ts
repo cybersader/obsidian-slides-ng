@@ -82,6 +82,48 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toMatch(/e\.key !== ['"]g['"]/);
   });
 
+  test("G keyboard handler is installed in capture phase so reveal does not see it (v0.11.40)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    // The G handler is registered as a capture-phase listener so
+    // reveal's own keydown handler never receives the event — this
+    // is what stops reveal's "jump to slide" number input from
+    // popping up after the user toggles the grid off.
+    expect(html).toContain("stopImmediatePropagation");
+    // The handler must be registered with capture=true (the third
+    // arg to addEventListener). Looking for the literal capture
+    // flag near the toggleOverview post.
+    expect(html).toMatch(/toggleOverview[\s\S]{0,300}\}, true\)/);
+  });
+
+  test("M key toggles the hamburger menu (open AND close) — v0.11.40", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    // The M handler reads isOpen() / .active class and calls
+    // closeMenu() when the menu is already open. Previously M
+    // only opened the menu (reveal-menu's stock binding).
+    expect(html).toMatch(/e\.key !== ['"]m['"]/);
+    expect(html).toContain("closeMenu");
+    expect(html).toContain("isOpen");
+  });
+
+  test("Q key exits fullscreen and closes overlays — v0.11.40", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    expect(html).toMatch(/e\.key !== ['"]q['"]/);
+    expect(html).toContain("exitFullscreen");
+    // Q also dismisses our grid overlay + reveal-menu + active scene.
+    expect(html).toContain("slides-ng-grid");
+  });
+
+  test("Grid button uses a distinct 3x3 dots icon (not the reveal-menu close X) — v0.11.40", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    // 3x3 grid icon = 9 filled rectangles. The pre-v0.11.40 icon
+    // had only 4 outlined rects, which the user reported looked
+    // similar to reveal-menu's close (X) glyph.
+    const rectCount = (html.match(/<rect x="(?:3|9\.5|16)"/g) || []).length;
+    expect(rectCount).toBeGreaterThanOrEqual(9);
+    // Filled, not outlined.
+    expect(html).toContain('fill="currentColor"');
+  });
+
   test("S-key speaker-view popup helpers are bundled", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {});
     expect(html).toContain("__slidesNgOpenSpeakerView");
@@ -155,5 +197,37 @@ describe("pathToFileUrl — Windows vs Unix", () => {
     // Sanity: the new URL constructor should parse it.
     const parsed = new URL(url);
     expect(parsed.search).toBe("?print-pdf");
+  });
+
+  test("ampersand in path is URL-encoded so it doesn't break the query string (v0.11.40)", () => {
+    // User-reported case: vault at `C:\Users\cybersader\Documents\01 Vaults\b&g\`
+    // The unencoded `&` in path was being interpreted as a query
+    // separator, dropping the entire `?print-pdf&showNotes=true`.
+    const url =
+      pathToFileUrl("C:\\Users\\cybersader\\Documents\\01 Vaults\\b&g\\export.html") +
+      "?print-pdf&showNotes=true";
+    expect(url).toBe(
+      "file:///C:/Users/cybersader/Documents/01%20Vaults/b%26g/export.html?print-pdf&showNotes=true"
+    );
+    const parsed = new URL(url);
+    expect(parsed.pathname).toBe(
+      "/C:/Users/cybersader/Documents/01%20Vaults/b%26g/export.html"
+    );
+    // The query string survives — both params are reachable.
+    expect(parsed.searchParams.has("print-pdf")).toBe(true);
+    expect(parsed.searchParams.get("showNotes")).toBe("true");
+  });
+
+  test("space in path is URL-encoded (matches what the browser would do anyway)", () => {
+    const url = pathToFileUrl("/home/user/My Documents/deck.html");
+    expect(url).toBe("file:///home/user/My%20Documents/deck.html");
+  });
+
+  test("file name with special chars in vault root", () => {
+    const url = pathToFileUrl("C:\\My Vault & Stuff\\.slides-ng-export-12345.html");
+    // `.` at the start of segment is OK (not encoded). `&` and ` ` are.
+    expect(url).toBe(
+      "file:///C:/My%20Vault%20%26%20Stuff/.slides-ng-export-12345.html"
+    );
   });
 });

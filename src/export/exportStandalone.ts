@@ -95,10 +95,25 @@ export async function exportDeckToFile(
  */
 export function pathToFileUrl(absolutePath: string): string {
   const normalized = absolutePath.replace(/\\/g, "/");
-  if (normalized.startsWith("/")) {
-    return "file://" + normalized;
+  // v0.11.40: URL-encode each path segment so reserved chars in the
+  // path (`&`, ` `, `?`, `#`, etc.) don't get parsed as URL syntax.
+  // User reported their vault path contains `b&g` and the unencoded
+  // `&` in the path was being mistaken for a query separator —
+  // browsers dropped the entire `?print-pdf&showNotes=true` query
+  // string. Encoding each segment individually preserves `/` as the
+  // path separator while encoding everything else.
+  const segments = normalized.split("/").map((seg, i) => {
+    // Leave the drive letter (`C:`) untouched on Windows — the colon
+    // is part of the file: URL scheme convention and `encodeURIComponent`
+    // would mangle it to `C%3A`.
+    if (i === 0 && /^[a-zA-Z]:$/.test(seg)) return seg;
+    return encodeURIComponent(seg);
+  });
+  const encoded = segments.join("/");
+  if (encoded.startsWith("/")) {
+    return "file://" + encoded;
   }
-  return "file:///" + normalized;
+  return "file:///" + encoded;
 }
 
 /**

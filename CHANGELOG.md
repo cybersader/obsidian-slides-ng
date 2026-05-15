@@ -6,6 +6,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.40] — 2026-05-15
+
+### Fixed
+
+- **PDF export silently dropped its options when the vault path
+  contained `&`, spaces, or other URL-reserved characters.**
+  `pathToFileUrl()` now URL-encodes each path segment via
+  `encodeURIComponent`, preserving `/` as the separator and
+  the drive letter on Windows. User-reported case:
+  `C:\Users\...\01 Vaults\b&g\.slides-ng-export-...html` —
+  the unencoded `&` was interpreted as a query-string
+  separator, so reveal never saw `?print-pdf&showNotes=true`
+  and the deck rendered in normal presentation mode.
+- **G key would summon reveal's "jump to slide" number input.**
+  The G keydown handler now runs in the capture phase and
+  calls `stopImmediatePropagation()` so reveal's own keyboard
+  listener never sees the event.
+
+### Added
+
+- **M key toggles the hamburger menu.** Previously M only
+  opened the menu (reveal-menu's stock binding). The slides-ng
+  handler now checks `isOpen()` / `.slide-menu.active` and
+  calls `closeMenu()` when already open.
+- **Q key exits fullscreen and dismisses overlays.** Calls
+  `document.exitFullscreen()`, removes the slides-ng grid
+  overlay, closes the hamburger menu if open, and clears the
+  active scene.
+- **Grid button icon redesigned** as a 3x3 grid of filled
+  dots so it's visually distinct from reveal-menu's close (X)
+  glyph. The previous 2x2 outlined-squares icon was being
+  mistaken for a close button at glance.
+
+### Tests
+
+- `tests/pdfExportOptions.test.ts` — 4 new tests covering
+  `&` in path encoding, M-toggle handler, Q exit handler,
+  and grid icon shape (9 filled rects, `currentColor` fill).
+  22 pass total in that file; 407 pass in the full suite.
+
+### Technical
+
+- `src/export/exportStandalone.ts` — per-segment
+  `encodeURIComponent` in `pathToFileUrl`.
+- `src/render/revealTemplate.ts` — G handler registered as
+  capture-phase listener; new M + Q capture-phase keydown
+  handlers; Grid button SVG rewritten with 9 filled
+  rectangles.
+
 ## [0.11.39] — 2026-05-15
 
 ### Added

@@ -808,14 +808,22 @@ ${sectionsHtml}
               gridBtn.id = 'slides-ng-grid-btn';
               gridBtn.title = 'Show all slides (G)';
               gridBtn.setAttribute('aria-label', 'Grid view');
+              // v0.11.40: filled 3x3 grid dots so the button reads
+              // unambiguously as "grid" — the previous 2x2 outlined-
+              // squares icon was being mistaken for the reveal-menu
+              // close (X) glyph when both buttons appeared at once.
               gridBtn.innerHTML =
                 '<svg viewBox="0 0 24 24" width="20" height="20" ' +
-                'fill="none" stroke="currentColor" stroke-width="2" ' +
-                'stroke-linecap="round" stroke-linejoin="round">' +
-                '<rect x="3" y="3" width="7" height="7" rx="1"/>' +
-                '<rect x="14" y="3" width="7" height="7" rx="1"/>' +
-                '<rect x="3" y="14" width="7" height="7" rx="1"/>' +
-                '<rect x="14" y="14" width="7" height="7" rx="1"/>' +
+                'fill="currentColor" stroke="none">' +
+                '<rect x="3"  y="3"  width="5" height="5" rx="1"/>' +
+                '<rect x="9.5" y="3"  width="5" height="5" rx="1"/>' +
+                '<rect x="16" y="3"  width="5" height="5" rx="1"/>' +
+                '<rect x="3"  y="9.5" width="5" height="5" rx="1"/>' +
+                '<rect x="9.5" y="9.5" width="5" height="5" rx="1"/>' +
+                '<rect x="16" y="9.5" width="5" height="5" rx="1"/>' +
+                '<rect x="3"  y="16" width="5" height="5" rx="1"/>' +
+                '<rect x="9.5" y="16" width="5" height="5" rx="1"/>' +
+                '<rect x="16" y="16" width="5" height="5" rx="1"/>' +
                 '</svg>';
               gridBtn.style.cssText =
                 'position:fixed;top:12px;right:12px;z-index:9999;' +
@@ -840,17 +848,94 @@ ${sectionsHtml}
               };
               document.body.appendChild(gridBtn);
 
-              /* === G keyboard shortcut for the same grid === */
+              /* === G keyboard shortcut for the same grid ===
+               * v0.11.40: capture-phase + stopImmediatePropagation so
+               * reveal's own keydown handler never sees the G — its
+               * stock binding opens a "jump to slide" number input
+               * which the user saw popping up after closing the grid. */
               document.addEventListener('keydown', function (e) {
                 if (e.key !== 'g' && e.key !== 'G') return;
                 if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
                 if (e.ctrlKey || e.metaKey || e.altKey) return;
                 e.preventDefault();
+                e.stopImmediatePropagation();
                 window.postMessage(
                   { type: 'slides-ng-cmd', cmd: 'toggleOverview' },
                   '*'
                 );
-              });
+              }, true);
+
+              /* === M keyboard shortcut to toggle the hamburger menu
+               * v0.11.40. reveal-menu's stock M binding only OPENS the
+               * menu; pressing M again does nothing because the open
+               * menu becomes the focus target and reveal-menu's
+               * keydown listener is rooted on the slide deck. We
+               * register our own handler in the capture phase so M
+               * round-trips even when the menu's open. */
+              document.addEventListener('keydown', function (e) {
+                if (e.key !== 'm' && e.key !== 'M') return;
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                try {
+                  if (typeof Reveal === 'undefined' || typeof Reveal.getPlugin !== 'function') return;
+                  var mp = Reveal.getPlugin('menu');
+                  if (!mp) return;
+                  e.preventDefault();
+                  e.stopImmediatePropagation();
+                  var open = false;
+                  try { open = typeof mp.isOpen === 'function' ? !!mp.isOpen() : false; } catch (_) { open = false; }
+                  if (!open) {
+                    var menuEl = document.querySelector('.slide-menu');
+                    open = !!(menuEl && menuEl.classList.contains('active'));
+                  }
+                  if (open && typeof mp.closeMenu === 'function') {
+                    mp.closeMenu();
+                  } else if (typeof mp.toggle === 'function') {
+                    mp.toggle();
+                  } else if (typeof mp.openMenu === 'function') {
+                    mp.openMenu();
+                  }
+                } catch (err) {
+                  console.warn('[slides-ng] M toggle failed', err);
+                }
+              }, true);
+
+              /* === Q keyboard shortcut to exit fullscreen + close
+               * overlays. v0.11.40. The user expected Q to behave
+               * like Esc — leave full-screen presentation mode and
+               * dismiss any open overlay (grid, menu, scene). */
+              document.addEventListener('keydown', function (e) {
+                if (e.key !== 'q' && e.key !== 'Q') return;
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                try {
+                  if (document.fullscreenElement && document.exitFullscreen) {
+                    document.exitFullscreen();
+                  }
+                } catch (_) {}
+                try {
+                  var gridEl = document.getElementById('slides-ng-grid');
+                  if (gridEl) gridEl.remove();
+                } catch (_) {}
+                try {
+                  if (typeof Reveal !== 'undefined' && typeof Reveal.getPlugin === 'function') {
+                    var mpq = Reveal.getPlugin('menu');
+                    if (mpq && typeof mpq.closeMenu === 'function') {
+                      var menuElQ = document.querySelector('.slide-menu');
+                      var openQ = !!(menuElQ && menuElQ.classList.contains('active'));
+                      if (openQ) mpq.closeMenu();
+                    }
+                  }
+                } catch (_) {}
+                try {
+                  var sceneEl = document.getElementById('slides-ng-scene');
+                  if (sceneEl && sceneEl.classList.contains('on')) {
+                    window.postMessage({ type: 'slides-ng-cmd', cmd: 'clearScene' }, '*');
+                  }
+                } catch (_) {}
+              }, true);
 
               /* === Speaker view popup (S key) === */
               var speakerWin = null;
