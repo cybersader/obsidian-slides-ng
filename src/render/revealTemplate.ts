@@ -1948,7 +1948,7 @@ ${sectionsHtml}
                   '.scene-btn:hover { background: #3a3a3a; border-color: #555; }',
                   '.scene-btn.active { background: var(--r-link-color, #42affa); color: #fff; border-color: var(--r-link-color, #42affa); }',
                   '.scene-btn.clear { margin-left: auto; background: transparent; border-color: #555; }',
-                  '.panel { background: #0a0a0a; border: 1px solid #333; overflow: hidden; display: flex; flex-direction: column; border-radius: 6px; min-height: 0; }',
+                  '.panel { background: #0a0a0a; border: 1px solid #333; overflow: hidden; display: flex; flex-direction: column; border-radius: 6px; min-height: 0; min-width: 0; }',
                   '.label { font-size: 0.75em; color: #999; padding: 0.3rem 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; flex: 0 0 auto; }',
                   /* v0.11.46: lock the iframe's aspect ratio to the
                    * deck's slide aspect so reveal scales it identically
@@ -1964,8 +1964,16 @@ ${sectionsHtml}
                   '.notes { padding: 0.6rem 0.8rem; overflow-y: auto; flex: 1 1 auto; font-size: 1em; line-height: 1.5; }',
                   '.notes .empty { color: #666; font-style: italic; }',
                   '.notes br { display: block; margin-bottom: 0.5em; }',
-                  '.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1 1 auto; gap: 0.3rem; }',
-                  '.timer { font-family: monospace; font-size: 3.5em; color: #e0e0e0; }',
+                  /* v0.11.80: panel overflow + min-height: 0 so the
+                   * timer panel can\\'t push its 3.5em digit display
+                   * past its grid cell. flex-children inherit min-
+                   * height auto from the spec, which prevents shrink. */
+                  '.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1 1 auto; gap: 0.3rem; min-height: 0; overflow: hidden; }',
+                  /* clamp the timer between 1.6em and 3.5em — scales
+                   * down on short popups (vh = viewport height) but
+                   * never below the readable floor. Avoids
+                   * container-type which breaks auto grid rows. */
+                  '.timer { font-family: monospace; font-size: clamp(1.6em, 6vh, 3.5em); color: #e0e0e0; line-height: 1; }',
                   '.timer-controls { display: flex; gap: 0.4rem; margin-top: 0.5rem; justify-content: center; }',
                   '.timer-controls button { background: #222; color: #ccc; border: 1px solid #444; padding: 0.25rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.85em; }',
                   '.timer-controls button:hover { background: #333; }',
