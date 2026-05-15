@@ -678,7 +678,50 @@ ${sectionsHtml}
     ${revealMenuJs}
   </script>` : ""}
   <script>
+    /* v0.11.39: capture any unhandled error before Reveal.initialize
+     * and surface it visibly. The user-reported "black screen" in
+     * v0.11.37 suggested an async error was being swallowed — this
+     * makes any such error impossible to miss. The handler also
+     * postMessages the error to the parent window so the speaker
+     * view can log it (and the plugin's debug.log feature in
+     * embedded mode can persist it for sharing). */
     (function () {
+      function reportError(label, err) {
+        try {
+          var info = {
+            type: 'slides-ng-iframe-error',
+            label: label,
+            message: err && err.message ? err.message : String(err),
+            stack: err && err.stack ? String(err.stack) : null,
+            time: Date.now(),
+          };
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(info, '*');
+          }
+        } catch (_) {}
+        try {
+          if (document && document.body) {
+            var existing = document.getElementById('slides-ng-iframe-error');
+            if (existing) existing.remove();
+            var pre = document.createElement('pre');
+            pre.id = 'slides-ng-iframe-error';
+            pre.style.cssText = 'position:fixed;top:0;left:0;right:0;' +
+              'background:#220000;color:#ffb0b0;font-family:monospace;' +
+              'font-size:12px;padding:0.6rem 1rem;margin:0;z-index:99999;' +
+              'white-space:pre-wrap;border-bottom:2px solid #ff4040;';
+            pre.textContent = 'slides-ng [' + label + ']: ' +
+              (err && err.message ? err.message : String(err)) +
+              (err && err.stack ? '\\n\\n' + err.stack : '');
+            document.body.appendChild(pre);
+          }
+        } catch (_) {}
+      }
+      window.addEventListener('error', function (e) {
+        reportError('uncaught', e.error || e.message);
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        reportError('unhandled-promise', e.reason);
+      });
       try {
         var initOpts = ${initConfig};
         ${!embedded ? `/* v0.11.35/v0.11.37/v0.11.38: print-pdf

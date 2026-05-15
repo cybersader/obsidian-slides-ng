@@ -50,6 +50,8 @@ export class SlidesNGView extends ItemView {
   private getSettings: SettingsAccessor;
   private resolveDeckFile: DeckFileAccessor;
   private debug?: DebugLog;
+  /** v0.11.39: iframe error message listener (cleaned up onClose). */
+  private iframeErrorHandler?: (e: MessageEvent) => void;
   /** Parent-side ResizeObserver on the iframe element; posts `relayout` to the bridge. */
   private iframeResizeObserver?: ResizeObserver;
   /**
@@ -110,6 +112,23 @@ export class SlidesNGView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.debug?.log("view/onOpen/enter", { filePath: this.filePath });
+    // v0.11.39: capture any iframe-side error and persist to debug.log
+    // so the user can share specific failures. Installed once per view
+    // open; auto-cleans on close. Errors only get persisted when
+    // debugLogging is enabled.
+    this.iframeErrorHandler = (event: MessageEvent) => {
+      const data = event.data as
+        | { type?: string; label?: string; message?: string; stack?: string | null; time?: number }
+        | undefined;
+      if (!data || data.type !== "slides-ng-iframe-error") return;
+      this.debug?.log("iframe/error", {
+        label: data.label,
+        message: data.message,
+        stack: data.stack,
+        time: data.time,
+      });
+    };
+    window.addEventListener("message", this.iframeErrorHandler);
     const container = this.contentEl;
     container.empty();
     container.addClass("slides-ng-view");
@@ -311,6 +330,10 @@ export class SlidesNGView extends ItemView {
     if (this.iframeResizeObserver) {
       this.iframeResizeObserver.disconnect();
       this.iframeResizeObserver = undefined;
+    }
+    if (this.iframeErrorHandler) {
+      window.removeEventListener("message", this.iframeErrorHandler);
+      this.iframeErrorHandler = undefined;
     }
     this.iframeEl = undefined;
     this.contentEl.empty();

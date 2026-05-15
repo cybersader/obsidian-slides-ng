@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.39] — 2026-05-15
+
+### Added
+
+- **Iframe-side error capture.** Any uncaught error in the
+  iframe (init, async reveal init, asset eval) now:
+  1. Shows visually as a red banner at the top of the
+     iframe (so you can screenshot)
+  2. PostMessages `slides-ng-iframe-error` to the parent
+     window
+  3. The parent persists the error to `slides-ng-debug.log`
+     in the vault root (when debugLogging is on, which is
+     the default for v0.11.x)
+  This means future "black screen" or "blank pane" issues
+  become diagnosable from the debug log without needing
+  browser dev tools.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — iframe IIFE now installs
+  `window.error` + `unhandledrejection` listeners
+  immediately, before Reveal.initialize. Surfaces errors
+  visually + via postMessage.
+- `src/SlidesNGView.ts` — new `iframeErrorHandler` field
+  attached on `onOpen`, removed on `onClose`. Routes
+  `slides-ng-iframe-error` messages into `this.debug.log`.
+
 ## [0.11.38] — 2026-05-14
 
 ### Fixed
