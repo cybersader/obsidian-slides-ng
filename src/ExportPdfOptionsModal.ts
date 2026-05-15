@@ -433,9 +433,6 @@ export class ExportPdfOptionsModal extends Modal {
       title.className = "mockup-slide-title";
       title.textContent = "BUILDING RESILIENT SYSTEMS";
       card.appendChild(title);
-      const accent = document.createElement("div");
-      accent.className = "mockup-slide-accent-bar";
-      card.appendChild(accent);
       const subtitle = document.createElement("div");
       subtitle.className = "mockup-slide-subtitle";
       subtitle.textContent = "Lessons from running production for a decade";

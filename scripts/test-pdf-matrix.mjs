@@ -167,9 +167,8 @@ function renderMockup(opts, currentTheme = "black") {
       }px;
       height: auto;
     }
-    .title { font-weight: 800; font-size: 10px; line-height: 1.1; color: #42affa; }
+    .title { font-weight: 800; font-size: 10px; line-height: 1.1; }
     .subtitle { font-size: 6px; margin-top: 3px; opacity: 0.85; }
-    .accent-bar { height: 2px; width: 30%; background: #ff8c42; margin: 4px auto 6px; border-radius: 1px; }
     .stamp {
       position: absolute; top: 2px; right: 3px; font-size: 5px;
       padding: 1px 3px; background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.85);
@@ -221,7 +220,6 @@ function renderMockup(opts, currentTheme = "black") {
       : "background:transparent;border:none;width:auto;flex:1 1 auto;align-self:stretch;padding:0;aspect-ratio:auto;";
     page1Inner = `<div class="card" style="${cardInline}">
         <div class="title">BUILDING RESILIENT SYSTEMS</div>
-        <div class="accent-bar"></div>
         <div class="subtitle">Lessons from running production for a decade</div>
         ${opts.slideNumberStamp ? `<div class="stamp">Slide 1 / 12</div>` : ""}
       </div>
