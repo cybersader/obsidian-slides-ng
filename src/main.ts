@@ -10,6 +10,7 @@ import {
   exportAndOpenForPdf,
   type PdfExportOptions,
 } from "./export/exportStandalone";
+import { checkPdfExportContrast } from "./export/contrastCheck";
 import { SlidesNGSettingTab } from "./SlidesNGSettingTab";
 import { DEFAULT_SETTINGS, type SlidesNGSettings } from "./settings";
 import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
@@ -199,6 +200,25 @@ export default class SlidesNGPlugin extends Plugin {
     file: TFile,
     pdfOptions: PdfExportOptions
   ): Promise<void> {
+    // v0.11.73: deterministic contrast pre-check. If the chosen
+    // theme + hideBackgrounds combo would print as low-contrast (or
+    // identical) text-on-bg, surface a Notice before opening the
+    // browser so the user can cancel + adjust. Pure-functional —
+    // no DOM walk, no extra render.
+    const contrastWarning = checkPdfExportContrast(
+      pdfOptions,
+      this.settings.defaultTheme
+    );
+    if (contrastWarning) {
+      new Notice(contrastWarning.message, 10000);
+      this.debug.log("export/pdf/contrast-warn", {
+        ratio: contrastWarning.ratio,
+        fg: contrastWarning.fg,
+        bg: contrastWarning.bg,
+        themeOverride: pdfOptions.themeOverride,
+        hideBackgrounds: pdfOptions.hideBackgrounds,
+      });
+    }
     try {
       const result = await exportAndOpenForPdf(
         this.app,
