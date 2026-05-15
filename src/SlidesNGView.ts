@@ -575,11 +575,15 @@ export class SlidesNGView extends ItemView {
     const file = await this.resolveCurrentFile();
     if (!file) return;
     const settings = this.getSettings();
+    this.debug?.log("export/pdf/click", { filePath: file.path });
     new ExportPdfOptionsModal(
       this.app,
       settings.defaultTheme,
       (pdfOptions) => {
-        if (!pdfOptions) return;
+        if (!pdfOptions) {
+          this.debug?.log("export/pdf/cancelled", {});
+          return;
+        }
         void this.runPdfExport(file, pdfOptions);
       }
     ).open();
@@ -590,7 +594,17 @@ export class SlidesNGView extends ItemView {
     file: TFile,
     pdfOptions: PdfExportOptions
   ): Promise<void> {
+    this.debug?.log("export/pdf/start", {
+      filePath: file.path,
+      pdfOptions,
+    });
     try {
+      // v0.11.43: log the exact URL we hand to the OS so we can
+      // diagnose why print mode might not activate (URL malformed,
+      // query stripped by Windows shell, encoded incorrectly, …).
+      const { buildPdfUrlSuffix, pathToFileUrl } = await import(
+        "./export/exportStandalone"
+      );
       const result = await exportAndOpenForPdf(
         this.app,
         file,
@@ -598,6 +612,20 @@ export class SlidesNGView extends ItemView {
         this.renderDefaults(),
         pdfOptions
       );
+      const suffix = buildPdfUrlSuffix(pdfOptions);
+      const finalUrl = pathToFileUrl(result.absolutePath) + suffix;
+      this.debug?.log("export/pdf/result", {
+        vaultRelativePath: result.vaultRelativePath,
+        absolutePath: result.absolutePath,
+        suffix,
+        finalUrl,
+        opened: result.opened,
+        htmlLength: result.html.length,
+        htmlContainsPrintCss: result.html.includes("html.print-pdf"),
+        htmlContainsShowNotesClass: result.html.includes(
+          "classList.add('show-notes')"
+        ),
+      });
       if (result.opened) {
         new Notice("Opened in print mode. Use your browser's print → save as PDF.");
       } else {
@@ -607,6 +635,7 @@ export class SlidesNGView extends ItemView {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      this.debug?.log("export/pdf/error", { error: msg });
       new Notice(`Export for PDF failed: ${msg}`);
     }
   }

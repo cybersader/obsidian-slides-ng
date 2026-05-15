@@ -41,6 +41,19 @@ export interface DeckRenderOptions {
    * anywhere on a slide (outside links / inputs / controls) advances.
    */
   clickToProgress?: boolean;
+  /**
+   * v0.11.43: bake print-pdf mode into the exported HTML so it
+   * doesn't depend on URL query parsing. Some browser/OS combinations
+   * (and in particular Windows `electron.shell.openExternal` with
+   * unusual path characters) seem to drop the `?print-pdf` query
+   * before the file:// URL reaches the browser. When this flag is on,
+   * the document forces `view: print` + adds the `print-pdf` and
+   * (optionally) `show-notes` classes at script start — no URL flag
+   * required.
+   */
+  forcePrintMode?: boolean;
+  /** v0.11.43: when forcePrintMode is on, also reserve room for notes. */
+  forceShowNotes?: boolean;
   /** Column split ratio for image-left / image-right layouts. */
   imageLayoutSplit?: "50/50" | "60/40" | "40/60";
   /** Line-step dimming opacity (0–1). */
@@ -100,6 +113,8 @@ export function buildIframeHtml(
   const showControlsEmbedded = options.showRevealControlsEmbedded ?? false;
   const showMenuEmbedded = options.showRevealMenuEmbedded ?? false;
   const clickToProgress = options.clickToProgress ?? false;
+  const forcePrintMode = options.forcePrintMode ?? false;
+  const forceShowNotes = options.forceShowNotes ?? false;
   const imageSplit = options.imageLayoutSplit ?? "50/50";
   const lineStepDim = options.lineStepDimOpacity ?? 0.32;
   const codeBlockMaxHeight = options.codeBlockMaxHeight ?? "60vh";
@@ -730,7 +745,23 @@ ${sectionsHtml}
       });
       try {
         var initOpts = ${initConfig};
-        ${!embedded ? `/* v0.11.35/v0.11.37/v0.11.38: print-pdf
+        ${!embedded && forcePrintMode ? `/* v0.11.43: forcePrintMode
+         * BAKED INTO THE EXPORTED HTML. The previous flow relied on
+         * a \`?print-pdf\` URL query, which depends on every layer
+         * (path encoding, electron.shell.openExternal, Windows shell,
+         * browser URL handler) preserving the query string. Repeated
+         * user reports of "PDF export still looks the same" pointed
+         * at one of those layers stripping or mis-decoding the query.
+         * Baking the flag into the document removes that whole class
+         * of failures — the file is intrinsically a PDF artifact. */
+        initOpts.view = 'print';
+        try {
+          document.documentElement.classList.add('print-pdf');
+          document.documentElement.classList.add('reveal-print');
+          ${forceShowNotes ? `document.documentElement.classList.add('show-notes');
+          initOpts.showNotes = true;` : ""}
+        } catch (_) {}
+        ` : ""}${!embedded ? `/* v0.11.35/v0.11.37/v0.11.38: print-pdf
          * detection is now STRICTLY gated to standalone mode at
          * render time. Embedded preview never sees this branch
          * because the !embedded interpolation gate strips it from
@@ -1117,15 +1148,18 @@ ${sectionsHtml}
                   ' * (id + pre-rendered html) to the opener via',
                   ' * window.opener.postMessage. Clear sends clearScene. */',
                   'var activeSceneBtn = null;',
-                  /* v0.11.42: sendScene now broadcasts to opener AND
-                   * popup iframes so the speaker\\'s "Current slide"
-                   * panel reflects scene changes (blackout, coffee,
-                   * etc.), not just the main audience window. */
+                  /* v0.11.42: sendScene mirrors to opener AND the
+                   * popup\\'s "Current slide" iframe. v0.11.43: do NOT
+                   * mirror to next-frame — a scene is a takeover
+                   * (blackout, coffee, etc.) of the CURRENT slide,
+                   * not a preview of upcoming content. */
                   'function sendScene(cmd, payload) {',
                   '  var msg = { type: "slides-ng-cmd", cmd: cmd };',
                   '  if (payload && payload.id !== undefined) msg.id = payload.id;',
                   '  if (payload && payload.html !== undefined) msg.html = payload.html;',
-                  '  broadcastCmd(msg);',
+                  '  try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, "*"); } catch (_) {}',
+                  '  var cf = document.getElementById("current-frame");',
+                  '  if (cf && cf.contentWindow) { try { cf.contentWindow.postMessage(msg, "*"); } catch (_) {} }',
                   '}',
                   'function buildSceneButtons() {',
                   '  var bar = document.getElementById("scenes-bar");',
@@ -2056,15 +2090,25 @@ ${sectionsHtml}
           if (cs.backgroundColor) bg = cs.backgroundColor;
           if (cs.color) color = cs.color;
         }
-        // Full-viewport overlay; flex-column so multiple block-level
-        // markdown children (h1 + p, lists, etc.) stack VERTICALLY.
+        // v0.11.43: parent the scene overlay to reveal\\'s viewport
+        // element instead of document.body. Reveal sizes
+        // .reveal-viewport to the slide aspect (16:9 / 4:3 / configured)
+        // so the scene inherits the same shape as the slides —
+        // previously it filled the iframe viewport, which often
+        // doesn\\'t match the slide aspect (the user-reported "not in
+        // the right ratio as the actual slides" bug, esp. visible in
+        // the speaker popup where iframes are roughly square).
+        // Fall back to body when .reveal-viewport hasn\\'t been
+        // built yet (very early scene calls).
+        var viewport = document.querySelector('.reveal-viewport');
+        var positionMode = viewport ? 'absolute' : 'fixed';
         el.style.cssText =
-          'position:fixed;inset:0;background:' + bg + ';color:' + color + ';' +
+          'position:' + positionMode + ';inset:0;background:' + bg + ';color:' + color + ';' +
           'z-index:9999;display:none;flex-direction:column;align-items:center;' +
           'justify-content:center;text-align:center;padding:5%;overflow:auto;' +
           'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);' +
           'font-size:2em;line-height:1.4;gap:0.5em;';
-        document.body.appendChild(el);
+        (viewport || document.body).appendChild(el);
         return el;
       }
       function setScene(id, html) {

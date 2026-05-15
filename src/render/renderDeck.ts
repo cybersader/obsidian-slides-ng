@@ -92,6 +92,14 @@ export interface RenderDefaults {
    * advances to the next slide. Off by default.
    */
   clickToProgress?: boolean;
+  /**
+   * v0.11.43: bake print-pdf mode into the exported HTML — no URL
+   * query parsing needed. Lets the PDF flow bypass the
+   * `?print-pdf` query mechanism entirely.
+   */
+  forcePrintMode?: boolean;
+  /** v0.11.43: when forcePrintMode, also force showNotes. */
+  forceShowNotes?: boolean;
   /** Max-height for code blocks before they scroll. CSS length. */
   codeBlockMaxHeight?: string;
   /** Whether code blocks scroll overflow when capped. */
@@ -209,6 +217,12 @@ export function renderDeckFromAst(
   }
   if (defaults.clickToProgress !== undefined) {
     defaultLayer.clickToProgress = defaults.clickToProgress;
+  }
+  if (defaults.forcePrintMode !== undefined) {
+    defaultLayer.forcePrintMode = defaults.forcePrintMode;
+  }
+  if (defaults.forceShowNotes !== undefined) {
+    defaultLayer.forceShowNotes = defaults.forceShowNotes;
   }
   if (defaults.codeBlockMaxHeight) {
     defaultLayer.codeBlockMaxHeight = defaults.codeBlockMaxHeight;

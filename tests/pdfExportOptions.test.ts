@@ -124,6 +124,35 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain('fill="currentColor"');
   });
 
+  test("forcePrintMode bakes print-pdf into the HTML — no URL query needed (v0.11.43)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+    });
+    // The forced branch sets view: print, adds print-pdf and
+    // reveal-print classes, and runs BEFORE the URL-search check.
+    // No `?print-pdf` query needed in the URL.
+    expect(html).toContain("initOpts.view = 'print'");
+    expect(html).toContain("classList.add('print-pdf')");
+    expect(html).toContain("classList.add('reveal-print')");
+  });
+
+  test("forceShowNotes adds show-notes class and forces initOpts.showNotes (v0.11.43)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+      forceShowNotes: true,
+    });
+    expect(html).toContain("classList.add('show-notes')");
+    expect(html).toContain("initOpts.showNotes = true");
+  });
+
+  test("forcePrintMode block is NOT emitted when the flag is off (regular standalone export)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    // The forced-mode block is only emitted when forcePrintMode is on.
+    expect(html).not.toContain("forcePrintMode BAKED INTO");
+    // Sanity: the URL-search-based detection branch is still present.
+    expect(html).toContain("/print-pdf/i.test(location.search)");
+  });
+
   test("html.show-notes class is added when ?showNotes is in URL (v0.11.42 per-page notes fix)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {});
     // The fix adds documentElement.classList.add('show-notes') inside

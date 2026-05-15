@@ -6,6 +6,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.43] — 2026-05-15
+
+### Fixed
+
+- **PDF export: BAKE print mode into the exported HTML.** Repeated
+  user reports of "PDF export still looks the same" with the
+  `b&g` vault path suggest the `?print-pdf` query string isn't
+  reaching the browser intact — possibly stripped by Windows
+  shell, electron.shell.openExternal, or some intermediate URL
+  handler. New `forcePrintMode` render flag emits a script
+  that sets `view: 'print'` + adds `print-pdf` / `reveal-print`
+  / `show-notes` classes synchronously at document load, BEFORE
+  any URL parsing. The PDF flow now sets this flag automatically.
+  The URL still gets `?print-pdf&showNotes=true` (for compatibility
+  + backwards reasons), but it's no longer a hard dependency.
+- **Speaker popup: scene takeover no longer blacks out the
+  "Next slide" panel.** v0.11.42 broadcast scene commands to
+  BOTH the current-frame and next-frame iframes; that meant a
+  blackout/coffee scene hid the upcoming slide preview. Scenes
+  are a takeover of the CURRENT slide only — now only the
+  current-frame mirror receives the scene cmd.
+- **Speaker popup: scene aspect ratio matches the slides.** The
+  scene overlay used to parent to `<body>` with
+  `position: fixed`, so it filled the iframe — which usually
+  isn't 16:9. Now it parents to `.reveal-viewport` (which reveal
+  sizes to the slide aspect) and uses `position: absolute`. The
+  scene now has the same shape as the slides behind it.
+
+### Added
+
+- **Debug logging for the PDF export flow.** Every step now
+  writes a line to `slides-ng-debug.log`:
+  `export/pdf/click`, `export/pdf/start`, `export/pdf/result`
+  (with `finalUrl`, `htmlContainsPrintCss`,
+  `htmlContainsShowNotesClass`, `opened`), `export/pdf/cancelled`,
+  `export/pdf/error`. Lets remote-diagnose "PDF still doesn't
+  work" without needing browser dev tools.
+
+### Tests
+
+- 3 new tests covering `forcePrintMode` HTML emission,
+  `forceShowNotes` class addition, and conditional-only-when-on
+  behavior. 417/417 pass.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — new `forcePrintMode` +
+  `forceShowNotes` template options; scene overlay parented to
+  `.reveal-viewport`; sendScene only mirrors to current-frame
+  (not next-frame).
+- `src/render/renderDeck.ts` — `forcePrintMode` + `forceShowNotes`
+  flow through `RenderDefaults`.
+- `src/export/exportStandalone.ts` — PDF export sets
+  `forcePrintMode: true` and `forceShowNotes` from pdfOptions.
+- `src/SlidesNGView.ts` — full PDF flow logged to debug.log.
+
 ## [0.11.42] — 2026-05-15
 
 ### Fixed

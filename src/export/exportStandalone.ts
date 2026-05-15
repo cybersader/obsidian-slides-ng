@@ -202,6 +202,13 @@ export async function exportAndOpenForPdf(
     merged.pdfAspectWidth = 1024;
     merged.pdfAspectHeight = 768;
   }
+  // v0.11.43: bake print-pdf flags INTO the exported HTML so the
+  // resulting file doesn't depend on the URL query reaching the
+  // browser intact. Eliminates a whole class of "PDF export still
+  // looks the same" failure modes where the path / shell / browser
+  // strips the query.
+  merged.forcePrintMode = true;
+  if (pdfOptions.showNotes) merged.forceShowNotes = true;
   const result = await exportDeckToFile(app, file, timestamp, merged);
   const suffix = buildPdfUrlSuffix(pdfOptions);
   const opened = await openExternalInBrowser(result.absolutePath, suffix);
