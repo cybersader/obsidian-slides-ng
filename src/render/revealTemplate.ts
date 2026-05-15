@@ -275,8 +275,25 @@ export function buildIframeHtml(
     ...userOptions,
   });
 
+  // v0.11.54: pre-bake the print-pdf marker classes onto the <html>
+  // element so they're present in the initial HTML load — no JS
+  // needed for CSS rules to match. The runtime script still adds
+  // them too (idempotent classList.add) but the user-reported
+  // "white empty slide card" PDF bug came from the browser print
+  // preview snapshotting the DOM before our init script ran;
+  // pre-baking guarantees the rules match from the first paint.
+  const initialHtmlClasses = !embedded && forcePrintMode
+    ? "print-pdf reveal-print"
+      + (forceShowNotes ? " show-notes" : "")
+      + (forceNotesEmphasis ? " notes-emphasis" : "")
+      + (forceGrayscale ? " pdf-grayscale" : "")
+      + (forceHideBackgrounds ? " pdf-hide-backgrounds" : "")
+      + (forceSlideNumberStamp ? " pdf-slide-number-stamp" : "")
+      + (forcePrintDocument ? " print-document" : "")
+    : "";
+
   return `<!doctype html>
-<html lang="en">
+<html lang="en"${initialHtmlClasses ? ` class="${initialHtmlClasses}"` : ""}>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
