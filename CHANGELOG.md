@@ -6,6 +6,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.42] — 2026-05-15
+
+### Fixed
+
+- **PDF export: speaker notes only appeared on the last slide.**
+  Diagnosed: the per-slide notes CSS rule requires
+  `html.print-pdf.show-notes` — but we only added `print-pdf`,
+  never `show-notes`. Without the second class the `height: 70vh`
+  reservation never kicked in, so notes spilled off the slide
+  area onto the next page. By the time the cascade reached the
+  bottom of the document, only the last slide's notes had room
+  to render before the page ran out. Fix: also add
+  `html.show-notes` when `?showNotes` is detected in the URL.
+
+### Added
+
+- **Speaker popup: in-popup navigation row.** Prev / Next /
+  First / Last buttons + slide-N-of-M counter. Speakers can
+  drive the deck from inside the popup without alt-tabbing
+  back to the audience window. Keyboard shortcuts also work
+  in-popup: Left/Right arrows, PageUp/PageDown, Home/End,
+  Space.
+- **Speaker popup: scenes now mirror into the speaker's
+  current-slide iframe.** Was: clicking a scene button changed
+  the audience window but the speaker's "Current slide" panel
+  kept showing the underlying slide. Now `sendScene` broadcasts
+  to both opener (audience) AND the popup's own iframes via a
+  new `broadcastCmd` helper.
+- **Print-mode diagnostic banner.** If `?print-pdf` is in URL
+  but the `print-pdf` class isn't on `<html>` after 3 seconds,
+  a red top-banner explains the state. Quick remote diagnosis
+  for "PDF still doesn't work" reports where we can't see the
+  screen.
+
+### Changed
+
+- **Speaker popup timer starts paused at 00:00.** Was: timer
+  auto-ran from popup open. The button label cycles
+  Start → Pause → Resume → Pause. Reset returns to 00:00 +
+  paused (was: reset-and-auto-resume).
+
+### Tests
+
+- 5 new tests in `tests/pdfExportOptions.test.ts` covering the
+  `show-notes` class fix, the diagnostic banner, popup nav
+  row, paused-default timer, and scene broadcast. 414 pass
+  in the full suite.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — print-pdf init branch now
+  adds `show-notes` class alongside `print-pdf` when
+  `?showNotes` is set; 3-second fallback diagnostic banner
+  bundled in non-embedded mode; popup template gained nav
+  row, `broadcastCmd`, paused-default timer wiring, and an
+  in-popup keydown listener.
+
 ## [0.11.41] — 2026-05-15
 
 ### Fixed

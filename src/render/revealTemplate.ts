@@ -744,11 +744,32 @@ ${sectionsHtml}
             document.documentElement.classList.add('print-pdf');
             document.documentElement.classList.add('reveal-print');
           } catch (_) {}
+          /* v0.11.42: diagnostic — if print mode somehow fails to
+           * activate within 3s, show a fixed banner explaining the
+           * state. Helps remote-diagnose user-reported "PDF export
+           * still looks the same" when we can\\'t see the screen. */
+          setTimeout(function () {
+            try {
+              if (!document.documentElement.classList.contains('print-pdf')) {
+                var banner = document.createElement('div');
+                banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c33;color:#fff;padding:8px 12px;z-index:99999;font-family:monospace;font-size:12px;';
+                banner.textContent = '[slides-ng v0.11.42] Print mode failed to activate. URL search: ' + location.search + ' — please screenshot.';
+                document.body.appendChild(banner);
+              }
+            } catch (_) {}
+          }, 3000);
           var notesMatch = location.search.match(/[?&]showNotes(?:=([^&]+))?/i);
           if (notesMatch) {
             initOpts.showNotes = notesMatch[1] && notesMatch[1] !== 'true'
               ? decodeURIComponent(notesMatch[1])
               : true;
+            /* v0.11.42: also flag the html element so our per-slide
+             * notes CSS rule (html.print-pdf.show-notes ...) matches.
+             * Without this, the section height stayed at 100vh and
+             * notes overflowed onto the next page — which is why the
+             * user reported "speaker notes only on the last slide":
+             * notes WERE rendered, just pushed off-page. */
+            try { document.documentElement.classList.add('show-notes'); } catch (_) {}
           }
         }` : ""}
         ${showMenu ? `if (typeof RevealMenu !== 'undefined') {
@@ -1037,12 +1058,32 @@ ${sectionsHtml}
                   '</div>',
                   '<div class="panel">',
                   '  <div class="label">Timer</div>',
-                  '  <div class="timer-wrap"><div><div class="timer" id="timer">00:00</div><div class="timer-controls"><button id="timer-reset">Reset</button><button id="timer-pause">Pause</button></div></div></div>',
+                  /* v0.11.42: default-paused timer + Start/Pause/Reset
+                   * triplet. Was Reset+Pause where the timer auto-ran
+                   * from popup-open. Per user request: starts paused
+                   * (00:00), explicit Start button to begin.
+                   * v0.11.42: also add an in-popup navigation row so
+                   * the speaker can drive the deck without alt-tabbing
+                   * back to the main window. */
+                  '  <div class="timer-wrap"><div><div class="timer" id="timer">00:00</div><div class="timer-controls"><button id="timer-pause">Start</button><button id="timer-reset">Reset</button></div></div></div>',
+                  '</div>',
+                  '<div class="panel" style="grid-column: 1 / -1; min-height: 0;">',
+                  '  <div class="label">Navigation</div>',
+                  '  <div style="display:flex;gap:0.4rem;align-items:center;padding:0.4rem 0.6rem;">',
+                  '    <button id="nav-prev" class="scene-btn">← Prev</button>',
+                  '    <button id="nav-next" class="scene-btn">Next →</button>',
+                  '    <button id="nav-first" class="scene-btn">⏮ First</button>',
+                  '    <button id="nav-last" class="scene-btn">Last ⏭</button>',
+                  '    <span id="nav-counter" style="margin-left:auto;color:#999;font-size:0.85em;">—</span>',
+                  '  </div>',
                   '</div>',
                   '<script>',
+                  /* v0.11.42: timer defaults to paused at 00:00. Counts
+                   * elapsed time since the user explicitly clicks Start.
+                   * Reset returns to 00:00 + paused. */
                   'var start = Date.now();',
-                  'var paused = false;',
-                  'var pausedAt = 0;',
+                  'var paused = true;',
+                  'var pausedAt = Date.now();',
                   'function fmt(ms) {',
                   '  var s = Math.floor(ms / 1000);',
                   '  var m = Math.floor(s / 60);',
@@ -1056,20 +1097,35 @@ ${sectionsHtml}
                   '  if (!t) return;',
                   '  t.textContent = fmt(paused ? pausedAt - start : Date.now() - start);',
                   '}, 250);',
-                  'document.getElementById("timer-reset").onclick = function () { start = Date.now(); paused = false; pausedAt = 0; document.getElementById("timer-pause").textContent = "Pause"; };',
+                  /* v0.11.42: Reset returns to 00:00 AND pauses. Was
+                   * Reset-and-auto-resume; user preferred paused. */
+                  'document.getElementById("timer-reset").onclick = function () { start = Date.now(); paused = true; pausedAt = Date.now(); document.getElementById("timer-pause").textContent = "Start"; };',
+                  /* v0.11.42: broadcast nav/scene cmds to BOTH the
+                   * opener (main deck) AND the popup\\'s current-frame
+                   * iframe so the speaker sees a mirror of what the
+                   * audience sees. The next-frame iframe gets the
+                   * adjusted idx via the regular state-sync path. */
+                  'function broadcastCmd(msg) {',
+                  '  try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, "*"); } catch (_) {}',
+                  '  ["current-frame", "next-frame"].forEach(function (id) {',
+                  '    var f = document.getElementById(id);',
+                  '    if (f && f.contentWindow) { try { f.contentWindow.postMessage(msg, "*"); } catch (_) {} }',
+                  '  });',
+                  '}',
                   '/* v0.11.36: scene buttons built dynamically from',
                   ' * window.opener.__slidesNgScenes. Click sends setScene',
                   ' * (id + pre-rendered html) to the opener via',
                   ' * window.opener.postMessage. Clear sends clearScene. */',
                   'var activeSceneBtn = null;',
+                  /* v0.11.42: sendScene now broadcasts to opener AND
+                   * popup iframes so the speaker\\'s "Current slide"
+                   * panel reflects scene changes (blackout, coffee,
+                   * etc.), not just the main audience window. */
                   'function sendScene(cmd, payload) {',
-                  '  if (!window.opener) return;',
-                  '  try {',
-                  '    var msg = { type: "slides-ng-cmd", cmd: cmd };',
-                  '    if (payload && payload.id !== undefined) msg.id = payload.id;',
-                  '    if (payload && payload.html !== undefined) msg.html = payload.html;',
-                  '    window.opener.postMessage(msg, "*");',
-                  '  } catch (_) {}',
+                  '  var msg = { type: "slides-ng-cmd", cmd: cmd };',
+                  '  if (payload && payload.id !== undefined) msg.id = payload.id;',
+                  '  if (payload && payload.html !== undefined) msg.html = payload.html;',
+                  '  broadcastCmd(msg);',
                   '}',
                   'function buildSceneButtons() {',
                   '  var bar = document.getElementById("scenes-bar");',
@@ -1127,10 +1183,32 @@ ${sectionsHtml}
                   '  sendScene("clearScene");',
                   '  if (activeSceneBtn) { activeSceneBtn.classList.remove("active"); activeSceneBtn = null; }',
                   '});',
+                  /* v0.11.42: Start/Pause/Resume toggle. Initial label
+                   * is "Start" (timer is paused on open). After first
+                   * click → "Pause"; subsequent → "Resume" / "Pause". */
                   'document.getElementById("timer-pause").onclick = function () {',
                   '  if (paused) { start = Date.now() - (pausedAt - start); paused = false; this.textContent = "Pause"; }',
                   '  else { pausedAt = Date.now(); paused = true; this.textContent = "Resume"; }',
                   '};',
+                  /* v0.11.42: navigation row. Speaker controls Prev /
+                   * Next / First / Last from inside the popup. Updates
+                   * arrive via state-sync so the counter stays current
+                   * even if the main window navigates via keyboard. */
+                  'function navCmd(c) { broadcastCmd({ type: "slides-ng-cmd", cmd: c }); }',
+                  'document.getElementById("nav-prev").addEventListener("click", function () { navCmd("prev"); });',
+                  'document.getElementById("nav-next").addEventListener("click", function () { navCmd("next"); });',
+                  'document.getElementById("nav-first").addEventListener("click", function () { navCmd("first"); });',
+                  'document.getElementById("nav-last").addEventListener("click", function () { navCmd("last"); });',
+                  /* Keyboard shortcuts INSIDE the popup so the speaker
+                   * can hit arrow keys without focusing the main
+                   * window. PgUp/PgDn + arrows. */
+                  'document.addEventListener("keydown", function (e) {',
+                  '  if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;',
+                  '  if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") { e.preventDefault(); navCmd("next"); }',
+                  '  else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); navCmd("prev"); }',
+                  '  else if (e.key === "Home") { e.preventDefault(); navCmd("first"); }',
+                  '  else if (e.key === "End") { e.preventDefault(); navCmd("last"); }',
+                  '});',
                   '/* v0.11.34: iframe-load gating. The popup\\'s inner',
                   ' * iframes need to finish loading the deck before they can',
                   ' * respond to postMessage goto commands. We queue any',
@@ -1184,6 +1262,11 @@ ${sectionsHtml}
                   '  var nxt = document.getElementById("next-counter");',
                   '  if (cur) cur.textContent = (d.idx + 1) + " / " + d.totalSlides;',
                   '  if (nxt) nxt.textContent = d.idx + 2 > d.totalSlides ? "end" : ((d.idx + 2) + " / " + d.totalSlides);',
+                  /* v0.11.42: also update the bottom navigation counter
+                   * (slide N of M) so the speaker has the same readout
+                   * next to the Prev/Next buttons. */
+                  '  var navc = document.getElementById("nav-counter");',
+                  '  if (navc) navc.textContent = "Slide " + (d.idx + 1) + " of " + d.totalSlides;',
                   '  pendingState = d;',
                   '  applyPending();',
                   '}',

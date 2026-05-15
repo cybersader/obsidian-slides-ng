@@ -124,6 +124,52 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain('fill="currentColor"');
   });
 
+  test("html.show-notes class is added when ?showNotes is in URL (v0.11.42 per-page notes fix)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    // The fix adds documentElement.classList.add('show-notes') inside
+    // the same branch that detects ?showNotes. Without this, the
+    // `html.print-pdf.show-notes` CSS rule never matched and notes
+    // overflowed onto the next page — the user-reported "notes only
+    // show on the last slide" symptom.
+    expect(html).toContain("classList.add('show-notes')");
+    expect(html).toContain("html.print-pdf.show-notes");
+  });
+
+  test("print-mode diagnostic banner is bundled (v0.11.42 remote diagnosis)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    expect(html).toContain("Print mode failed to activate");
+    expect(html).toContain("slides-ng v0.11.42");
+  });
+
+  test("popup includes in-popup navigation row (Prev/Next/First/Last) — v0.11.42", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    expect(html).toContain('id="nav-prev"');
+    expect(html).toContain('id="nav-next"');
+    expect(html).toContain('id="nav-first"');
+    expect(html).toContain('id="nav-last"');
+    expect(html).toContain('id="nav-counter"');
+    // Keyboard shortcuts inside popup are wired up.
+    expect(html).toMatch(/ArrowRight|PageDown/);
+  });
+
+  test("popup timer defaults to paused on open (v0.11.42)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    // Initial state: paused=true, label="Start". Was: paused=false,
+    // label="Pause" — timer auto-ran from open.
+    expect(html).toContain("var paused = true");
+    expect(html).toContain('">Start</button>');
+  });
+
+  test("popup scene clicks broadcast to current-frame too (v0.11.42)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    // sendScene now uses broadcastCmd which posts to both opener
+    // AND the popup\'s own iframes — so the speaker\'s "Current slide"
+    // panel reflects scene changes, not just the audience window.
+    expect(html).toContain("function broadcastCmd(msg)");
+    expect(html).toMatch(/broadcastCmd\(msg\)/);
+    expect(html).toMatch(/current-frame[\s\S]{0,200}next-frame|current-frame.{0,200}contentWindow/);
+  });
+
   test("popup HTML's inline <script> body parses as valid JS (v0.11.41 regression guard)", () => {
     // v0.11.41: the previous popup template had a nested string-escape
     // bug — the "<span class=\\"empty\\">" literal lost a layer of
