@@ -36,17 +36,21 @@ export class ExportPdfOptionsModal extends Modal {
    * so the user sees a live preview of what the PDF will look
    * like before they hit Export.
    */
-  private renderPreview?: (options: PdfExportOptions) => Promise<string>;
+  private renderPreview?: (options: PdfExportOptions, zoom: number) => Promise<string>;
   /** DOM ref for the preview iframe so we can update its srcdoc. */
   private previewIframe?: HTMLIFrameElement;
   /** Debounce timer for the preview re-render. */
   private previewTimer: number | null = null;
+  /** v0.11.59: zoom level for the preview iframe (0.1–1.0). Persisted in localStorage. */
+  private previewZoom: number = 0.4;
+  /** DOM ref for the zoom-level readout. */
+  private previewZoomLabel?: HTMLSpanElement;
 
   constructor(
     app: App,
     currentTheme: string,
     onSubmit: (options: PdfExportOptions | null) => void,
-    renderPreview?: (options: PdfExportOptions) => Promise<string>
+    renderPreview?: (options: PdfExportOptions, zoom: number) => Promise<string>
   ) {
     super(app);
     this.onSubmit = onSubmit;
@@ -66,14 +70,66 @@ export class ExportPdfOptionsModal extends Modal {
 
     // v0.11.57: live preview pane. Sandboxed iframe that renders
     // the deck through the export pipeline with the currently-
-    // selected options. Updates 350ms after any option change so
-    // we don\'t re-render on every keystroke.
+    // selected options. v0.11.59: with a zoom slider so the user
+    // can dial in 1-page-at-a-glance vs see-multiple-pages.
     if (this.renderPreview) {
+      // Restore persisted zoom (if any).
+      const storedZoom = parseFloat(window.localStorage.getItem("slides-ng-pdf-preview-zoom") ?? "");
+      if (Number.isFinite(storedZoom) && storedZoom > 0.05 && storedZoom <= 1.5) {
+        this.previewZoom = storedZoom;
+      }
+
       const previewWrap = contentEl.createDiv({ cls: "slides-ng-export-pdf-preview" });
-      previewWrap.createEl("div", {
+
+      const previewHeader = previewWrap.createDiv({ cls: "slides-ng-export-pdf-preview-header" });
+      previewHeader.createEl("div", {
         cls: "slides-ng-export-pdf-preview-label",
-        text: "Live preview (first slide)",
+        text: "Live preview",
       });
+
+      const zoomGroup = previewHeader.createDiv({ cls: "slides-ng-export-pdf-preview-zoom" });
+      const zoomOut = zoomGroup.createEl("button", {
+        cls: "slides-ng-export-pdf-preview-zoom-btn",
+        text: "−",
+        attr: { type: "button", title: "Zoom out" },
+      });
+      const zoomSlider = zoomGroup.createEl("input", {
+        cls: "slides-ng-export-pdf-preview-zoom-slider",
+        attr: {
+          type: "range",
+          min: "10",
+          max: "100",
+          step: "5",
+          value: String(Math.round(this.previewZoom * 100)),
+          title: "Preview zoom",
+        },
+      });
+      const zoomIn = zoomGroup.createEl("button", {
+        cls: "slides-ng-export-pdf-preview-zoom-btn",
+        text: "+",
+        attr: { type: "button", title: "Zoom in" },
+      });
+      this.previewZoomLabel = zoomGroup.createEl("span", {
+        cls: "slides-ng-export-pdf-preview-zoom-readout",
+        text: `${Math.round(this.previewZoom * 100)}%`,
+      });
+
+      const applyZoom = (zoom: number) => {
+        this.previewZoom = Math.max(0.1, Math.min(1.0, zoom));
+        zoomSlider.value = String(Math.round(this.previewZoom * 100));
+        if (this.previewZoomLabel) {
+          this.previewZoomLabel.textContent = `${Math.round(this.previewZoom * 100)}%`;
+        }
+        window.localStorage.setItem("slides-ng-pdf-preview-zoom", String(this.previewZoom));
+        this.schedulePreviewRefresh();
+      };
+      zoomSlider.addEventListener("input", (e) => {
+        const v = parseInt((e.target as HTMLInputElement).value, 10);
+        if (Number.isFinite(v)) applyZoom(v / 100);
+      });
+      zoomOut.addEventListener("click", () => applyZoom(this.previewZoom - 0.05));
+      zoomIn.addEventListener("click", () => applyZoom(this.previewZoom + 0.05));
+
       this.previewIframe = previewWrap.createEl("iframe", {
         cls: "slides-ng-export-pdf-preview-iframe",
         attr: { sandbox: "allow-scripts", title: "PDF preview" },
@@ -83,8 +139,13 @@ export class ExportPdfOptionsModal extends Modal {
       // Bubble-listen for any user interaction so we don\'t have
       // to wire `schedulePreviewRefresh()` into every individual
       // option\'s onChange handler. Both `input` (for text fields)
-      // and `change` (for dropdowns/toggles) cover the set.
-      const refresh = () => this.schedulePreviewRefresh();
+      // and `change` (for dropdowns/toggles) cover the set. We
+      // skip the zoom slider so its native `input` events don\'t
+      // double-trigger (applyZoom already calls schedulePreviewRefresh).
+      const refresh = (ev: Event) => {
+        if (ev.target === zoomSlider) return;
+        this.schedulePreviewRefresh();
+      };
       contentEl.addEventListener("change", refresh);
       contentEl.addEventListener("input", refresh);
     }
@@ -289,7 +350,7 @@ export class ExportPdfOptionsModal extends Modal {
       this.previewTimer = null;
       if (!this.renderPreview || !this.previewIframe) return;
       try {
-        const html = await this.renderPreview(this.options);
+        const html = await this.renderPreview(this.options, this.previewZoom);
         this.previewIframe.srcdoc = html;
       } catch (err) {
         // Failure here shouldn\'t break the modal — just log.

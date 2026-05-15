@@ -2009,7 +2009,23 @@ ${sectionsHtml}
                    * Next / First / Last from inside the popup. Updates
                    * arrive via state-sync so the counter stays current
                    * even if the main window navigates via keyboard. */
-                  'function navCmd(c) { broadcastCmd({ type: "slides-ng-cmd", cmd: c }); }',
+                  /* v0.11.59: nav commands go ONLY to the opener (the main
+                   * deck window). The popup\\'s current-frame +
+                   * next-frame iframes update via state-sync — when
+                   * the opener navigates, postStateToSpeaker fires and
+                   * tells the popup which slide each iframe should show.
+                   *
+                   * The previous broadcastCmd path posted nav cmds to
+                   * BOTH opener and the popup iframes. Rapid clicks
+                   * (e.g. Next-Next-Next) caused jitter: each iframe
+                   * received its own Reveal.next() AND a stream of
+                   * gotoSlide(N) updates from state-sync, and the two
+                   * pipelines fell out of phase. Single source of
+                   * truth (the opener) fixes it. */
+                  'function navCmd(c) {',
+                  '  var msg = { type: "slides-ng-cmd", cmd: c };',
+                  '  try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, "*"); } catch (_) {}',
+                  '}',
                   'document.getElementById("nav-prev").addEventListener("click", function () { navCmd("prev"); });',
                   'document.getElementById("nav-next").addEventListener("click", function () { navCmd("next"); });',
                   'document.getElementById("nav-first").addEventListener("click", function () { navCmd("first"); });',

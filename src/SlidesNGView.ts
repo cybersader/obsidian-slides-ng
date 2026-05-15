@@ -684,7 +684,7 @@ export class SlidesNGView extends ItemView {
       // currently-selected options after each change. We render
       // the deck through the export pipeline + return the HTML;
       // the modal pumps it into a sandboxed iframe.
-      async (previewOptions) => {
+      async (previewOptions, previewZoom) => {
         const markdown = await this.app.vault.read(file);
         const { renderDeckStandalone } = await import("./render/renderDeck");
         const merged: import("./render/renderDeck").RenderDefaults = {
@@ -721,13 +721,13 @@ export class SlidesNGView extends ItemView {
         if (previewOptions.headerText) merged.forceHeaderText = previewOptions.headerText;
         if (previewOptions.footerText) merged.forceFooterText = previewOptions.footerText;
         const rendered = renderDeckStandalone(markdown, file.path, merged);
-        // v0.11.58: shrink the rendered HTML to fit the 240px-tall
-        // preview iframe. The actual PDF page is ~8.5×11in @ 96dpi ≈
-        // 816×1056px; scaling by ~0.22 makes one page roughly
-        // 180×232px which fits comfortably alongside the next page.
-        // CSS `zoom` (Chromium-only, but Obsidian is Electron→Chromium)
-        // shrinks proportionally without the transform-origin gotchas.
-        const PREVIEW_ZOOM = 0.22;
+        // v0.11.58/v0.11.59: shrink the rendered HTML to fit the
+        // preview iframe. CSS `zoom` shrinks the entire page
+        // proportionally (Chromium-only; Obsidian is Electron→
+        // Chromium, so safe). Zoom factor is user-controlled via
+        // the modal slider (default 0.4 = one Letter page ≈ 330×425px,
+        // visible cleanly in the 240px iframe + a peek of page 2).
+        const PREVIEW_ZOOM = previewZoom ?? 0.4;
         const previewStyle =
           `<style id="slides-ng-preview-scale">html,body{zoom:${PREVIEW_ZOOM} !important;background:#fff !important;}` +
           `body{margin:0 !important;padding:0 !important;}` +
