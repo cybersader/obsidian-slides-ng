@@ -720,7 +720,23 @@ export class SlidesNGView extends ItemView {
         if (previewOptions.slideNumberStamp) merged.forceSlideNumberStamp = true;
         if (previewOptions.headerText) merged.forceHeaderText = previewOptions.headerText;
         if (previewOptions.footerText) merged.forceFooterText = previewOptions.footerText;
-        return renderDeckStandalone(markdown, file.path, merged);
+        const rendered = renderDeckStandalone(markdown, file.path, merged);
+        // v0.11.58: shrink the rendered HTML to fit the 240px-tall
+        // preview iframe. The actual PDF page is ~8.5×11in @ 96dpi ≈
+        // 816×1056px; scaling by ~0.22 makes one page roughly
+        // 180×232px which fits comfortably alongside the next page.
+        // CSS `zoom` (Chromium-only, but Obsidian is Electron→Chromium)
+        // shrinks proportionally without the transform-origin gotchas.
+        const PREVIEW_ZOOM = 0.22;
+        const previewStyle =
+          `<style id="slides-ng-preview-scale">html,body{zoom:${PREVIEW_ZOOM} !important;background:#fff !important;}` +
+          `body{margin:0 !important;padding:0 !important;}` +
+          `</style>`;
+        // Inject just before </head>. Falls back to prepending the
+        // style to body if no </head> is found (shouldn\'t happen).
+        return rendered.includes("</head>")
+          ? rendered.replace("</head>", `${previewStyle}</head>`)
+          : previewStyle + rendered;
       }
     ).open();
   }

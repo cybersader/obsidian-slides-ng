@@ -1065,6 +1065,10 @@
   border-radius: 4px;
   background: #fff;
   display: block;
+  /* v0.11.58: the rendered preview is zoomed-out internally via CSS
+   * `zoom` so multiple pages fit. Keep the iframe scroll for
+   * decks longer than ~2 pages — user can drag to see later pages. */
+  overflow: auto;
 }
 .slides-ng-export-pdf-actions {
   display: flex;
