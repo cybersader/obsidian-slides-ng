@@ -44,10 +44,11 @@ export class ExportPdfOptionsModal extends Modal {
     new Setting(contentEl)
       .setName("Layout")
       .setDesc(
-        "Slides: render as slide cards with theme styling, one per page. Document: flow content as a regular handout — sections become headings, notes inline, no slide chrome. Document mode is better for text-heavy decks that keep overflowing."
+        "Slides: full-page slide cards with theme styling (notes ~30% of page when included). Slides + notes emphasis: small slide at the top, notes fill the rest — for lecture handouts. Document: flowing handout, no slide chrome."
       )
       .addDropdown((d) => {
         d.addOption("slides", "Slides (cards with theme)");
+        d.addOption("slides-notes", "Slides + notes emphasis (small slide, big notes)");
         d.addOption("document", "Document (flowing handout)");
         d.setValue(this.options.pdfStyle ?? "slides").onChange((v) => {
           this.options.pdfStyle = v as PdfExportOptions["pdfStyle"];

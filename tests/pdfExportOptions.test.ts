@@ -124,6 +124,19 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain('fill="currentColor"');
   });
 
+  test("forceNotesEmphasis adds notes-emphasis class + bigger-notes CSS (v0.11.45)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+      forceShowNotes: true,
+      forceNotesEmphasis: true,
+    });
+    expect(html).toContain("classList.add('notes-emphasis')");
+    // The CSS rule that activates when notes-emphasis is on.
+    expect(html).toContain("html.print-pdf.notes-emphasis .reveal .slides > section");
+    expect(html).toContain("height: 35vh");
+    expect(html).toContain("min-height: 55vh");
+  });
+
   test("forceMaxPagesPerSlide bakes pdfMaxPagesPerSlide into initOpts (v0.11.44)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {
       forcePrintMode: true,

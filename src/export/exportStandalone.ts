@@ -29,16 +29,23 @@ export interface PdfExportOptions {
    */
   maxPagesPerSlide?: number;
   /**
-   * v0.11.44: how the printed pages should look.
+   * v0.11.44/v0.11.45: how the printed pages should look.
    *
    * - `"slides"` (default) — render as slide cards, one per page,
    *   with theme styling. Best for handouts that match the deck.
-   * - `"document"` — render as a flowing document with no slide
-   *   chrome. Sections become headings; content flows naturally;
-   *   notes appear inline beneath each section. Better for
-   *   text-heavy decks where slides keep overflowing.
+   *   When `showNotes` is on, slide takes ~70% of the page and
+   *   notes take ~30%.
+   * - `"slides-notes"` (v0.11.45) — like `"slides"` but notes
+   *   take MOST of the page; the slide shrinks to a small block
+   *   at the top. Best for text-heavy / lecture-style handouts
+   *   where the audience reads the notes more than the slide.
+   *   Implies `showNotes: true`.
+   * - `"document"` (v0.11.44) — render as a flowing document
+   *   with no slide chrome. Sections become headings; content
+   *   flows naturally; notes appear inline beneath each section.
+   *   Better for text-heavy decks where slides keep overflowing.
    */
-  pdfStyle?: "slides" | "document";
+  pdfStyle?: "slides" | "slides-notes" | "document";
 }
 
 /**
@@ -231,6 +238,13 @@ export async function exportAndOpenForPdf(
   // inline, page breaks between slides. Better for text-heavy decks.
   if (pdfOptions.pdfStyle === "document") {
     merged.forcePrintDocument = true;
+  }
+  // v0.11.45: notes-emphasis layout — slide shrinks to top ~35%,
+  // notes get the bottom ~60%. Implies showNotes (the layout makes
+  // no sense without notes). Mutually exclusive with `document` mode.
+  if (pdfOptions.pdfStyle === "slides-notes") {
+    merged.forceNotesEmphasis = true;
+    merged.forceShowNotes = true;
   }
   const result = await exportDeckToFile(app, file, timestamp, merged);
   const suffix = buildPdfUrlSuffix(pdfOptions);

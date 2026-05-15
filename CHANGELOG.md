@@ -6,6 +6,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.45] — 2026-05-15
+
+### Added
+
+- **PDF export: "Slides + notes emphasis" layout option.** Third
+  entry in the Layout dropdown. Slide shrinks to a ~35vh block
+  at the top of the page; speaker notes fill the bottom ~55vh
+  with a softer background. Implies `showNotes`. Useful for
+  lecture-style handouts where audiences read notes more than
+  the slide. Complements the existing two modes:
+  - **Slides** — full-page slide cards (default).
+  - **Slides + notes emphasis** — small slide + big notes.
+  - **Document** — flowing handout, no slide chrome.
+
+### Tests
+
+- New test covering `forceNotesEmphasis` class addition + CSS
+  rules. 421 pass.
+
+### Technical
+
+- `src/export/exportStandalone.ts` — `pdfStyle` union extended
+  with `"slides-notes"`; export pipeline maps it to
+  `forceNotesEmphasis` + auto-enables `showNotes`.
+- `src/render/revealTemplate.ts` — new `forceNotesEmphasis`
+  template option emits `html.notes-emphasis` class; CSS rules
+  for the layout layered after `.show-notes` so they override
+  the default 70vh slide height.
+- `src/render/renderDeck.ts` — the new flag flows through
+  `RenderDefaults`.
+- `src/ExportPdfOptionsModal.ts` — third dropdown option +
+  updated description.
+
 ## [0.11.44] — 2026-05-15
 
 ### Added

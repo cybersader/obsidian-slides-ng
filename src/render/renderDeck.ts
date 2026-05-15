@@ -104,6 +104,8 @@ export interface RenderDefaults {
   forceMaxPagesPerSlide?: number;
   /** v0.11.44: render as flowing document instead of slide cards. */
   forcePrintDocument?: boolean;
+  /** v0.11.45: notes-emphasis PDF layout (slide on top, notes large). */
+  forceNotesEmphasis?: boolean;
   /** Max-height for code blocks before they scroll. CSS length. */
   codeBlockMaxHeight?: string;
   /** Whether code blocks scroll overflow when capped. */
@@ -233,6 +235,9 @@ export function renderDeckFromAst(
   }
   if (defaults.forcePrintDocument !== undefined) {
     defaultLayer.forcePrintDocument = defaults.forcePrintDocument;
+  }
+  if (defaults.forceNotesEmphasis !== undefined) {
+    defaultLayer.forceNotesEmphasis = defaults.forceNotesEmphasis;
   }
   if (defaults.codeBlockMaxHeight) {
     defaultLayer.codeBlockMaxHeight = defaults.codeBlockMaxHeight;

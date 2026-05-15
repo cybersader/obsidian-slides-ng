@@ -67,6 +67,12 @@ export interface DeckRenderOptions {
    * overflowing — gives a more handout-like layout.
    */
   forcePrintDocument?: boolean;
+  /**
+   * v0.11.45: notes-emphasis layout. Slide shrinks to top ~35%,
+   * notes get the bottom ~60% of the page. Engaged at PDF export
+   * time when the user picks the "Slides (notes emphasis)" layout.
+   */
+  forceNotesEmphasis?: boolean;
   /** Column split ratio for image-left / image-right layouts. */
   imageLayoutSplit?: "50/50" | "60/40" | "40/60";
   /** Line-step dimming opacity (0–1). */
@@ -130,6 +136,7 @@ export function buildIframeHtml(
   const forceShowNotes = options.forceShowNotes ?? false;
   const forceMaxPagesPerSlide = options.forceMaxPagesPerSlide ?? 0;
   const forcePrintDocument = options.forcePrintDocument ?? false;
+  const forceNotesEmphasis = options.forceNotesEmphasis ?? false;
   const imageSplit = options.imageLayoutSplit ?? "50/50";
   const lineStepDim = options.lineStepDimOpacity ?? 0.32;
   const codeBlockMaxHeight = options.codeBlockMaxHeight ?? "60vh";
@@ -675,6 +682,24 @@ export function buildIframeHtml(
     html.print-pdf.show-notes .reveal .slides > section {
       height: 70vh !important;
     }
+    /* v0.11.45: notes-emphasis layout. Slide is a small block at
+     * the top of the page; notes get the rest. Useful for lecture-
+     * style handouts where the audience reads the notes more than
+     * the slide. Layered AFTER .show-notes so it overrides. */
+    html.print-pdf.notes-emphasis .reveal .slides > section {
+      height: 35vh !important;
+      padding: 1rem 2rem !important;
+    }
+    html.print-pdf.notes-emphasis .reveal aside.notes {
+      min-height: 55vh !important;
+      font-size: 0.95em !important;
+      padding: 1.25rem 2rem !important;
+      margin-top: 1rem !important;
+      background: #fafafa !important;
+      color: #222 !important;
+      page-break-inside: auto !important;
+      break-inside: auto !important;
+    }
 
     /* v0.11.44: document-layout mode for PDF export. The deck flows
      * as a regular document — no fixed slide-card dimensions, no
@@ -872,6 +897,11 @@ ${sectionsHtml}
            * adds .print-document marker so CSS flattens sections into
            * a flowing document instead of slide cards. */
           document.documentElement.classList.add('print-document');` : ""}
+          ${forceNotesEmphasis ? `/* v0.11.45: notes-emphasis mode —
+           * adds .notes-emphasis class. CSS shrinks the slide block
+           * to the top ~35vh and gives the notes the bottom ~60vh.
+           * Implies showNotes (caller already set forceShowNotes). */
+          document.documentElement.classList.add('notes-emphasis');` : ""}
         } catch (_) {}
         ${forceMaxPagesPerSlide > 0 ? `/* v0.11.44: bake pdfMaxPagesPerSlide
          * directly into initOpts so reveal splits overflowing slides
