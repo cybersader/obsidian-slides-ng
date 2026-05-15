@@ -1083,7 +1083,8 @@
   gap: 0.6rem;
 }
 .mockup-page-overflow-continued {
-  opacity: 0.92;
+  opacity: 0.78;
+  border-style: dashed !important;
 }
 .slides-ng-export-pdf-mockup-page {
   width: 200px;
@@ -1322,6 +1323,18 @@
  * rest of the page. */
 .mockup-slide-card.mockup-slide-card-small {
   width: 140px !important;
+}
+/* v0.11.68: plain "slides" mode = page IS the slide. The card
+ * mockup has no separate frame — it's just the slide content
+ * centered on the themed page bg. */
+.mockup-slide-card.mockup-slide-card-fullpage {
+  border: none !important;
+  background: transparent !important;
+  width: auto !important;
+  aspect-ratio: auto !important;
+  flex: 1 1 auto !important;
+  align-self: stretch !important;
+  padding: 0 !important;
 }
 .mockup-slide-card.mockup-slide-auto-shrink .mockup-slide-title {
   font-size: 8px;

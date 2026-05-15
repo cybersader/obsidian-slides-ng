@@ -410,12 +410,21 @@ export class ExportPdfOptionsModal extends Modal {
         inner.appendChild(notes);
       }
     } else {
-      // Slides modes — render a slide card with theme styling.
+      // v0.11.68: plain "slides" mode = each slide IS its page
+      // (full-page dark theme bg with title/subtitle centered).
+      // ONLY slides-notes-emphasis puts the slide in a smaller
+      // card at the top with notes filling the page.
       const isNotesEmphasis = opts.pdfStyle === "slides-notes";
+      if (!isNotesEmphasis) {
+        const themeName = opts.themeOverride ?? this.currentTheme ?? "black";
+        page.classList.add("mockup-doc-page");
+        page.setAttribute("data-doc-theme", opts.hideBackgrounds ? "white" : themeName);
+      }
       const card = document.createElement("div");
       const aspectClass = `mockup-slide-aspect-${(opts.aspectRatio ?? "current").replace(":", "-")}`;
       card.className = `mockup-slide-card ${aspectClass}`;
       if (isNotesEmphasis) card.classList.add("mockup-slide-card-small");
+      else card.classList.add("mockup-slide-card-fullpage");
       // Theme override or "Current". Hide-backgrounds forces white.
       const themeName = opts.themeOverride ?? this.currentTheme ?? "black";
       card.setAttribute("data-theme", opts.hideBackgrounds ? "white" : themeName);
@@ -482,15 +491,22 @@ export class ExportPdfOptionsModal extends Modal {
     pagesRow.appendChild(page);
 
     if (opts.maxPagesPerSlide && opts.maxPagesPerSlide > 1) {
-      // Side-by-side continuation page mockup
+      // v0.11.68: side-by-side continuation page mockup. Labelled
+      // explicitly "(only IF content overflows)" with a dashed
+      // border to avoid the misleading mockup-vs-actual where
+      // short-content decks never produce the overflow page even
+      // though `maxPagesPerSlide` is > 1.
       const cont = page.cloneNode(false) as HTMLDivElement;
       cont.classList.add("mockup-page-overflow-continued");
       const contInner = document.createElement("div");
       contInner.className = "mockup-page-inner";
-      const contLabel = this.makeLabel("(cont.)");
+      const ifLabel = document.createElement("div");
+      ifLabel.style.cssText = "font-size:6px;color:#999;font-style:italic;margin-bottom:6px;text-align:center;";
+      ifLabel.textContent = "(only IF content overflows)";
+      contInner.appendChild(ifLabel);
+      const contLabel = this.makeLabel("Page 2 of slide");
       contInner.appendChild(contLabel);
-      // Overflow body lines
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 6; i++) {
         const line = document.createElement("div");
         line.className = "mockup-line";
         contInner.appendChild(line);

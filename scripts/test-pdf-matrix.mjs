@@ -208,7 +208,17 @@ function renderMockup(opts, currentTheme = "black") {
         ${"<div style='height:2px;background:#888;border-radius:1px;width:100%;'></div>".repeat(2)}
       </div>` : ""}`;
   } else {
-    page1Inner = `<div class="card">
+    // v0.11.68: plain "slides" mode = page IS the slide (full-page
+    // theme bg with title/subtitle). slides-notes-emphasis = small
+    // card on top + big notes block.
+    if (!isNotesEmphasis) {
+      pageBgOverride = cardBg;
+      pageColorOverride = cardColor;
+    }
+    const cardInline = isNotesEmphasis
+      ? "" // .card class handles all styling
+      : "background:transparent;border:none;width:auto;flex:1 1 auto;align-self:stretch;padding:0;aspect-ratio:auto;";
+    page1Inner = `<div class="card" style="${cardInline}">
         <div class="title">BUILDING RESILIENT SYSTEMS</div>
         <div class="subtitle">Lessons from running production for a decade</div>
         ${opts.slideNumberStamp ? `<div class="stamp">Slide 1 / 12</div>` : ""}
@@ -325,17 +335,21 @@ for (const combo of filtered) {
   // primary thing we want to verify). Without this flag, the
   // screen-mode reveal layout doesn't reflect the PDF.
   // Window 816x1056 ≈ one Letter page @ 96dpi.
+  // v0.11.68: bump virtual-time-budget to 6000ms — reveal's print
+  // plugin sometimes hasn't finished its async slide-rendering pass
+  // by 4000ms, leaving the screenshot black for slides-mode and
+  // document-mode combos.
   await chrome([
     "--window-size=816,1056",
     "--emulate-media-type=print",
     `--screenshot=${dir}/actual.png`,
-    "--virtual-time-budget=4000",
+    "--virtual-time-budget=6000",
     url,
   ]);
   await chrome([
     `--print-to-pdf=${dir}/actual.pdf`,
     "--no-pdf-header-footer",
-    "--virtual-time-budget=4000",
+    "--virtual-time-budget=6000",
     url,
   ]);
 
