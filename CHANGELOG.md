@@ -6,6 +6,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.48] — 2026-05-15
+
+### Added
+
+- **Black-screen diagnostic suite.** Three new debug-log lines
+  trace iframe init state end-to-end, so the next time the
+  preview goes black we know exactly which stage failed:
+  - `iframe/bootstrap` — fires the moment iframe scripts start
+    running. Absence ⇒ Obsidian / Electron is blocking script
+    execution in the sandboxed iframe.
+  - `iframe/reveal-ready` — fires when `Reveal.on("ready")`
+    fires. Absence ⇒ reveal.initialize is hanging or the promise
+    is rejected silently.
+  - `iframe/watchdog` — fires unconditionally 5s after init
+    with a full state snapshot: `readyFired`, `slidesCount`,
+    `presentCount`, `viewportSize`, `docSize`,
+    `firstSectionDisplay`. Lets us correlate user-reported black
+    screens with actual iframe state.
+- **`no-slide-present` failure-mode detection + self-heal.** If
+  reveal fires `ready` but no `<section>` has the `.present`
+  class at the 5s mark, the watchdog logs an `iframe/error`
+  with label `no-slide-present` AND force-calls
+  `Reveal.slide(0)` to recover. The previous v0.11.47 watchdog
+  only checked whether ready fired — it would skip the timeout
+  branch even when reveal silently failed to activate any
+  slide.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — bootstrap heartbeat posted
+  before reveal.initialize; ready listener posts a separate
+  message in addition to setting the `readyFired` flag; 5s
+  watchdog now always posts state, classifies failure modes
+  (`reveal-init-timeout` vs `no-slide-present`), and self-heals
+  the latter.
+- `src/SlidesNGView.ts` — message-router handles four message
+  types instead of one, each routed to a dedicated debug-log
+  channel.
+
+## [0.11.47] — 2026-05-15
+
+### Fixed
+
+- **Speaker notes rendered as raw `slide: notes="..."` text.**
+  The deck used `<!-- slide: notes="..." -->` (colon after
+  `slide`). Both `SLIDE_ANNOTATION_RE` and `RECLASSIFY_NOTE_RE`
+  required whitespace (not a colon) after the kind keyword, so
+  the annotation was misclassified as a literal speaker note
+  containing the verbatim `slide: notes="..."` text. PDF
+  export showed this raw text on every slide. Both regexes
+  now accept optional `:?` after `slide` / `element`.
+- **`<!-- slide notes="..." -->` annotation didn't actually
+  produce a speaker note.** Even when the regex parsed the
+  attribute, `slideAttrs.notes` was never piped to `noteHtml`.
+  `renderDeck` now promotes `slideAttrs.notes` to the speaker
+  note when there's no canonical `slide.note`. Also deletes
+  it from `slideAttrs` so it doesn't leak onto the `<section>`
+  tag.
+
+### Added
+
+- **Initial black-screen watchdog.** Iframe-side 5s timer that
+  posts `slides-ng-iframe-error` with label
+  `reveal-init-timeout` if `Reveal.on("ready")` hasn't fired,
+  with viewport size + slide count for diagnostics. (v0.11.48
+  strengthens this; this is the first cut.)
+
+### Tests
+
+- New `tests/slideColonAnnotation.test.ts` (6 tests) covering
+  both regex paths, the renderDeck end-to-end, and the
+  user-reported PDF screenshot case.
+- New `tests/embeddedRender.test.ts` (7 tests) — black-screen
+  regression guards: scripts parse, no print-pdf leakage in
+  embedded mode, reveal init present, slide DOM present,
+  no blanket display-none rules.
+
+### Technical
+
+- `src/parser/annotations.ts` — `SLIDE_ANNOTATION_RE` /
+  `ELEMENT_ANNOTATION_RE` accept `slide:` / `element:`.
+- `src/parser/parseDeck.ts` — `RECLASSIFY_NOTE_RE` accepts the
+  colon form.
+- `src/render/renderDeck.ts` — `slideAttrs.notes` ⇒
+  `noteHtml`; attribute removed from `slideAttrs` afterward.
+
 ## [0.11.46] — 2026-05-15
 
 ### Added — PDF export experimentation knobs

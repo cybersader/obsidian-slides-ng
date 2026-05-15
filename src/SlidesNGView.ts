@@ -118,15 +118,48 @@ export class SlidesNGView extends ItemView {
     // debugLogging is enabled.
     this.iframeErrorHandler = (event: MessageEvent) => {
       const data = event.data as
-        | { type?: string; label?: string; message?: string; stack?: string | null; time?: number }
+        | {
+            type?: string;
+            label?: string;
+            message?: string;
+            stack?: string | null;
+            time?: number;
+            [k: string]: unknown;
+          }
         | undefined;
-      if (!data || data.type !== "slides-ng-iframe-error") return;
-      this.debug?.log("iframe/error", {
-        label: data.label,
-        message: data.message,
-        stack: data.stack,
-        time: data.time,
-      });
+      if (!data || typeof data.type !== "string") return;
+      // v0.11.48: also capture the bootstrap heartbeat and the
+      // watchdog state snapshot so we know exactly which stage
+      // failed when the user reports a black screen.
+      switch (data.type) {
+        case "slides-ng-iframe-error":
+          this.debug?.log("iframe/error", {
+            label: data.label,
+            message: data.message,
+            stack: data.stack,
+            time: data.time,
+          });
+          break;
+        case "slides-ng-iframe-bootstrap":
+          this.debug?.log("iframe/bootstrap", {
+            time: data.time,
+            hasReveal: data.hasReveal,
+          });
+          break;
+        case "slides-ng-iframe-reveal-ready":
+          this.debug?.log("iframe/reveal-ready", { time: data.time });
+          break;
+        case "slides-ng-iframe-watchdog":
+          this.debug?.log("iframe/watchdog", {
+            readyFired: data.readyFired,
+            slidesCount: data.slidesCount,
+            presentCount: data.presentCount,
+            viewportSize: data.viewportSize,
+            docSize: data.docSize,
+            firstSectionDisplay: data.firstSectionDisplay,
+          });
+          break;
+      }
     };
     window.addEventListener("message", this.iframeErrorHandler);
     const container = this.contentEl;

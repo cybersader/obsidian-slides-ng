@@ -29,8 +29,16 @@
 
 export type AttrMap = Record<string, string>;
 
-const SLIDE_ANNOTATION_RE = /<!--\s*slide\s+([^-][\s\S]*?)\s*-->/g;
-const ELEMENT_ANNOTATION_RE = /<!--\s*element\s+([^-][\s\S]*?)\s*-->/g;
+/*
+ * v0.11.47: accept BOTH `<!-- slide attr="..." -->` (canonical, space)
+ * AND `<!-- slide: attr="..." -->` (Slides-Extended-style, colon).
+ * Many existing decks use the colon form because it reads more like a
+ * label. The optional `:?` after the kind keyword + greedy whitespace
+ * means we still require at least one space before the attributes,
+ * but we tolerate the leading colon.
+ */
+const SLIDE_ANNOTATION_RE = /<!--\s*slide:?\s+([^-][\s\S]*?)\s*-->/g;
+const ELEMENT_ANNOTATION_RE = /<!--\s*element:?\s+([^-][\s\S]*?)\s*-->/g;
 
 /**
  * Parse an attribute string like `class="foo bar" style="color:red" data-auto-animate`

@@ -404,7 +404,18 @@ function slideToHtml(
   // so multi-line speaker notes (written by the speaker-view editor
   // as `<!--\nline1\nline2\n-->`) render with `<br>` between lines.
   // The slide-body marked stays CommonMark-default.
-  const noteHtml = slide.note ? (notesMd.parse(slide.note, { async: false }) as string) : undefined;
+  // v0.11.47: also honour `<!-- slide notes="..." -->` (Slides-Extended
+  // style). The `notes` attribute on the slide annotation gets promoted
+  // to a speaker note. If both forms exist on the same slide, the
+  // canonical @slidev `note` field wins (last-one-wins is consistent
+  // with how multi-annotation attrs merge).
+  const slideAttrNotes = slideAttrs.notes;
+  const noteSource = slide.note ?? slideAttrNotes;
+  // Don't leak the notes attribute onto the rendered <section> tag.
+  if (slideAttrNotes !== undefined) {
+    delete slideAttrs.notes;
+  }
+  const noteHtml = noteSource ? (notesMd.parse(noteSource, { async: false }) as string) : undefined;
 
   // v0.11.15: per-slide panel-visibility override. Emit a
   // `data-hide-panels="picker,scenes"` attribute on the section

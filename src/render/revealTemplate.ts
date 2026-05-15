@@ -1054,7 +1054,108 @@ ${sectionsHtml}
         ${showMenu ? `if (typeof RevealMenu !== 'undefined') {
           initOpts.plugins = (initOpts.plugins || []).concat([RevealMenu]);
         }` : ""}
+        /* v0.11.48: bootstrap heartbeat. Post to parent IMMEDIATELY
+         * so the parent knows iframe scripts at least started running.
+         * Catches the "Obsidian iframe scripts aren\\'t executing"
+         * failure mode where the watchdog itself never fires. */
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+              type: 'slides-ng-iframe-bootstrap',
+              time: Date.now(),
+              hasReveal: typeof Reveal !== 'undefined',
+              sandbox: (typeof document.featurePolicy !== 'undefined') ? 'with-policy' : 'no-policy',
+            }, '*');
+          }
+        } catch (_) {}
         var revealInit = Reveal.initialize(initOpts);
+        /* v0.11.47/v0.11.48: black-screen watchdog with stronger
+         * post-init visibility check. The previous v0.11.47 watchdog
+         * only checked whether ready fired — but reveal can fire
+         * ready successfully while still failing to activate any
+         * slide (every section stays display:none, the user sees
+         * a black pane). v0.11.48 also checks slide visibility at
+         * the 5s mark AND attempts to force-activate slide 0 as a
+         * last-resort self-heal. */
+        (function () {
+          var readyFired = false;
+          function markReady() { readyFired = true; }
+          try {
+            if (revealInit && typeof revealInit.then === 'function') {
+              revealInit.then(markReady, function (err) {
+                reportError('reveal-init-rejected', err || new Error('reveal.initialize promise rejected'));
+              });
+            }
+            if (typeof Reveal !== 'undefined' && typeof Reveal.on === 'function') {
+              Reveal.on('ready', function () {
+                markReady();
+                try {
+                  if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ type: 'slides-ng-iframe-reveal-ready', time: Date.now() }, '*');
+                  }
+                } catch (_) {}
+              });
+            }
+          } catch (_) {}
+          setTimeout(function () {
+            try {
+              var sections = document.querySelectorAll('.reveal .slides > section');
+              var slidesCount = sections.length;
+              var presentCount = document.querySelectorAll('.reveal .slides > section.present').length;
+              var viewportEl = document.querySelector('.reveal-viewport');
+              var viewportSize = viewportEl
+                ? viewportEl.clientWidth + 'x' + viewportEl.clientHeight
+                : 'no-viewport';
+              var docSize = document.documentElement.clientWidth + 'x' + document.documentElement.clientHeight;
+              var firstSecComputed = sections[0] ? getComputedStyle(sections[0]) : null;
+              var firstSecDisplay = firstSecComputed ? firstSecComputed.display : 'no-section';
+              /* Always post a state snapshot so the parent can log
+               * the iframe state at 5s — even when everything looks
+               * healthy. Lets us correlate "user sees black" reports
+               * with actual DOM state. */
+              try {
+                if (window.parent && window.parent !== window) {
+                  window.parent.postMessage({
+                    type: 'slides-ng-iframe-watchdog',
+                    time: Date.now(),
+                    readyFired: readyFired,
+                    slidesCount: slidesCount,
+                    presentCount: presentCount,
+                    viewportSize: viewportSize,
+                    docSize: docSize,
+                    firstSectionDisplay: firstSecDisplay,
+                  }, '*');
+                }
+              } catch (_) {}
+              /* Failure mode A: reveal never fired ready. */
+              if (!readyFired) {
+                reportError('reveal-init-timeout', new Error(
+                  'Reveal.initialize did not emit ready within 5s. ' +
+                  'slidesInDom=' + slidesCount + ' viewport=' + viewportSize
+                ));
+              }
+              /* Failure mode B (NEW in v0.11.48): reveal fired ready
+               * but no slide is .present, so the deck looks black. */
+              else if (slidesCount > 0 && presentCount === 0) {
+                reportError('no-slide-present', new Error(
+                  'Reveal fired ready but no section has .present class. ' +
+                  'slidesInDom=' + slidesCount +
+                  ' firstSectionDisplay=' + firstSecDisplay +
+                  ' viewport=' + viewportSize
+                ));
+                /* Self-heal: explicitly navigate to slide 0. */
+                try { if (typeof Reveal.slide === 'function') Reveal.slide(0); } catch (_) {}
+              }
+              /* Banner only when something is actually wrong. */
+              if (!readyFired || (slidesCount > 0 && presentCount === 0)) {
+                var banner = document.createElement('div');
+                banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#a30;color:#fff;padding:8px 12px;z-index:99999;font-family:monospace;font-size:11px;line-height:1.4;';
+                banner.textContent = '[slides-ng v0.11.48] black-screen watchdog — ready=' + readyFired + ' slides=' + slidesCount + ' present=' + presentCount + ' viewport=' + viewportSize + ' display=' + firstSecDisplay;
+                document.body.appendChild(banner);
+              }
+            } catch (_) {}
+          }, 5000);
+        })();
         ${!embedded && (forceAutoShrink || forceSlideNumberStamp || forceHeaderText || forceFooterText) ? `
         /* v0.11.46: post-init PDF tweaks. Hook into Reveal\\'s 'ready'
          * so slide DOM exists. Cheap — only runs in standalone-export

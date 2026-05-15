@@ -33,7 +33,17 @@ export interface Deck {
  * recognises the misclassification so we can re-inject those markers back
  * into the slide's content and let the annotation pipeline handle them.
  */
-const RECLASSIFY_NOTE_RE = /^\s*(slide|element)\s+([\s\S]*?)\s*$/;
+/*
+ * v0.11.47: accept both canonical (`slide attr=...`) and Slides-
+ * Extended colon form (`slide: attr=...`). When @slidev/parser pulls
+ * the annotation comment into `.note`, it strips the `<!-- -->` but
+ * leaves any leading colon. Without the optional `:?`, colon-form
+ * annotations leak into speaker notes verbatim — user-reported in
+ * v0.11.46 where every PDF page showed the literal raw annotation
+ * as the speaker note. The reInjected output drops the colon so the
+ * downstream annotation parser sees canonical form.
+ */
+const RECLASSIFY_NOTE_RE = /^\s*(slide|element):?\s+([\s\S]*?)\s*$/;
 
 /**
  * v0.11.5: cheap regex peek into the top-of-file frontmatter to find
