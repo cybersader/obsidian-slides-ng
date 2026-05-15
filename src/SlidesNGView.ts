@@ -524,7 +524,6 @@ export class SlidesNGView extends ItemView {
         lineStepDimOpacity: settings.lineStepDimOpacity,
         showRevealControlsEmbedded: settings.showRevealControlsEmbedded,
         showRevealMenuEmbedded: settings.showRevealMenuEmbedded,
-        popupRenderedGrid: settings.experimentalPopupRenderedGrid,
         clickToProgress: settings.clickToProgress,
         codeBlockMaxHeight: settings.codeBlockMaxHeight,
         codeBlockOverflowScroll: settings.codeBlockOverflowScroll,

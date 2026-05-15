@@ -37,12 +37,6 @@ export interface DeckRenderOptions {
   /** Show reveal.js-menu hamburger plugin in embedded mode. */
   showRevealMenuEmbedded?: boolean;
   /**
-   * v0.11.76: render the speaker-popup slide grid as iframe-thumbnails
-   * (matching the in-Obsidian picker strip) instead of text-only tiles.
-   * Plumbed in from the experimentalPopupRenderedGrid setting.
-   */
-  popupRenderedGrid?: boolean;
-  /**
    * v0.11.41: PowerPoint-style click-to-advance. When true, clicking
    * anywhere on a slide (outside links / inputs / controls) advances.
    */
@@ -153,7 +147,6 @@ export function buildIframeHtml(
   const userOptions = options.revealOptions ?? {};
   const showControlsEmbedded = options.showRevealControlsEmbedded ?? false;
   const showMenuEmbedded = options.showRevealMenuEmbedded ?? false;
-  const popupRenderedGrid = options.popupRenderedGrid ?? false;
   const clickToProgress = options.clickToProgress ?? false;
   const forcePrintMode = options.forcePrintMode ?? false;
   const forceShowNotes = options.forceShowNotes ?? false;
@@ -2019,8 +2012,18 @@ ${sectionsHtml}
                    * layout reading slide titles from window.opener\\'s
                    * deck DOM. Click a tile → goto that slide. */
                   '<div class="panel" style="grid-column: 1 / -1; min-height: 0;">',
-                  '  <div class="label" style="display:flex;justify-content:space-between;align-items:center;padding-right:0.6rem;">',
+                  '  <div class="label" style="display:flex;justify-content:space-between;align-items:center;padding-right:0.6rem;gap:0.6rem;">',
                   '    <span>Slides</span>',
+                  /* v0.11.78: runtime mode toggle. Choice persists
+                   * to localStorage so the popup remembers between
+                   * sessions. Default is "text" (cheap, always works);
+                   * "visual" renders one sandboxed iframe per slide
+                   * (heavier; depends on file:// allowing iframe
+                   * loads, which works in normal desktop browsers). */
+                  '    <span style="margin-left:auto;display:flex;gap:0.3rem;align-items:center;color:#999;text-transform:none;letter-spacing:normal;font-weight:normal;font-size:0.85em;">',
+                  '      <button id="grid-mode-text" class="scene-btn" style="font-size:0.85em;padding:0.15rem 0.5rem;">Text</button>',
+                  '      <button id="grid-mode-visual" class="scene-btn" style="font-size:0.85em;padding:0.15rem 0.5rem;">Visual</button>',
+                  '    </span>',
                   '    <span id="nav-counter" style="color:#999;font-size:0.85em;font-weight:normal;text-transform:none;letter-spacing:normal;">—</span>',
                   '  </div>',
                   '  <div id="slide-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;padding:0.4rem 0.6rem;max-height:260px;overflow-y:auto;">',
@@ -2107,12 +2110,29 @@ ${sectionsHtml}
                   'document.getElementById("timer-reset").onclick = function () { start = Date.now(); paused = true; pausedAt = Date.now(); document.getElementById("timer-pause").textContent = "Start"; applyTimerLabel(); };',
                   /* v0.11.67: slide grid — build tiles from window.opener\\'s
                    * deck DOM (slide titles). Click → goto N. */
-                  /* v0.11.76: render-mode flag baked into the popup
-                   * HTML at build time. When true, slide tiles are
-                   * sandboxed iframes pinned to slide N (visual
-                   * thumbnails). Default false renders text-only
-                   * "N — title" tiles (cheap; the safe default). */
-                  'var SLIDES_NG_RENDERED_GRID = ${popupRenderedGrid ? "true" : "false"};',
+                  /* v0.11.78: runtime grid mode driven by localStorage.
+                   * Both code paths are always baked in — the user
+                   * picks via the Text / Visual buttons in the
+                   * Slides panel header. Default = "text" (cheap,
+                   * predictable). "visual" renders one sandboxed
+                   * iframe per slide (heavy). */
+                  'var SLIDES_NG_GRID_LS_KEY = "slides-ng-popup-grid-mode";',
+                  'function getGridMode() {',
+                  '  try { return localStorage.getItem(SLIDES_NG_GRID_LS_KEY) === "visual" ? "visual" : "text"; }',
+                  '  catch (_) { return "text"; }',
+                  '}',
+                  'function setGridMode(mode) {',
+                  '  try { localStorage.setItem(SLIDES_NG_GRID_LS_KEY, mode); } catch (_) {}',
+                  '  syncGridModeButtons();',
+                  '  buildSlideGrid();',
+                  '}',
+                  'function syncGridModeButtons() {',
+                  '  var mode = getGridMode();',
+                  '  var t = document.getElementById("grid-mode-text");',
+                  '  var v = document.getElementById("grid-mode-visual");',
+                  '  if (t) t.classList.toggle("active", mode === "text");',
+                  '  if (v) v.classList.toggle("active", mode === "visual");',
+                  '}',
                   'function buildSlideGrid() {',
                   '  var grid = document.getElementById("slide-grid");',
                   '  if (!grid) return;',
@@ -2143,7 +2163,7 @@ ${sectionsHtml}
                    * the deck init script as a goto + freeze
                    * directive). One iframe per slide is heavy for big
                    * decks; that is why this is opt-in. */
-                  '    if (SLIDES_NG_RENDERED_GRID) {',
+                  '    if (getGridMode() === "visual") {',
                   '      var deckUrlBase = "' + deckUrl + '";',
                   '      grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(180px, 1fr))";',
                   '      for (var i = 0; i < sections.length; i++) {',
@@ -2153,7 +2173,12 @@ ${sectionsHtml}
                   '        tile.style.cssText = "background:#000;border:1px solid #333;border-radius:4px;padding:0;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;overflow:hidden;transition:border-color 80ms ease;aspect-ratio:16/9;position:relative;";',
                   '        var fr = document.createElement("iframe");',
                   '        fr.src = deckUrlBase + "?slidesNgPinSlide=" + i;',
+                  /* v0.11.78: minimum sandbox — scripts for reveal
+                   * init, same-origin so reveal can fetch its
+                   * relative theme/script paths. No allow-popups,
+                   * no allow-forms, no allow-top-navigation, etc. */
                   '        fr.setAttribute("sandbox", "allow-scripts allow-same-origin");',
+                  '        fr.setAttribute("loading", "lazy");',
                   '        fr.style.cssText = "border:0;width:100%;height:100%;pointer-events:none;background:#000;";',
                   '        var badge = document.createElement("div");',
                   '        badge.textContent = String(i + 1);',
@@ -2205,7 +2230,20 @@ ${sectionsHtml}
                   '    tiles[i].style.boxShadow = isCurrent ? "0 0 0 2px rgba(66,175,250,0.25)" : "";',
                   '  }',
                   '}',
-                  'setTimeout(buildSlideGrid, 400);',
+                  'setTimeout(function () { syncGridModeButtons(); buildSlideGrid(); }, 400);',
+                  /* v0.11.78: wire the mode toggle buttons. Resets
+                   * grid columns first so swapping back to text drops
+                   * the wider visual-tile column layout. */
+                  '(function () {',
+                  '  var t = document.getElementById("grid-mode-text");',
+                  '  var v = document.getElementById("grid-mode-visual");',
+                  '  if (t) t.addEventListener("click", function () {',
+                  '    var g = document.getElementById("slide-grid");',
+                  '    if (g) g.style.gridTemplateColumns = "repeat(auto-fill, minmax(110px, 1fr))";',
+                  '    setGridMode("text");',
+                  '  });',
+                  '  if (v) v.addEventListener("click", function () { setGridMode("visual"); });',
+                  '})();',
                   /* v0.11.42: broadcast nav/scene cmds to BOTH the
                    * opener (main deck) AND the popup\\'s current-frame
                    * iframe so the speaker sees a mirror of what the

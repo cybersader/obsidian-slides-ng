@@ -87,14 +87,6 @@ export interface RenderDefaults {
   /** Show reveal.js-menu hamburger plugin in embedded mode. */
   showRevealMenuEmbedded?: boolean;
   /**
-   * v0.11.76: render the slide-picker grid in the browser speaker
-   * popup as iframe-rendered thumbnails (one iframe per slide,
-   * pinned to that slide) instead of the default text-only tiles.
-   * CPU/memory heavy for large decks — opt-in via the
-   * experimentalPopupRenderedGrid setting.
-   */
-  popupRenderedGrid?: boolean;
-  /**
    * v0.11.41: PowerPoint-style click-to-advance. When true, clicking
    * anywhere on a slide (outside links / interactive controls)
    * advances to the next slide. Off by default.
@@ -237,9 +229,6 @@ export function renderDeckFromAst(
   }
   if (defaults.showRevealMenuEmbedded !== undefined) {
     defaultLayer.showRevealMenuEmbedded = defaults.showRevealMenuEmbedded;
-  }
-  if (defaults.popupRenderedGrid !== undefined) {
-    defaultLayer.popupRenderedGrid = defaults.popupRenderedGrid;
   }
   if (defaults.clickToProgress !== undefined) {
     defaultLayer.clickToProgress = defaults.clickToProgress;

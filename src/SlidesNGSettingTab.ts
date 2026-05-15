@@ -430,19 +430,6 @@ export class SlidesNGSettingTab extends PluginSettingTab {
         );
       });
 
-    new Setting(containerEl)
-      .setName("Experimental: rendered slide grid in browser speaker popup")
-      .setDesc(
-        "Replace the text-only slide grid in the browser speaker controls with iframe-rendered thumbnails (one per slide, like the in-Obsidian picker). Looks like the real deck but is CPU/memory heavy for large decks. Default off; text grid is the safe default."
-      )
-      .addToggle((t) => {
-        t.setValue(this.plugin.settings.experimentalPopupRenderedGrid).onChange(
-          async (v) => {
-            this.plugin.settings.experimentalPopupRenderedGrid = v;
-            await this.plugin.saveSettings();
-          }
-        );
-      });
 
     // ---------- Speaker panels ----------
     new Setting(containerEl).setName("Speaker panels").setHeading();
