@@ -735,6 +735,18 @@ export function buildIframeHtml(
     html.print-pdf.notes-emphasis body {
       background: #fff !important;
       color: #222 !important;
+      /* v0.11.52: force browsers to honor backgrounds even when
+       * the print dialog\\'s "Background graphics" is unchecked
+       * (Chrome default). Without this, the dark slide-card
+       * background dropped silently and the white headings became
+       * invisible on the white page. Both modern and webkit-
+       * prefixed versions for browser compatibility. */
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html.print-pdf.notes-emphasis * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     html.print-pdf.notes-emphasis .reveal {
       position: static !important;
@@ -805,6 +817,14 @@ export function buildIframeHtml(
       break-inside: avoid !important;
       margin: 0 !important;
       gap: 0.2in !important;
+      /* v0.11.52: force the browser to render the dark slide-card
+       * background even when the user has Chrome\\'s "Background
+       * graphics" print option turned off (it\\'s OFF by default,
+       * which is why the v0.11.51 user-reported "white empty card,
+       * no headings" PDF bug happened: bg dropped to white, color
+       * stayed white = white-on-white, invisible). */
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     /* Headings inside the slide card — explicit light color so the
      * H1 doesn\\'t inherit the page-body dark color and disappear
