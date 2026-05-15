@@ -1964,11 +1964,13 @@ ${sectionsHtml}
                   '.notes { padding: 0.6rem 0.8rem; overflow-y: auto; flex: 1 1 auto; font-size: 1em; line-height: 1.5; }',
                   '.notes .empty { color: #666; font-style: italic; }',
                   '.notes br { display: block; margin-bottom: 0.5em; }',
-                  /* v0.11.80: panel overflow + min-height: 0 so the
-                   * timer panel can\\'t push its 3.5em digit display
-                   * past its grid cell. flex-children inherit min-
-                   * height auto from the spec, which prevents shrink. */
-                  '.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1 1 auto; gap: 0.3rem; min-height: 0; overflow: hidden; }',
+                  /* v0.11.80/v0.11.81: panel overflow + min-height: 0
+                   * so the timer panel can\\'t push its 3.5em digit
+                   * display past its grid cell. justify-content moved
+                   * to space-around so when the panel is short, the
+                   * buttons + digits + dropdown share remaining space
+                   * proportionally instead of all-or-nothing clipping. */
+                  '.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: space-around; flex: 1 1 auto; gap: 0.2rem; min-height: 0; padding: 0.3rem 0.4rem; }',
                   /* clamp the timer between 1.6em and 3.5em — scales
                    * down on short popups (vh = viewport height) but
                    * never below the readable floor. Avoids
@@ -2028,8 +2030,11 @@ ${sectionsHtml}
                   /* v0.11.79: explicit grid placement — col span all,
                    * row 4 (the new auto-sized row). max-height bounds
                    * the panel so it can\\'t push above into the timer/
-                   * notes panels above. */
-                  '<div class="panel" style="grid-column: 1 / -1; grid-row: 4; min-height: 0; max-height: 280px;">',
+                   * notes panels above. v0.11.81: proportional cap
+                   * (min of 280px or 35vh) so short popups don\\'t
+                   * see this panel eat the whole viewport and starve
+                   * the slide-preview / notes / timer panels. */
+                  '<div class="panel" style="grid-column: 1 / -1; grid-row: 4; min-height: 0; max-height: min(280px, 35vh);">',
                   '  <div class="label" style="display:flex;justify-content:space-between;align-items:center;padding-right:0.6rem;gap:0.5rem;flex-wrap:nowrap;">',
                   '    <span style="flex:0 0 auto;">Slides</span>',
                   /* v0.11.78: runtime mode toggle. Choice persists

@@ -29,7 +29,7 @@ body { display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) aut
 .frame-aspect { aspect-ratio: 960 / 700; background: #000; border: 1px solid #222; max-width: 100%; max-height: 100%; position: relative; display: flex; align-items: center; justify-content: center; color: #555; font-size: 0.85em; }
 .notes { padding: 0.6rem 0.8rem; overflow-y: auto; flex: 1 1 auto; font-size: 1em; line-height: 1.5; }
 .notes .empty { color: #666; font-style: italic; }
-.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1 1 auto; gap: 0.3rem; min-height: 0; overflow: hidden; }
+.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: space-around; flex: 1 1 auto; gap: 0.2rem; min-height: 0; padding: 0.3rem 0.4rem; }
 .timer { font-family: monospace; font-size: clamp(1.6em, 6vh, 3.5em); color: #e0e0e0; line-height: 1; }
 .timer-controls { display: flex; gap: 0.4rem; margin-top: 0.5rem; justify-content: center; }
 .timer-controls button { background: #222; color: #ccc; border: 1px solid #444; padding: 0.25rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
@@ -66,7 +66,7 @@ body { display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) aut
     <div class="timer-controls"><button>Start</button><button>Reset</button></div></div>
   </div>
 </div>
-<div class="panel" style="grid-column: 1 / -1; grid-row: 4; min-height: 0; max-height: 280px;">
+<div class="panel" style="grid-column: 1 / -1; grid-row: 4; min-height: 0; max-height: min(280px, 35vh);">
   <div class="label" style="display:flex;justify-content:space-between;align-items:center;padding-right:0.6rem;gap:0.5rem;flex-wrap:nowrap;">
     <span style="flex:0 0 auto;">Slides</span>
     <span style="margin-left:auto;display:flex;gap:0.25rem;align-items:center;color:#999;text-transform:none;letter-spacing:normal;font-weight:normal;font-size:0.8em;flex:0 0 auto;">
@@ -91,9 +91,27 @@ const path = `${outDir}/popup-only.html`;
 writeFileSync(path, html);
 console.log(`Wrote ${path}`);
 
-for (const size of [{w: 1100, h: 800}, {w: 900, h: 700}, {w: 700, h: 600}]) {
+const sizes = [
+  // Standard / aspirational
+  {w: 1100, h: 800, label: "popup-default"},
+  {w: 1920, h: 1080, label: "full-hd"},
+  // Wide + short — second monitor in landscape
+  {w: 1400, h: 500, label: "wide-short"},
+  {w: 1600, h: 600, label: "wider-short"},
+  // Narrow + tall — portrait monitor
+  {w: 500, h: 900, label: "narrow-tall"},
+  {w: 600, h: 1000, label: "portrait"},
+  // Square / cramped
+  {w: 800, h: 800, label: "square"},
+  // Small
+  {w: 700, h: 600, label: "small"},
+  {w: 600, h: 500, label: "tiny"},
+  // Very wide
+  {w: 2000, h: 700, label: "ultrawide"},
+];
+for (const size of sizes) {
   await new Promise((res) => {
-    const out = `${outDir}/screenshot-${size.w}x${size.h}.png`;
+    const out = `${outDir}/${size.label}-${size.w}x${size.h}.png`;
     const chrome = spawn(CHROME, [
       "--headless=new", "--no-sandbox", "--disable-gpu",
       `--window-size=${size.w},${size.h}`,
