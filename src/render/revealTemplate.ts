@@ -724,32 +724,138 @@ export function buildIframeHtml(
     html.print-pdf.show-notes .reveal .slides > section {
       height: 70vh !important;
     }
-    /* v0.11.45: notes-emphasis layout. Slide is a small block at
-     * the top of the page; notes get the rest. Useful for lecture-
-     * style handouts where the audience reads the notes more than
-     * the slide. Layered AFTER .show-notes so it overrides. */
-    html.print-pdf.notes-emphasis .reveal .slides > section {
-      height: 35vh !important;
-      padding: 1rem 2rem !important;
-    }
-    html.print-pdf.notes-emphasis .reveal aside.notes {
-      min-height: 55vh !important;
-      font-size: 0.95em !important;
-      padding: 1.25rem 2rem !important;
-      margin-top: 1rem !important;
-      background: #fafafa !important;
+    /* v0.11.50: notes-emphasis is now a "Notes Pages" handout
+     * layout (matches PowerPoint Notes Pages view). Each slide page
+     * has a slide visual sized like a real slide at the top, then
+     * notes flow naturally below. If notes overflow, they wrap to
+     * the next page. Engaged by the forcePrintMode + forceShowNotes
+     * + forceNotesEmphasis combination. Overrides reveal's print
+     * positioning so content can flow as a normal document. */
+    html.print-pdf.notes-emphasis,
+    html.print-pdf.notes-emphasis body {
+      background: #fff !important;
       color: #222 !important;
+    }
+    html.print-pdf.notes-emphasis .reveal {
+      position: static !important;
+      background: #fff !important;
+      color: #222 !important;
+    }
+    html.print-pdf.notes-emphasis .reveal .slides {
+      position: static !important;
+      display: block !important;
+      width: auto !important;
+      height: auto !important;
+      transform: none !important;
+      left: 0 !important;
+      top: 0 !important;
+    }
+    html.print-pdf.notes-emphasis .reveal .slides > section {
+      position: static !important;
+      display: block !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      width: 100% !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      padding: 0 !important;
+      margin: 0 0 0.4in 0 !important;
+      box-sizing: border-box !important;
+      transform: none !important;
+      background: #fff !important;
+      color: #222 !important;
+      page-break-after: always !important;
+      break-after: page !important;
       page-break-inside: auto !important;
       break-inside: auto !important;
     }
-    /* v0.11.49: notes-emphasis layout already styles aside.notes as
-     * the BIG notes block. Reveal\\'s own print + showNotes adds a
-     * second .speaker-notes element on every page with the same
-     * content (and a "Speaker notes" CSS ::before label). Hide it —
-     * the user reported duplicated notes in v0.11.48 PDF tests. */
+    html.print-pdf.notes-emphasis .reveal .slides > section:last-of-type {
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
+    /* The "slide visual" — block at top of each page, sized like an
+     * actual rendered slide (~ 16:9, ~45% of page height). Keeps
+     * the deck's theme styling inside the slide-card so it actually
+     * looks like a slide. */
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout {
+      display: block !important;
+      width: 100% !important;
+      aspect-ratio: 16 / 9 !important;
+      max-height: 4.4in !important;
+      background: var(--r-background-color, #191919) !important;
+      color: var(--r-main-color, #fff) !important;
+      padding: 0.35in 0.5in !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      border: 1px solid #aaa !important;
+      border-radius: 4px !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    /* Restore theme heading colors inside the slide card. The
+     * default print-pdf rules above force body to #fff/#222 black;
+     * the slide card needs its own theme colors restored. */
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h1,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h2,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h3,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h4,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout p,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout li,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout span {
+      color: inherit !important;
+    }
+    /* Notes flow naturally below the slide card, no fixed sizes.
+     * Can overflow to the next page if too long. */
+    html.print-pdf.notes-emphasis .reveal aside.notes {
+      position: static !important;
+      display: block !important;
+      visibility: visible !important;
+      width: 100% !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      background: transparent !important;
+      color: #222 !important;
+      padding: 0.25in 0.1in 0.1in 0.1in !important;
+      margin: 0.3in 0 0 0 !important;
+      border-top: 1px solid #ccc !important;
+      font-size: 11pt !important;
+      line-height: 1.55 !important;
+      font-style: normal !important;
+      page-break-inside: auto !important;
+      break-inside: auto !important;
+    }
+    html.print-pdf.notes-emphasis .reveal aside.notes::before {
+      content: "Notes";
+      display: block;
+      font-size: 9pt;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 0.15in;
+    }
+    /* Hide reveal\\'s own .speaker-notes injection (still shown in
+     * showNotes mode) — our aside.notes block already covers the
+     * content. (v0.11.49 fix, retained.) */
     html.print-pdf.notes-emphasis .reveal .speaker-notes,
     html.print-pdf.notes-emphasis .speaker-notes {
       display: none !important;
+    }
+    /* Hide reveal print-mode UI clutter inside notes-emphasis. */
+    html.print-pdf.notes-emphasis .reveal .controls,
+    html.print-pdf.notes-emphasis .reveal .progress,
+    html.print-pdf.notes-emphasis .reveal .slide-menu-button,
+    html.print-pdf.notes-emphasis #slides-ng-grid-btn,
+    html.print-pdf.notes-emphasis .reveal .backgrounds {
+      display: none !important;
+    }
+    /* Notes-emphasis sets its own @page margin to leave room for the
+     * card + notes layout. Overrides the user\\'s pageMargin pick
+     * because the layout depends on knowing the printable area. */
+    html.print-pdf.notes-emphasis {
+      --slides-ng-notes-page-margin: 0.6in;
     }
 
     /* v0.11.46: PDF experimentation knobs. Each rule is gated on
@@ -2517,9 +2623,38 @@ ${sectionsHtml}
         var bg = '#000';
         var color = '#fff';
         if (SCENE_INHERIT_THEME_BG && window.getComputedStyle) {
-          var cs = getComputedStyle(document.body);
-          if (cs.backgroundColor) bg = cs.backgroundColor;
-          if (cs.color) color = cs.color;
+          /* v0.11.50: reveal applies the theme background-color to
+           * .reveal-viewport (and main color via CSS variable),
+           * NOT to body. Reading from body returns the default
+           * rgba(0, 0, 0, 0) (transparent) which our previous code
+           * stored as bg — making the scene overlay transparent,
+           * which then showed the slide content underneath. The
+           * user-reported "Stand by" scene rendering dark-on-dark
+           * came from this: bg=transparent, color also resolving to
+           * inherited dark theme color → unreadable.
+           *
+           * Probe in order: body, .reveal-viewport, then :root CSS
+           * variable. The first one to produce a non-transparent
+           * value wins. */
+          function isUseful(c) {
+            return c && c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)';
+          }
+          var bodyCs = getComputedStyle(document.body);
+          var viewportEl = document.querySelector('.reveal-viewport') || document.querySelector('.reveal');
+          var viewportCs = viewportEl ? getComputedStyle(viewportEl) : null;
+          var rootCs = getComputedStyle(document.documentElement);
+          if (isUseful(bodyCs.backgroundColor)) bg = bodyCs.backgroundColor;
+          else if (viewportCs && isUseful(viewportCs.backgroundColor)) bg = viewportCs.backgroundColor;
+          else {
+            var rootBg = rootCs.getPropertyValue('--r-background-color').trim();
+            if (isUseful(rootBg)) bg = rootBg;
+          }
+          if (isUseful(bodyCs.color)) color = bodyCs.color;
+          else if (viewportCs && isUseful(viewportCs.color)) color = viewportCs.color;
+          else {
+            var rootColor = rootCs.getPropertyValue('--r-main-color').trim();
+            if (isUseful(rootColor)) color = rootColor;
+          }
         }
         // v0.11.43/v0.11.44: parent the scene overlay to reveal viewport
         // element instead of document.body. Reveal sizes

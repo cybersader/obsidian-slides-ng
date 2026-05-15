@@ -295,6 +295,13 @@ export async function exportAndOpenForPdf(
   if (pdfOptions.pdfStyle === "slides-notes") {
     merged.forceNotesEmphasis = true;
     merged.forceShowNotes = true;
+    // v0.11.50: notes-emphasis uses its own document-flow pagination
+    // (page-break-after on each section, notes overflow naturally).
+    // Reveal's pdfMaxPagesPerSlide > 1 generates extra empty pages
+    // because reveal allocates fixed page slots per slide. Force
+    // back to 1 — our CSS handles notes overflow with
+    // page-break-inside: auto.
+    merged.forceMaxPagesPerSlide = 1;
   }
   // v0.11.46: pass through all the new tweak options. Each one is
   // a CSS / JS branch in the iframe template; they all default to

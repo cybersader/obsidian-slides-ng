@@ -180,17 +180,23 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain("aspect-ratio: var(--slides-ng-aspect");
   });
 
-  test("forceNotesEmphasis adds notes-emphasis class + bigger-notes CSS (v0.11.45)", () => {
+  test("forceNotesEmphasis renders as 'Notes Pages' handout: slide visual on top, flowing notes (v0.11.50)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {
       forcePrintMode: true,
       forceShowNotes: true,
       forceNotesEmphasis: true,
     });
     expect(html).toContain("classList.add('notes-emphasis')");
-    // The CSS rule that activates when notes-emphasis is on.
+    // v0.11.50: notes-emphasis is now a Notes Pages handout layout.
+    // - section becomes a block-flow page container (position:static)
+    // - .slides-ng-layout (the slide visual) is sized like a slide card
+    // - aside.notes flows naturally below, no fixed sizes, can wrap
     expect(html).toContain("html.print-pdf.notes-emphasis .reveal .slides > section");
-    expect(html).toContain("height: 35vh");
-    expect(html).toContain("min-height: 55vh");
+    expect(html).toContain("aspect-ratio: 16 / 9");
+    expect(html).toContain("page-break-after: always");
+    // Notes block: NO fixed min-height (the v0.11.45 bug),
+    // page-break-inside auto so they can flow.
+    expect(html).toMatch(/notes-emphasis[^{}]*aside\.notes\s*\{[\s\S]{0,1500}?min-height:\s*0/);
   });
 
   test("forceMaxPagesPerSlide bakes pdfMaxPagesPerSlide into initOpts (v0.11.44)", () => {
