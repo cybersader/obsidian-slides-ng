@@ -111,6 +111,7 @@ ballpark.
 |---|---|---|
 | pretext (`chenglou/pretext`) overflow detection at render time — warn or auto-fit slides whose content will clip the bounding box | Low | 2-3 hr (lib is heavy ~200 KB+) |
 | **Auto-fit-aspect-ratio for PDF export** (v0.11.64 user idea) — instead of forcing every slide into a fixed 16:9/4:3 card, measure each slide's content and pick the aspect ratio that fits the content best (per-slide variable card height). Different from `autoShrink` (which shrinks font). Would be an experimental option in the export modal. Doable but needs careful: requires DOM measurement after render, then re-layout. Could also extend to non-PDF rendering. | Low-Medium | 3-5 hr |
+| **Deterministic contrast check for PDF export** (v0.11.65 user idea) — at export time, walk every text element + compute its effective color vs effective background. Flag any pairs whose contrast ratio is below WCAG AA (4.5:1 for body text, 3:1 for large text) OR are literally the same color. Surface as a warning in the Notice / modal so the user can fix bad combos (e.g. theme override that ended up with white text on white slide-card from hide-backgrounds). Pure deterministic — compute hex colors, run WCAG luminance formula. | Medium | 2-3 hr |
 | pretext-driven auto-fit for `cover` / `statement` / `quote` layouts (currently fixed font sizes) | Low | 2-3 hr (same lib) |
 | Fragment animation timing setting | Low | <1 hr |
 | Per-slide `customCSS:` (scoped via generated `[data-slide-uid]` selectors) | Medium | 2 hr — needs slide-uid assignment in parseDeck |

@@ -1011,25 +1011,30 @@ export function buildIframeHtml(
       ${pageMarginCss ? `margin: ${pageMarginCss};` : ""}
     }` : ""}
 
-    /* v0.11.44: document-layout mode for PDF export. The deck flows
-     * as a regular document — no fixed slide-card dimensions, no
-     * theme background, sections page-break between content blocks.
-     * Engaged by the forcePrintDocument template flag (added to
-     * html as .print-document class). Layered ON TOP of the
-     * .print-pdf rules above, so it overrides them where needed.
-     * Higher !important specificity by virtue of being later in the
-     * cascade. */
+    /* v0.11.44/v0.11.65: document-layout mode for PDF export.
+     * v0.11.65 rewrite per user feedback: page ITSELF adopts the
+     * slide theme styling (dark bg, light text) — instead of
+     * rendering content as plain black-on-white text. The PAGE
+     * becomes the slide. Speaker notes are a separate light box
+     * inside the dark page. Reveal\'s normal print-pdf section
+     * positioning is overridden so content flows naturally. */
     html.print-document {
-      background: #fff !important;
+      background: var(--r-background-color, #191919) !important;
     }
     html.print-document body {
-      background: #fff !important;
-      color: #222 !important;
+      background: var(--r-background-color, #191919) !important;
+      color: var(--r-main-color, #ffffff) !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html.print-document * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     html.print-document .reveal {
       position: static !important;
-      background: #fff !important;
-      color: #222 !important;
+      background: var(--r-background-color, #191919) !important;
+      color: var(--r-main-color, #ffffff) !important;
     }
     html.print-document .reveal .slides {
       position: static !important;
@@ -1040,21 +1045,26 @@ export function buildIframeHtml(
       left: 0 !important;
       top: 0 !important;
     }
+    /* v0.11.65: section = full page styled like a slide. Theme bg
+     * + theme color. Generous padding so the content reads like
+     * a single-slide handout. */
     html.print-document .reveal .slides > section {
       position: static !important;
-      display: block !important;
+      display: flex !important;
+      flex-direction: column !important;
       width: 100% !important;
       height: auto !important;
-      min-height: 0 !important;
+      min-height: 9in !important;
       max-height: none !important;
-      padding: 1.5rem 2rem !important;
-      margin: 0 0 1rem 0 !important;
+      padding: 0.8in 0.7in !important;
+      margin: 0 !important;
       visibility: visible !important;
       opacity: 1 !important;
       transform: none !important;
-      background: #fff !important;
-      color: #222 !important;
-      border-bottom: 1px solid #ddd;
+      background: var(--r-background-color, #191919) !important;
+      color: var(--r-main-color, #ffffff) !important;
+      border: none !important;
+      box-sizing: border-box !important;
       page-break-after: always !important;
       break-after: page !important;
       page-break-inside: auto !important;
@@ -1063,32 +1073,49 @@ export function buildIframeHtml(
     html.print-document .reveal .slides > section:last-of-type {
       page-break-after: avoid !important;
       break-after: avoid !important;
-      border-bottom: none;
     }
+    /* Headings inherit theme; preserve uppercase if theme calls
+     * for it (black theme does). */
     html.print-document .reveal .slides > section h1,
     html.print-document .reveal .slides > section h2,
-    html.print-document .reveal .slides > section h3 {
-      color: #111 !important;
-      text-transform: none !important;
+    html.print-document .reveal .slides > section h3,
+    html.print-document .reveal .slides > section h4,
+    html.print-document .reveal .slides > section h5,
+    html.print-document .reveal .slides > section h6 {
+      color: var(--r-heading-color, var(--r-main-color, #ffffff)) !important;
     }
     html.print-document .reveal .slides > section p,
     html.print-document .reveal .slides > section li,
-    html.print-document .reveal .slides > section td {
-      color: #222 !important;
+    html.print-document .reveal .slides > section td,
+    html.print-document .reveal .slides > section span {
+      color: var(--r-main-color, #ffffff) !important;
     }
+    /* Notes block: a separate styled box at the bottom of each
+     * page. Lighter-tinted to contrast with the dark page bg. */
     html.print-document .reveal aside.notes {
       position: static !important;
       display: block !important;
       visibility: visible !important;
-      background: #f7f7f7 !important;
-      color: #555 !important;
-      padding: 0.85rem 1.2rem !important;
-      margin-top: 1.25rem !important;
-      border-left: 4px solid #ccc !important;
-      border-top: none !important;
-      font-size: 0.9em !important;
-      font-style: italic;
-      page-break-inside: avoid !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+      color: #222 !important;
+      padding: 0.4in 0.5in !important;
+      margin-top: 0.4in !important;
+      border: 1px solid rgba(0, 0, 0, 0.18) !important;
+      border-radius: 6px !important;
+      font-size: 11pt !important;
+      font-style: normal !important;
+      line-height: 1.55 !important;
+      page-break-inside: auto !important;
+    }
+    html.print-document .reveal aside.notes::before {
+      content: "Notes";
+      display: block;
+      font-size: 9pt;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 0.15in;
     }
     html.print-document #slides-ng-grid-btn,
     html.print-document .reveal .slide-menu-button,
@@ -1511,6 +1538,31 @@ ${sectionsHtml}
             for (var si = 0; si < sections.length; si++) {
               sections[si].setAttribute('data-slide-number', String(si + 1));
               sections[si].setAttribute('data-slide-total', String(total));
+              /* v0.11.65: inject a REAL DOM element for the slide-
+               * number stamp. The ::before pseudo-element approach
+               * was too fragile (depended on position-relative
+               * ancestors that v0.11.55 inline-styles sometimes
+               * overrode; on a #ffffff section the dark stamp blended
+               * with its own slide-card backdrop). A real positioned
+               * element with inline-styles is foolproof. */
+              if (!sections[si].querySelector('.slides-ng-slide-number-badge')) {
+                var badge = document.createElement('div');
+                badge.className = 'slides-ng-slide-number-badge';
+                badge.textContent = 'Slide ' + (si + 1) + ' / ' + total;
+                badge.style.cssText =
+                  'position:absolute;top:0.25in;right:0.4in;z-index:50;' +
+                  'font-size:9pt;padding:3px 8px;border-radius:3px;' +
+                  'background:rgba(255,255,255,0.92);color:#222;' +
+                  'border:1px solid rgba(0,0,0,0.18);' +
+                  'font-family:var(--r-main-font, sans-serif);' +
+                  'pointer-events:none;' +
+                  '-webkit-print-color-adjust:exact;print-color-adjust:exact;';
+                /* Ensure the section can anchor a position:absolute child. */
+                if (getComputedStyle(sections[si]).position === 'static') {
+                  sections[si].style.setProperty('position', 'relative', 'important');
+                }
+                sections[si].appendChild(badge);
+              }
             }` : ""}
             ${forceHeaderText || forceFooterText ? `for (var hi = 0; hi < sections.length; hi++) {
               ${forceHeaderText ? `var h = document.createElement('div');

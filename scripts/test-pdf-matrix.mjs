@@ -191,12 +191,22 @@ function renderMockup(opts, currentTheme = "black") {
   `;
   // page1
   let page1Inner = "";
+  let pageBgOverride = "";
+  let pageColorOverride = "";
   if (isDoc) {
-    page1Inner = `<div class="doc-heading">Building Resilient Systems</div>
-      <div class="doc-body">
-        ${"<div class='line'></div>".repeat(4)}
+    // v0.11.65: page-as-slide. The page itself gets the theme bg.
+    pageBgOverride = cardBg;
+    pageColorOverride = cardColor;
+    page1Inner = `
+      <div style="font-weight:800;font-size:11px;line-height:1.1;letter-spacing:0.02em;text-align:center;margin-bottom:4px;">BUILDING RESILIENT SYSTEMS</div>
+      <div style="font-size:6px;opacity:0.85;text-align:center;margin-bottom:8px;">Lessons from running production for a decade</div>
+      <div style="display:flex;flex-direction:column;gap:3px;margin:4px 0 8px 0;">
+        ${"<div style='height:3px;background:currentColor;opacity:0.55;width:100%;'></div>".repeat(3)}
       </div>
-      ${opts.showNotes ? `<div class="doc-notes"><div class="label">Notes</div>${"<div class='line line-notes'></div>".repeat(2)}</div>` : ""}`;
+      ${opts.showNotes ? `<div style="background:rgba(255,255,255,0.92);color:#222;border:1px solid rgba(0,0,0,0.18);border-radius:3px;padding:3px 5px;margin-top:auto;display:flex;flex-direction:column;gap:2px;">
+        <div style="font-size:5px;color:#666;text-transform:uppercase;letter-spacing:0.1em;font-weight:600;">Notes</div>
+        ${"<div style='height:2px;background:#888;border-radius:1px;width:100%;'></div>".repeat(2)}
+      </div>` : ""}`;
   } else {
     page1Inner = `<div class="card">
         <div class="title">BUILDING RESILIENT SYSTEMS</div>
@@ -227,9 +237,12 @@ function renderMockup(opts, currentTheme = "black") {
   if (opts.autoShrink) bits.push("auto-shrink");
   if (opts.maxPagesPerSlide && opts.maxPagesPerSlide > 1) bits.push(`max ${opts.maxPagesPerSlide} pgs/slide`);
 
+  const pageInlineStyle = pageBgOverride
+    ? `style="background:${pageBgOverride} !important;color:${pageColorOverride} !important;"`
+    : "";
   return `<!doctype html><html><head><meta charset="utf-8"><style>${styles}</style></head><body>
     <div class="pages-row">
-      <div class="page">
+      <div class="page" ${pageInlineStyle}>
         ${opts.headerText ? `<div class="page-header">${opts.headerText}</div>` : ""}
         <div class="inner">${page1Inner}</div>
         ${opts.footerText ? `<div class="page-footer">${opts.footerText}</div>` : ""}

@@ -1227,6 +1227,62 @@
   flex-direction: column;
   gap: 2px;
 }
+/* v0.11.65: document-handout page-as-slide mockup. Page itself
+ * gets the theme bg + light text; notes are a separate box. */
+.mockup-doc-page {
+  background: #191919 !important;
+  color: #fff !important;
+}
+.mockup-doc-page[data-doc-theme="white"],
+.mockup-doc-page[data-doc-theme="beige"],
+.mockup-doc-page[data-doc-theme="simple"],
+.mockup-doc-page[data-doc-theme="serif"] {
+  background: #f5f5f0 !important;
+  color: #222 !important;
+}
+.mockup-doc-page[data-doc-theme="dracula"] { background: #282a36 !important; }
+.mockup-doc-page[data-doc-theme="solarized"] { background: #fdf6e3 !important; color: #586e75 !important; }
+.mockup-doc-heading-themed {
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  margin-bottom: 4px;
+  text-align: center;
+}
+.mockup-doc-subtitle {
+  font-size: 6px;
+  opacity: 0.85;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.mockup-doc-body-themed {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 4px 0 8px 0;
+}
+.mockup-line-themed {
+  background: currentColor;
+  opacity: 0.55;
+}
+.mockup-doc-notes-themed {
+  background: rgba(255, 255, 255, 0.92);
+  color: #222;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 3px;
+  padding: 3px 5px;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mockup-doc-notes-themed .mockup-label {
+  color: #666;
+}
+.mockup-doc-notes-themed .mockup-line-notes {
+  background: #888;
+}
 .slides-ng-export-pdf-mockup-summary {
   font-size: 0.7rem;
   color: var(--text-muted);

@@ -376,22 +376,31 @@ export class ExportPdfOptionsModal extends Modal {
     page.appendChild(inner);
 
     if (opts.pdfStyle === "document") {
-      // Flowing document — section header + body + notes
+      // v0.11.65: page ITSELF adopts the slide theme styling.
+      // The page IS the slide. No card-within-page. Notes are a
+      // light box at the bottom.
+      const themeName = opts.hideBackgrounds ? "white" : (opts.themeOverride ?? this.currentTheme ?? "black");
+      page.classList.add("mockup-doc-page");
+      page.setAttribute("data-doc-theme", themeName);
       const heading = document.createElement("div");
-      heading.className = "mockup-doc-heading";
-      heading.textContent = "Building Resilient Systems";
+      heading.className = "mockup-doc-heading-themed";
+      heading.textContent = "BUILDING RESILIENT SYSTEMS";
       inner.appendChild(heading);
+      const sub = document.createElement("div");
+      sub.className = "mockup-doc-subtitle";
+      sub.textContent = "Lessons from running production for a decade";
+      inner.appendChild(sub);
       const body = document.createElement("div");
-      body.className = "mockup-doc-body";
-      for (let i = 0; i < 4; i++) {
+      body.className = "mockup-doc-body-themed";
+      for (let i = 0; i < 3; i++) {
         const line = document.createElement("div");
-        line.className = "mockup-line";
+        line.className = "mockup-line mockup-line-themed";
         body.appendChild(line);
       }
       inner.appendChild(body);
       if (opts.showNotes) {
         const notes = document.createElement("div");
-        notes.className = "mockup-doc-notes";
+        notes.className = "mockup-doc-notes-themed";
         notes.appendChild(this.makeLabel("Notes"));
         for (let i = 0; i < 2; i++) {
           const line = document.createElement("div");
