@@ -1934,8 +1934,14 @@ ${sectionsHtml}
                   '<meta charset="utf-8">',
                   '<title>Slides NG — Speaker view</title>',
                   '<style>',
-                  'html, body { margin: 0; height: 100%; background: #1a1a1a; color: #fff; font-family: sans-serif; }',
-                  'body { display: grid; grid-template-rows: auto 1fr 1fr; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; box-sizing: border-box; }',
+                  'html, body { margin: 0; height: 100%; background: #1a1a1a; color: #fff; font-family: sans-serif; overflow: hidden; }',
+                  /* v0.11.79: explicit 4-row grid + minmax(0, 1fr) so
+                   * panels never overflow their cells. Was auto/1fr/1fr,
+                   * and the slides panel (the 5th item) auto-flowed
+                   * into a phantom 4th row whose height wasn\\'t
+                   * capped — caused the slides grid to overlap the
+                   * notes / timer panels above. */
+                  'body { display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; box-sizing: border-box; overflow: hidden; }',
                   '.scenes-bar { grid-column: 1 / -1; background: #0a0a0a; border: 1px solid #333; border-radius: 6px; padding: 0.4rem 0.6rem; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }',
                   '.scenes-bar .scene-label { font-size: 0.75em; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.4rem; }',
                   '.scene-btn { background: #2a2a2a; color: #e0e0e0; border: 1px solid #444; border-radius: 4px; padding: 0.3rem 0.6rem; cursor: pointer; font-size: 0.85em; transition: background 80ms ease, border-color 80ms ease; }',
@@ -2011,22 +2017,28 @@ ${sectionsHtml}
                   /* v0.11.67: slide picker grid. Auto-fitting tile
                    * layout reading slide titles from window.opener\\'s
                    * deck DOM. Click a tile → goto that slide. */
-                  '<div class="panel" style="grid-column: 1 / -1; min-height: 0;">',
-                  '  <div class="label" style="display:flex;justify-content:space-between;align-items:center;padding-right:0.6rem;gap:0.6rem;">',
-                  '    <span>Slides</span>',
+                  /* v0.11.79: explicit grid placement — col span all,
+                   * row 4 (the new auto-sized row). max-height bounds
+                   * the panel so it can\\'t push above into the timer/
+                   * notes panels above. */
+                  '<div class="panel" style="grid-column: 1 / -1; grid-row: 4; min-height: 0; max-height: 280px;">',
+                  '  <div class="label" style="display:flex;justify-content:space-between;align-items:center;padding-right:0.6rem;gap:0.5rem;flex-wrap:nowrap;">',
+                  '    <span style="flex:0 0 auto;">Slides</span>',
                   /* v0.11.78: runtime mode toggle. Choice persists
                    * to localStorage so the popup remembers between
-                   * sessions. Default is "text" (cheap, always works);
-                   * "visual" renders one sandboxed iframe per slide
-                   * (heavier; depends on file:// allowing iframe
-                   * loads, which works in normal desktop browsers). */
-                  '    <span style="margin-left:auto;display:flex;gap:0.3rem;align-items:center;color:#999;text-transform:none;letter-spacing:normal;font-weight:normal;font-size:0.85em;">',
-                  '      <button id="grid-mode-text" class="scene-btn" style="font-size:0.85em;padding:0.15rem 0.5rem;">Text</button>',
-                  '      <button id="grid-mode-visual" class="scene-btn" style="font-size:0.85em;padding:0.15rem 0.5rem;">Visual</button>',
+                   * sessions. Default is "text"; "visual" renders
+                   * one sandboxed iframe per slide. */
+                  '    <span style="margin-left:auto;display:flex;gap:0.25rem;align-items:center;color:#999;text-transform:none;letter-spacing:normal;font-weight:normal;font-size:0.8em;flex:0 0 auto;">',
+                  '      <button id="grid-mode-text" class="scene-btn" style="font-size:0.8em;padding:0.1rem 0.4rem;">Text</button>',
+                  '      <button id="grid-mode-visual" class="scene-btn" style="font-size:0.8em;padding:0.1rem 0.4rem;">Visual</button>',
                   '    </span>',
-                  '    <span id="nav-counter" style="color:#999;font-size:0.85em;font-weight:normal;text-transform:none;letter-spacing:normal;">—</span>',
+                  '    <span id="nav-counter" style="color:#999;font-size:0.85em;font-weight:normal;text-transform:none;letter-spacing:normal;flex:0 0 auto;white-space:nowrap;">—</span>',
                   '  </div>',
-                  '  <div id="slide-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;padding:0.4rem 0.6rem;max-height:260px;overflow-y:auto;">',
+                  /* min-height: 0 + flex: 1 lets the grid use the
+                   * remaining panel space; overflow-y: auto means
+                   * tiles scroll if they exceed the panel\\'s capped
+                   * height. */
+                  '  <div id="slide-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;padding:0.4rem 0.6rem;min-height:0;flex:1 1 auto;overflow-y:auto;">',
                   '    <!-- tiles injected at runtime -->',
                   '  </div>',
                   '  <div style="display:flex;gap:0.4rem;padding:0.3rem 0.6rem;border-top:1px solid #333;">',
