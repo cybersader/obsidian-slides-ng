@@ -2450,6 +2450,44 @@ ${sectionsHtml}
                   '  if (typeof idx === "number") msg.idx = idx;',
                   '  try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, "*"); } catch (_) {}',
                   '}',
+                  /* v0.11.84: layout-diagnostics — capture key element
+                   * rects every second after layout settles and post
+                   * them to the opener, which logs to debug.log.
+                   * Helps me see what the user actually sees without
+                   * needing an external screenshot tool. */
+                  'function captureLayoutSnapshot() {',
+                  '  function rectOf(id) {',
+                  '    var el = document.getElementById(id);',
+                  '    if (!el) return null;',
+                  '    var r = el.getBoundingClientRect();',
+                  '    return { id: id, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };',
+                  '  }',
+                  '  function rectOfSel(sel) {',
+                  '    var els = document.querySelectorAll(sel);',
+                  '    var out = [];',
+                  '    for (var i = 0; i < els.length; i++) {',
+                  '      var r = els[i].getBoundingClientRect();',
+                  '      out.push({ sel: sel, idx: i, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });',
+                  '    }',
+                  '    return out;',
+                  '  }',
+                  '  var snap = {',
+                  '    viewport: window.innerWidth + "x" + window.innerHeight,',
+                  '    gridMode: getGridMode ? getGridMode() : "?",',
+                  '    panels: rectOfSel(".panel"),',
+                  '    scenesBar: rectOfSel(".scenes-bar"),',
+                  '    timer: rectOf("timer"),',
+                  '    timerPause: rectOf("timer-pause"),',
+                  '    timerReset: rectOf("timer-reset"),',
+                  '    slideGrid: rectOf("slide-grid"),',
+                  '    firstTile: rectOfSel(".slide-tile")[0] || null,',
+                  '    navCounter: rectOf("nav-counter"),',
+                  '  };',
+                  '  try { if (window.opener && !window.opener.closed) window.opener.postMessage({ type: "slides-ng-popup-layout", snap: snap, time: Date.now() }, "*"); } catch (_) {}',
+                  '}',
+                  'setTimeout(captureLayoutSnapshot, 1000);',
+                  'setTimeout(captureLayoutSnapshot, 3000);',
+                  'window.addEventListener("resize", function () { setTimeout(captureLayoutSnapshot, 200); });',
                   'document.getElementById("nav-prev").addEventListener("click", function () { navCmd("prev"); });',
                   'document.getElementById("nav-next").addEventListener("click", function () { navCmd("next"); });',
                   'document.getElementById("nav-first").addEventListener("click", function () { navCmd("first"); });',
@@ -2650,6 +2688,20 @@ ${sectionsHtml}
               window.addEventListener('message', function (e) {
                 if (e.data && e.data.type === 'slides-ng-speaker-poke') {
                   postStateToSpeaker();
+                }
+                /* v0.11.84: forward popup layout snapshots to the
+                 * parent (Obsidian view), which logs to debug.log so
+                 * I can diagnose layout issues remotely. */
+                if (e.data && e.data.type === 'slides-ng-popup-layout') {
+                  try {
+                    if (window.parent && window.parent !== window) {
+                      window.parent.postMessage({
+                        type: 'slides-ng-popup-layout',
+                        snap: e.data.snap,
+                        time: e.data.time,
+                      }, '*');
+                    }
+                  } catch (_) {}
                 }
               });
               function openSpeakerPopup() {
