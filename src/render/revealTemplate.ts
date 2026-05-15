@@ -936,6 +936,30 @@ export function buildIframeHtml(
     html.print-pdf.notes-emphasis {
       --slides-ng-notes-page-margin: 0.6in;
     }
+    /* v0.11.69: hideBackgrounds override for the notes-emphasis slide
+     * card. The card has hardcoded #191919 / #fff so hideBackgrounds
+     * had no effect on it. Drop to white + dark text when on. */
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout {
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+      color: #222222 !important;
+      border-color: #c0c0c0 !important;
+    }
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout h1,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout h2,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout h3,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout h4,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout h5,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout h6,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout p,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout li,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout span,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout strong,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout em,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout ul,
+    html.print-pdf.notes-emphasis.pdf-hide-backgrounds .reveal .slides > section > .slides-ng-layout ol {
+      color: #222222 !important;
+    }
 
     /* v0.11.46: PDF experimentation knobs. Each rule is gated on
      * a class added by the forcePrintMode init branch, so off-by-
@@ -1129,6 +1153,38 @@ export function buildIframeHtml(
     html.print-document .reveal section[data-background-image] {
       background-color: #fff !important;
       background-image: none !important;
+    }
+    /* v0.11.69: hideBackgrounds override for print-document. The
+     * theme-bg + theme-color rules above bake in the dark slide
+     * styling; hideBackgrounds must drop the page to white and
+     * recolor headings/body to dark for legibility. */
+    html.print-document.pdf-hide-backgrounds,
+    html.print-document.pdf-hide-backgrounds body,
+    html.print-document.pdf-hide-backgrounds .reveal,
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section {
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+      color: #222222 !important;
+    }
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section h1,
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section h2,
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section h3,
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section h4,
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section h5,
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section h6,
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section p,
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section li,
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section td,
+    html.print-document.pdf-hide-backgrounds .reveal .slides > section span {
+      color: #222222 !important;
+    }
+    /* The "Notes" sidebox is already light/dark contrasted; keep it
+     * but tone the bg down so it doesn\\'t look like a white card on
+     * white page. Border + subtle bg-tint. */
+    html.print-document.pdf-hide-backgrounds .reveal aside.notes {
+      background: #f5f5f5 !important;
+      color: #222 !important;
+      border: 1px solid #ccc !important;
     }
     /* v0.11.34: hamburger button contrast. The default reveal-menu
      * button is too transparent and disappears against light slide
@@ -1406,6 +1462,14 @@ ${sectionsHtml}
          * anything funky. */
         function applyNotesEmphasisInline() {
           try {
+            /* v0.11.69: hideBackgrounds opts out of the dark slide-card
+             * theme. Use white card + dark text instead. */
+            var hideBg = document.documentElement.classList.contains('pdf-hide-backgrounds');
+            var cardBg = hideBg ? '#ffffff' : '#191919';
+            var cardColor = hideBg ? '#222222' : '#ffffff';
+            var headColor = hideBg ? '#222222' : '#ffffff';
+            var bodyColor = hideBg ? '#444444' : '#e8e8e8';
+            var borderCol = hideBg ? '#c0c0c0' : '#444';
             var layouts = document.querySelectorAll('.slides-ng-layout');
             for (var li = 0; li < layouts.length; li++) {
               var el = layouts[li];
@@ -1418,21 +1482,21 @@ ${sectionsHtml}
               el.style.setProperty('height', '4in', 'important');
               el.style.setProperty('min-height', '4in', 'important');
               el.style.setProperty('max-height', '4in', 'important');
-              el.style.setProperty('background', '#191919', 'important');
-              el.style.setProperty('background-color', '#191919', 'important');
-              el.style.setProperty('color', '#ffffff', 'important');
+              el.style.setProperty('background', cardBg, 'important');
+              el.style.setProperty('background-color', cardBg, 'important');
+              el.style.setProperty('color', cardColor, 'important');
               el.style.setProperty('padding', '0.35in 0.5in', 'important');
               el.style.setProperty('box-sizing', 'border-box', 'important');
               el.style.setProperty('overflow', 'hidden', 'important');
-              el.style.setProperty('border', '1px solid #444', 'important');
+              el.style.setProperty('border', '1px solid ' + borderCol, 'important');
               el.style.setProperty('border-radius', '4px', 'important');
               el.style.setProperty('margin', '0 0 0.3in 0', 'important');
               el.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
               el.style.setProperty('print-color-adjust', 'exact', 'important');
-              /* Force every heading inside to white + larger size. */
+              /* Force every heading inside to theme-card-color + larger size. */
               var heads = el.querySelectorAll('h1, h2, h3, h4, h5, h6');
               for (var hi = 0; hi < heads.length; hi++) {
-                heads[hi].style.setProperty('color', '#ffffff', 'important');
+                heads[hi].style.setProperty('color', headColor, 'important');
                 heads[hi].style.setProperty('margin', '0', 'important');
                 heads[hi].style.setProperty('padding', '0', 'important');
                 heads[hi].style.setProperty('text-shadow', 'none', 'important');
@@ -1447,7 +1511,7 @@ ${sectionsHtml}
               }
               var paras = el.querySelectorAll('p, li, span, strong, em');
               for (var pi = 0; pi < paras.length; pi++) {
-                paras[pi].style.setProperty('color', '#e8e8e8', 'important');
+                paras[pi].style.setProperty('color', bodyColor, 'important');
                 paras[pi].style.setProperty('font-size', '14pt', 'important');
                 paras[pi].style.setProperty('line-height', '1.4', 'important');
                 paras[pi].style.setProperty('margin', '0', 'important');

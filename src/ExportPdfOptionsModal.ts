@@ -109,12 +109,12 @@ export class ExportPdfOptionsModal extends Modal {
     new Setting(contentEl)
       .setName("Layout")
       .setDesc(
-        "Slides: full-page slide cards with theme styling (notes ~30% of page when included). Slides + notes emphasis: small slide at the top, notes fill the rest — for lecture handouts. Document: flowing handout, no slide chrome."
+        "Slides: each page IS the slide (full-bleed theme background). Slides + notes emphasis: a small slide card on top, notes fill the rest — for lecture handouts. Document: page IS the slide with notes inline as a panel — flowing handout."
       )
       .addDropdown((d) => {
-        d.addOption("slides", "Slides (cards with theme)");
+        d.addOption("slides", "Slides (page is the slide)");
         d.addOption("slides-notes", "Slides + notes emphasis (small slide, big notes)");
-        d.addOption("document", "Document (flowing handout)");
+        d.addOption("document", "Document (page is the slide + notes panel)");
         d.setValue(this.options.pdfStyle ?? "slides").onChange((v) => {
           this.options.pdfStyle = v as PdfExportOptions["pdfStyle"];
         });
@@ -433,6 +433,9 @@ export class ExportPdfOptionsModal extends Modal {
       title.className = "mockup-slide-title";
       title.textContent = "BUILDING RESILIENT SYSTEMS";
       card.appendChild(title);
+      const accent = document.createElement("div");
+      accent.className = "mockup-slide-accent-bar";
+      card.appendChild(accent);
       const subtitle = document.createElement("div");
       subtitle.className = "mockup-slide-subtitle";
       subtitle.textContent = "Lessons from running production for a decade";
@@ -522,7 +525,7 @@ export class ExportPdfOptionsModal extends Modal {
       ? "Slides + notes emphasis"
       : opts.pdfStyle === "document"
         ? "Document handout"
-        : "Slides (cards with theme)";
+        : "Slides (page is the slide)";
     const bits = [layoutLabel];
     if (opts.aspectRatio && opts.aspectRatio !== "current") bits.push(opts.aspectRatio);
     if (opts.pageSize && opts.pageSize !== "current") bits.push(opts.pageSize.toUpperCase());
