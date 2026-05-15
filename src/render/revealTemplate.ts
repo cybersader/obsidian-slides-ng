@@ -2466,7 +2466,13 @@ ${sectionsHtml}
                   '    return Array.from(document.querySelectorAll(sel)).map(function (el, i) {',
                   '      var r = el.getBoundingClientRect();',
                   '      var label = el.querySelector(".label");',
-                  '      return { sel: sel, idx: i, name: label ? (label.textContent || "").trim().split("\\n")[0].slice(0,20) : "", x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };',
+                  /* v0.11.87: double-escape \\\\n because this string
+                   * passes through TWO JS parsers (deck script then
+                   * popup script). Single \\n becomes a real newline
+                   * after the deck parse, which leaves an unterminated
+                   * string literal in the popup source — breaking the
+                   * entire popup script. */
+                  '      return { sel: sel, idx: i, name: label ? (label.textContent || "").trim().split("\\\\n")[0].slice(0,20) : "", x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };',
                   '    });',
                   '  }',
                   '  function rectsOverlap(a, b) {',
