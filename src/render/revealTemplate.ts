@@ -36,6 +36,11 @@ export interface DeckRenderOptions {
   showRevealControlsEmbedded?: boolean;
   /** Show reveal.js-menu hamburger plugin in embedded mode. */
   showRevealMenuEmbedded?: boolean;
+  /**
+   * v0.11.41: PowerPoint-style click-to-advance. When true, clicking
+   * anywhere on a slide (outside links / inputs / controls) advances.
+   */
+  clickToProgress?: boolean;
   /** Column split ratio for image-left / image-right layouts. */
   imageLayoutSplit?: "50/50" | "60/40" | "40/60";
   /** Line-step dimming opacity (0–1). */
@@ -94,6 +99,7 @@ export function buildIframeHtml(
   const userOptions = options.revealOptions ?? {};
   const showControlsEmbedded = options.showRevealControlsEmbedded ?? false;
   const showMenuEmbedded = options.showRevealMenuEmbedded ?? false;
+  const clickToProgress = options.clickToProgress ?? false;
   const imageSplit = options.imageLayoutSplit ?? "50/50";
   const lineStepDim = options.lineStepDimOpacity ?? 0.32;
   const codeBlockMaxHeight = options.codeBlockMaxHeight ?? "60vh";
@@ -937,6 +943,45 @@ ${sectionsHtml}
                 } catch (_) {}
               }, true);
 
+              /* === Click-to-progress (v0.11.41, opt-in via settings) ===
+               * PowerPoint-style: a click anywhere on a slide that
+               * isn't an interactive element (link, button, input, …)
+               * advances to the next slide. Reveal\\'s own \`controls\`
+               * + \`mouseWheel\` flags don\\'t cover bare slide-area
+               * clicks — we install our own delegating listener. */
+              ${clickToProgress ? `
+              document.addEventListener('click', function (e) {
+                try {
+                  var t = e.target;
+                  if (!t) return;
+                  if (typeof Reveal === 'undefined') return;
+                  /* Walk up looking for an interactive ancestor so we
+                   * don\\'t hijack links, buttons, form controls,
+                   * reveal-menu items, or the picker tiles. */
+                  var node = t;
+                  for (var i = 0; node && i < 12; i++, node = node.parentElement) {
+                    var tag = node.tagName;
+                    if (tag === 'A' || tag === 'BUTTON' || tag === 'INPUT' ||
+                        tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'LABEL' ||
+                        tag === 'SUMMARY' || tag === 'DETAILS') return;
+                    if (node.getAttribute && node.getAttribute('role') === 'button') return;
+                    if (node.classList && (
+                      node.classList.contains('slide-menu') ||
+                      node.classList.contains('slide-menu-button') ||
+                      node.classList.contains('slide-menu-panel') ||
+                      node.classList.contains('reveal') === false &&
+                      node.id === 'slides-ng-grid'
+                    )) return;
+                  }
+                  /* Also skip if there\\'s an open grid overlay or
+                   * scene overlay — clicks there shouldn\\'t advance. */
+                  if (document.getElementById('slides-ng-grid')) return;
+                  var sceneOpen = document.getElementById('slides-ng-scene');
+                  if (sceneOpen && sceneOpen.classList.contains('on')) return;
+                  Reveal.next();
+                } catch (_) { /* swallow — non-fatal */ }
+              });
+              ` : ""}
               /* === Speaker view popup (S key) === */
               var speakerWin = null;
               function buildSpeakerPopupHtml(deckUrl) {
@@ -1124,7 +1169,16 @@ ${sectionsHtml}
                   '  if (!d || d.type !== "slides-ng-speaker-update") return;',
                   '  var notesEl = document.getElementById("notes");',
                   '  if (notesEl) {',
-                  '    notesEl.innerHTML = d.notesHtml ? d.notesHtml : "<span class=\\"empty\\">(no notes for this slide)</span>";',
+                  /* v0.11.41: HTML5 unquoted attribute value — avoids
+                   * a nested-string escaping bug. The previous
+                   * "<span class=\\"empty\\">" form lost a layer of
+                   * backslashes after template-literal processing,
+                   * which caused the popup\\'s "empty" identifier to
+                   * leak out of the surrounding JS string at popup-
+                   * parse time. The popup script then SyntaxError\\'d,
+                   * which is why the timer never moved, scenes never
+                   * rendered, and notes stayed at "(waiting for sync)". */
+                  '    notesEl.innerHTML = d.notesHtml ? d.notesHtml : "<span class=empty>(no notes for this slide)</span>";',
                   '  }',
                   '  var cur = document.getElementById("current-counter");',
                   '  var nxt = document.getElementById("next-counter");',

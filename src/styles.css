@@ -550,13 +550,28 @@
   border-radius: 6px;
   background: var(--background-secondary);
 }
+/* v0.11.41: every direct child of the row must allow itself to
+ * shrink below its content size, otherwise grid columns expand
+ * past their minmax cap and the inputs visibly overlap into the
+ * next column. The label input + icon input overlapping case
+ * was the user-reported bug. */
+.slides-ng-scene-editor-row > * {
+  min-width: 0;
+}
+.slides-ng-scene-editor-row input,
+.slides-ng-scene-editor-row textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
 .slides-ng-scene-editor-icon {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+  min-width: 0;
 }
 .slides-ng-scene-editor-icon input {
   flex: 1 1 auto;
+  min-width: 0;
 }
 .slides-ng-scene-editor-icon-preview {
   display: inline-flex;
@@ -768,12 +783,18 @@
   border: none !important;
   box-shadow: none !important;
   border-radius: 6px;
-  color: var(--text-muted);
+  /* v0.11.41: match Obsidian's view-action (edit-pencil)
+   * transparency. Was solid --text-muted which felt visually
+   * heavy next to the panel header text. Now: native icon color
+   * + reduced opacity at rest, full opacity on hover. */
+  color: var(--icon-color, var(--text-muted));
+  opacity: var(--icon-opacity, 0.55);
   gap: 0;
 }
 .slides-ng-speaker-btn.slides-ng-icon-tool:hover {
   background: var(--background-modifier-hover) !important;
-  color: var(--text-normal);
+  color: var(--icon-color-hover, var(--text-normal));
+  opacity: var(--icon-opacity-hover, 1);
 }
 .slides-ng-speaker-btn.slides-ng-icon-tool:active {
   background: var(--background-modifier-active-hover, var(--background-modifier-hover)) !important;

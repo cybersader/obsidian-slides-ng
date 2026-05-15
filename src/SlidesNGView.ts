@@ -491,6 +491,7 @@ export class SlidesNGView extends ItemView {
         lineStepDimOpacity: settings.lineStepDimOpacity,
         showRevealControlsEmbedded: settings.showRevealControlsEmbedded,
         showRevealMenuEmbedded: settings.showRevealMenuEmbedded,
+        clickToProgress: settings.clickToProgress,
         codeBlockMaxHeight: settings.codeBlockMaxHeight,
         codeBlockOverflowScroll: settings.codeBlockOverflowScroll,
         transitionSpeed: settings.transitionSpeed,
@@ -641,6 +642,9 @@ export class SlidesNGView extends ItemView {
       // v0.11.36: scenes for the standalone speaker-view popup. The
       // markdown content gets rendered to HTML at export time.
       scenes: s.scenes,
+      // v0.11.41: PowerPoint-style click-to-advance flows through
+      // to standalone exports too.
+      clickToProgress: s.clickToProgress,
       // showRevealControlsEmbedded + showRevealMenuEmbedded intentionally
       // not threaded into standalone exports — standalone mode shows
       // controls + menu regardless.

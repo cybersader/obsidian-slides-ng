@@ -108,6 +108,20 @@ export class SlidesNGSettingTab extends PluginSettingTab {
         );
       });
 
+    new Setting(containerEl)
+      .setName("Click to advance slides")
+      .setDesc(
+        "PowerPoint-style: click anywhere on a slide to advance. Clicks on links, buttons and form inputs still work normally. Off by default."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.clickToProgress).onChange(
+          async (v) => {
+            this.plugin.settings.clickToProgress = v;
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
     // ---------- Code ----------
     new Setting(containerEl).setName("Code").setHeading();
 

@@ -86,6 +86,12 @@ export interface RenderDefaults {
   showRevealControlsEmbedded?: boolean;
   /** Show reveal.js-menu hamburger plugin in embedded mode. */
   showRevealMenuEmbedded?: boolean;
+  /**
+   * v0.11.41: PowerPoint-style click-to-advance. When true, clicking
+   * anywhere on a slide (outside links / interactive controls)
+   * advances to the next slide. Off by default.
+   */
+  clickToProgress?: boolean;
   /** Max-height for code blocks before they scroll. CSS length. */
   codeBlockMaxHeight?: string;
   /** Whether code blocks scroll overflow when capped. */
@@ -200,6 +206,9 @@ export function renderDeckFromAst(
   }
   if (defaults.showRevealMenuEmbedded !== undefined) {
     defaultLayer.showRevealMenuEmbedded = defaults.showRevealMenuEmbedded;
+  }
+  if (defaults.clickToProgress !== undefined) {
+    defaultLayer.clickToProgress = defaults.clickToProgress;
   }
   if (defaults.codeBlockMaxHeight) {
     defaultLayer.codeBlockMaxHeight = defaults.codeBlockMaxHeight;

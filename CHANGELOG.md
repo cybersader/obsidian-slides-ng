@@ -6,6 +6,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.41] — 2026-05-15
+
+### Fixed
+
+- **Speaker popup script never ran.** Diagnosed: the `<span
+  class=\"empty\">` HTML literal inside the popup template had
+  one too few backslashes. After the OUTER template literal
+  collapsed `\\` to `\`, the JS engine then collapsed `\"` to
+  `"` — so the popup parser saw `"<span class="empty">"` with
+  bare quotes, treated `empty` as an unexpected identifier, and
+  threw a SyntaxError. The error killed the entire popup
+  `<script>` block, which is why **the timer never moved, the
+  scenes bar never built buttons, and the notes panel stayed at
+  "(waiting for sync…)"** — every symptom came from this one
+  parse error. Fixed by switching to an unquoted HTML5
+  attribute (`class=empty`) — survives every layer of escape
+  with zero backslashes. Added a regression test that parses
+  the generated popup script as JS and fails on any SyntaxError.
+- **Scene-editor inputs (Label / Lucide icon / Markdown content)
+  overlapped in Settings** when the panel was narrow. Grid
+  columns weren't allowed to shrink below their content because
+  `min-width` defaulted to `auto`. Added `min-width: 0` on every
+  direct child of the row and `width: 100%; box-sizing:
+  border-box` on inputs/textareas.
+
+### Added
+
+- **Click-to-advance setting** (Settings → Behaviour →
+  "Click to advance slides"). Off by default. When on, a click
+  anywhere on a slide that isn't a link / button / input
+  advances to the next slide, PowerPoint-style. The handler
+  skips clicks on the Grid overlay, hamburger menu, scene
+  overlay, and reveal-menu controls. Flows through to standalone
+  exports too.
+
+### Changed
+
+- **Picker-header icon buttons (Grid orient + Magnifier-cycle)
+  now match Obsidian's view-action transparency.** Was a solid
+  `--text-muted` color which read as visually heavy next to the
+  panel header label. Now uses `--icon-color` + `--icon-opacity`
+  (≈0.55) at rest, full opacity on hover — same as Obsidian's
+  edit-pencil icon.
+
+### Tests
+
+- `tests/pdfExportOptions.test.ts` — 2 new tests: popup-script
+  JS-parse guard (catches the v0.11.41 regression class) and
+  click-to-progress conditional emission. 24 file-local pass;
+  409 total in the suite.
+
+### Technical
+
+- `src/render/revealTemplate.ts` — popup notes-empty literal
+  switched to `class=empty` (unquoted HTML5 attr). New
+  `clickToProgress` template option emits a delegating click
+  listener that walks ancestors for interactive tags before
+  calling `Reveal.next()`.
+- `src/settings.ts` / `src/SlidesNGSettingTab.ts` — new
+  `clickToProgress` setting (default false) and UI toggle.
+- `src/SlidesNGView.ts` — threads `clickToProgress` into both
+  the embedded render and the standalone export defaults.
+- `src/styles.css` — picker icon-tool buttons use Obsidian's
+  `--icon-color` / `--icon-opacity` vars; scene-editor row
+  children get `min-width: 0` + inputs get `width: 100%`.
+
 ## [0.11.40] — 2026-05-15
 
 ### Fixed

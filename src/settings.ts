@@ -69,6 +69,16 @@ export interface SlidesNGSettings {
   showRevealMenuEmbedded: boolean;
 
   /**
+   * v0.11.41: when on, a click anywhere on a slide advances to the
+   * next slide (PowerPoint-style). Off by default because reveal's
+   * default click behavior is "ignore" — clicking shouldn't navigate
+   * unless the user opts in. Maps to reveal's `mouseWheel: false`
+   * + a custom click handler we install ourselves (reveal\\'s own
+   * `controls`/`mouseWheel` flags don't cover slide-area click).
+   */
+  clickToProgress: boolean;
+
+  /**
    * Max-height for fenced code blocks before they scroll internally.
    * Any valid CSS length (e.g. `"60vh"`, `"400px"`). Use `"none"` to
    * remove the cap entirely.
@@ -391,6 +401,7 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   lineStepDimOpacity: 0.32,
   showRevealControlsEmbedded: false,
   showRevealMenuEmbedded: true,
+  clickToProgress: false,
   codeBlockMaxHeight: "60vh",
   codeBlockOverflowScroll: true,
   transitionSpeed: "default",

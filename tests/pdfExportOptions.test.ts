@@ -124,6 +124,46 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain('fill="currentColor"');
   });
 
+  test("popup HTML's inline <script> body parses as valid JS (v0.11.41 regression guard)", () => {
+    // v0.11.41: the previous popup template had a nested string-escape
+    // bug — the "<span class=\\"empty\\">" literal lost a layer of
+    // backslashes after template-literal processing, so the popup's
+    // JS parser encountered an unescaped `"empty"` identifier outside
+    // a string and SyntaxError'd. That single error killed the timer,
+    // scenes UI, and the localStorage sync handler — which is why
+    // the speaker popup just sat at "(waiting for sync…)".
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    // The popup HTML is generated at runtime inside the iframe. Run
+    // the generator function in this sandbox so we can lint its
+    // output the same way the popup's HTML parser will.
+    const start = html.indexOf("function buildSpeakerPopupHtml");
+    const end = html.indexOf("/* v0.11.37: localStorage-based sync");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const fnSrc = html.slice(start, end);
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const factory = new Function(
+      `${fnSrc} return buildSpeakerPopupHtml("about:blank");`
+    );
+    const popupHtml = factory() as string;
+    const scriptMatch = popupHtml.match(/<script>([\s\S]*?)<\/script>/);
+    expect(scriptMatch).not.toBeNull();
+    // Re-parse the popup's script body the way the popup's JS engine
+    // would. SyntaxError throws here ⇒ the popup is broken end-to-end.
+    expect(() => new Function(scriptMatch![1])).not.toThrow();
+  });
+
+  test("click-to-progress handler is bundled only when option is on (v0.11.41)", () => {
+    const off = renderDeckStandalone(SAMPLE, "deck.md", {});
+    expect(off).not.toMatch(/click[\s\S]{0,80}Reveal\.next/);
+
+    const on = renderDeckStandalone(SAMPLE, "deck.md", {
+      clickToProgress: true,
+    });
+    expect(on).toContain("Reveal.next()");
+    expect(on).toMatch(/addEventListener\(['"]click['"]/);
+  });
+
   test("S-key speaker-view popup helpers are bundled", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {});
     expect(html).toContain("__slidesNgOpenSpeakerView");
