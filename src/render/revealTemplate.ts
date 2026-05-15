@@ -2055,20 +2055,34 @@ ${sectionsHtml}
                   '  gotoFrame("current-frame", d.idx);',
                   '  gotoFrame("next-frame", Math.min(d.idx + 1, d.totalSlides - 1));',
                   '}',
+                  /* v0.11.60: cancel any pending burst-posts for the
+                   * same iframe before scheduling new ones. The
+                   * previous burst (4 posts at 0/100/300/700ms) was
+                   * meant to handle iframe-not-ready-yet, but during
+                   * rapid Prev/Next clicks the older bursts kept
+                   * firing OLD target indexes, fighting the newer
+                   * ones — caused user-reported jitter where slides
+                   * bounced back and forth. */
+                  'var gotoFrameTimers = {};',
                   'function gotoFrame(id, idx) {',
                   '  var f = document.getElementById(id);',
                   '  if (!f || !f.contentWindow) return;',
-                  '  /* Burst — bridge listener inside iframe may install on',
-                  '   * a delayed tick. Cheap. */',
+                  '  /* Cancel any pending posts for this iframe. */',
+                  '  if (gotoFrameTimers[id] && gotoFrameTimers[id].length) {',
+                  '    for (var ti = 0; ti < gotoFrameTimers[id].length; ti++) {',
+                  '      clearTimeout(gotoFrameTimers[id][ti]);',
+                  '    }',
+                  '  }',
+                  '  gotoFrameTimers[id] = [];',
                   '  function post() {',
                   '    try {',
                   '      f.contentWindow.postMessage({ type: "slides-ng-cmd", cmd: "goto", idx: idx }, "*");',
                   '    } catch (_) {}',
                   '  }',
                   '  post();',
-                  '  setTimeout(post, 100);',
-                  '  setTimeout(post, 300);',
-                  '  setTimeout(post, 700);',
+                  '  gotoFrameTimers[id].push(setTimeout(post, 100));',
+                  '  gotoFrameTimers[id].push(setTimeout(post, 300));',
+                  '  gotoFrameTimers[id].push(setTimeout(post, 700));',
                   '}',
                   '/* v0.11.37: receive state from EITHER channel —',
                   ' * postMessage (primary if opener is reachable) OR',
