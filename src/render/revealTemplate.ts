@@ -1383,6 +1383,21 @@ ${sectionsHtml}
           setTimeout(pdfPostInit, 500);
         }
         ` : ""}
+        ${!embedded && forcePrintMode ? `/* v0.11.53: auto-open the
+         * browser print dialog ~1.2s after Reveal init resolves, so
+         * the user doesn\\'t have to hit Ctrl+P manually on the
+         * opened export file. The delay lets reveal finish DOM
+         * layout AND our pdfPostInit/notes-emphasis CSS settle
+         * before window.print() takes its snapshot. */
+        function autoOpenPrintDialog() {
+          try { window.print(); } catch (_) {}
+        }
+        if (revealInit && typeof revealInit.then === 'function') {
+          revealInit.then(function () { setTimeout(autoOpenPrintDialog, 1200); });
+        } else {
+          setTimeout(autoOpenPrintDialog, 1500);
+        }
+        ` : ""}
         ${showMenu ? `/* v0.11.32: reveal-menu's init() blocks on loading
          * menu.css via the network — its DOM-construction callback
          * only fires inside the stylesheet load handler. We bundle
