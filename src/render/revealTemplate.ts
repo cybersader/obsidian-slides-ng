@@ -742,6 +742,15 @@ export function buildIframeHtml(
       page-break-inside: auto !important;
       break-inside: auto !important;
     }
+    /* v0.11.49: notes-emphasis layout already styles aside.notes as
+     * the BIG notes block. Reveal\\'s own print + showNotes adds a
+     * second .speaker-notes element on every page with the same
+     * content (and a "Speaker notes" CSS ::before label). Hide it —
+     * the user reported duplicated notes in v0.11.48 PDF tests. */
+    html.print-pdf.notes-emphasis .reveal .speaker-notes,
+    html.print-pdf.notes-emphasis .speaker-notes {
+      display: none !important;
+    }
 
     /* v0.11.46: PDF experimentation knobs. Each rule is gated on
      * a class added by the forcePrintMode init branch, so off-by-
