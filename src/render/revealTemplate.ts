@@ -2506,9 +2506,17 @@ ${sectionsHtml}
                   '  var pane = document.createElement("div");',
                   '  pane.id = "slides-ng-debug-pane";',
                   '  pane.style.cssText = "position:fixed;top:10px;right:10px;width:380px;max-height:80vh;overflow:auto;background:rgba(0,0,0,0.92);color:#0f0;border:1px solid #555;border-radius:6px;padding:0.5rem;font-family:monospace;font-size:11px;z-index:99999;display:none;";',
+                  /* Build via DOM API (avoids the escape hell of innerHTML
+                   * with quoted-attr strings inside a TS template literal). */
                   '  var header = document.createElement("div");',
                   '  header.style.cssText = "display:flex;justify-content:space-between;color:#aaa;border-bottom:1px solid #333;padding-bottom:4px;margin-bottom:4px;";',
-                  '  header.innerHTML = "<strong>slides-ng popup layout</strong><span style=\\"color:#888;font-weight:normal;\\">? to toggle</span>";',
+                  '  var hLabel = document.createElement("strong");',
+                  '  hLabel.textContent = "slides-ng popup layout";',
+                  '  var hHint = document.createElement("span");',
+                  '  hHint.textContent = "? to toggle";',
+                  '  hHint.style.cssText = "color:#888;font-weight:normal;";',
+                  '  header.appendChild(hLabel);',
+                  '  header.appendChild(hHint);',
                   '  var pre = document.createElement("pre");',
                   '  pre.style.cssText = "margin:0;white-space:pre-wrap;font-size:10px;line-height:1.3;";',
                   '  pre.textContent = "(capturing…)";',
