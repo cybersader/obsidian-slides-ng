@@ -264,6 +264,16 @@ export interface SlidesNGSettings {
    * real output.
    */
   experimentalLivePdfPreview: boolean;
+
+  /**
+   * v0.11.76: render the popup speaker-controls slide picker as
+   * actual iframe-rendered slide thumbnails (matching the in-Obsidian
+   * picker strip) instead of the default text-only tiles. Each tile
+   * is a sandboxed iframe loading the deck pinned to slide N — that\'s
+   * one iframe per slide, so for big decks this can be heavy. Default
+   * off; opt-in for users who want a visual picker on a second screen.
+   */
+  experimentalPopupRenderedGrid: boolean;
 }
 
 /** All draggable/toggleable speaker-view panels. */
@@ -433,4 +443,5 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   sceneInheritThemeBg: true,
   experimentalGridSpeakerView: false,
   experimentalLivePdfPreview: false,
+  experimentalPopupRenderedGrid: false,
 };

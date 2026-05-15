@@ -37,6 +37,12 @@ export interface DeckRenderOptions {
   /** Show reveal.js-menu hamburger plugin in embedded mode. */
   showRevealMenuEmbedded?: boolean;
   /**
+   * v0.11.76: render the speaker-popup slide grid as iframe-thumbnails
+   * (matching the in-Obsidian picker strip) instead of text-only tiles.
+   * Plumbed in from the experimentalPopupRenderedGrid setting.
+   */
+  popupRenderedGrid?: boolean;
+  /**
    * v0.11.41: PowerPoint-style click-to-advance. When true, clicking
    * anywhere on a slide (outside links / inputs / controls) advances.
    */
@@ -147,6 +153,7 @@ export function buildIframeHtml(
   const userOptions = options.revealOptions ?? {};
   const showControlsEmbedded = options.showRevealControlsEmbedded ?? false;
   const showMenuEmbedded = options.showRevealMenuEmbedded ?? false;
+  const popupRenderedGrid = options.popupRenderedGrid ?? false;
   const clickToProgress = options.clickToProgress ?? false;
   const forcePrintMode = options.forcePrintMode ?? false;
   const forceShowNotes = options.forceShowNotes ?? false;
@@ -1362,6 +1369,24 @@ ${sectionsHtml}
                     window.parent.postMessage({ type: 'slides-ng-iframe-reveal-ready', time: Date.now() }, '*');
                   }
                 } catch (_) {}
+                /* v0.11.76: support the ?slidesNgPinSlide=N URL query
+                 * for the experimental rendered-grid popup thumbnails.
+                 * Each popup tile is an iframe loading the deck pinned
+                 * to slide N — once Reveal is ready, jump there and
+                 * suppress further nav (the tile is read-only). */
+                try {
+                  var pinMatch = location.search.match(/[?&]slidesNgPinSlide=(\\d+)/i);
+                  if (pinMatch) {
+                    var pinIdx = parseInt(pinMatch[1], 10);
+                    if (Number.isFinite(pinIdx) && typeof Reveal.slide === 'function') {
+                      Reveal.slide(pinIdx);
+                      /* Disable keyboard nav inside the thumbnail. */
+                      if (typeof Reveal.configure === 'function') {
+                        Reveal.configure({ keyboard: false, controls: false, progress: false, mouseWheel: false, touch: false });
+                      }
+                    }
+                  }
+                } catch (_) {}
               });
             }
           } catch (_) {}
@@ -2082,6 +2107,12 @@ ${sectionsHtml}
                   'document.getElementById("timer-reset").onclick = function () { start = Date.now(); paused = true; pausedAt = Date.now(); document.getElementById("timer-pause").textContent = "Start"; applyTimerLabel(); };',
                   /* v0.11.67: slide grid — build tiles from window.opener\\'s
                    * deck DOM (slide titles). Click → goto N. */
+                  /* v0.11.76: render-mode flag baked into the popup
+                   * HTML at build time. When true, slide tiles are
+                   * sandboxed iframes pinned to slide N (visual
+                   * thumbnails). Default false renders text-only
+                   * "N — title" tiles (cheap; the safe default). */
+                  'var SLIDES_NG_RENDERED_GRID = ' + (popupRenderedGrid ? 'true' : 'false') + ';',
                   'function buildSlideGrid() {',
                   '  var grid = document.getElementById("slide-grid");',
                   '  if (!grid) return;',
@@ -2106,6 +2137,39 @@ ${sectionsHtml}
                   '      return;',
                   '    }',
                   '    grid.innerHTML = "";',
+                  /* Visual / rendered grid: build iframe thumbnails.
+                   * Each is a deck-iframe pinned to slide N using the
+                   * URL query slidesNgPinSlide=N (interpreted by
+                   * the deck init script as a goto + freeze
+                   * directive). One iframe per slide is heavy for big
+                   * decks; that is why this is opt-in. */
+                  '    if (SLIDES_NG_RENDERED_GRID) {',
+                  '      var deckUrlBase = "' + deckUrl + '";',
+                  '      grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(180px, 1fr))";',
+                  '      for (var i = 0; i < sections.length; i++) {',
+                  '        var tile = document.createElement("button");',
+                  '        tile.setAttribute("data-idx", String(i));',
+                  '        tile.className = "slide-tile";',
+                  '        tile.style.cssText = "background:#000;border:1px solid #333;border-radius:4px;padding:0;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;overflow:hidden;transition:border-color 80ms ease;aspect-ratio:16/9;position:relative;";',
+                  '        var fr = document.createElement("iframe");',
+                  '        fr.src = deckUrlBase + "?slidesNgPinSlide=" + i;',
+                  '        fr.setAttribute("sandbox", "allow-scripts allow-same-origin");',
+                  '        fr.style.cssText = "border:0;width:100%;height:100%;pointer-events:none;background:#000;";',
+                  '        var badge = document.createElement("div");',
+                  '        badge.textContent = String(i + 1);',
+                  '        badge.style.cssText = "position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.65);color:#fff;font-size:0.7em;padding:1px 5px;border-radius:3px;font-weight:600;pointer-events:none;";',
+                  '        tile.appendChild(fr);',
+                  '        tile.appendChild(badge);',
+                  '        tile.addEventListener("click", (function (idx) {',
+                  '          return function () { navCmd("goto", idx); };',
+                  '        })(i));',
+                  '        tile.addEventListener("mouseenter", function () { this.style.borderColor = "#555"; });',
+                  '        tile.addEventListener("mouseleave", function () { var cur = this.classList.contains("current"); this.style.borderColor = cur ? "#42affa" : "#333"; });',
+                  '        grid.appendChild(tile);',
+                  '      }',
+                  '      return;',
+                  '    }',
+                  /* Default text-only grid (cheap, no extra iframes). */
                   '    for (var i = 0; i < sections.length; i++) {',
                   '      var sec = sections[i];',
                   '      var heading = sec.querySelector("h1, h2, h3");',

@@ -164,6 +164,7 @@ export default class SlidesNGPlugin extends Plugin {
         defaultTheme: this.settings.defaultTheme,
         defaultTransition: this.settings.defaultTransition,
         scenes: this.settings.scenes,
+        popupRenderedGrid: this.settings.experimentalPopupRenderedGrid,
       });
       if (result.opened) {
         new Notice(`Opened ${result.vaultRelativePath} in your default browser.`);
@@ -228,6 +229,7 @@ export default class SlidesNGPlugin extends Plugin {
           defaultTheme: this.settings.defaultTheme,
           defaultTransition: this.settings.defaultTransition,
           scenes: this.settings.scenes,
+          popupRenderedGrid: this.settings.experimentalPopupRenderedGrid,
         },
         pdfOptions
       );
