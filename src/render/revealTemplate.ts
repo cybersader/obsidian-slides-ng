@@ -1555,9 +1555,16 @@ ${sectionsHtml}
          * the user doesn\\'t have to hit Ctrl+P manually on the
          * opened export file. The delay lets reveal finish DOM
          * layout AND our pdfPostInit/notes-emphasis CSS settle
-         * before window.print() takes its snapshot. */
+         * before window.print() takes its snapshot.
+         *
+         * v0.11.63: suppress auto-print when ?slidesNgNoAutoPrint=1
+         * is in the URL — used by the test-pdf-matrix dev tool so
+         * headless screenshots don\\'t collide with the print call. */
         function autoOpenPrintDialog() {
-          try { window.print(); } catch (_) {}
+          try {
+            if (/slidesNgNoAutoPrint/i.test(location.search)) return;
+            window.print();
+          } catch (_) {}
         }
         if (revealInit && typeof revealInit.then === 'function') {
           revealInit.then(function () { setTimeout(autoOpenPrintDialog, 1200); });

@@ -340,6 +340,21 @@ export class ExportPdfOptionsModal extends Modal {
     page.className = "slides-ng-export-pdf-mockup-page";
     page.setAttribute("data-style", opts.pdfStyle ?? "slides");
 
+    // v0.11.63: reflect page size in the mockup outline. Page sizes
+    // have different aspect ratios, independent of slide aspect:
+    //   Letter 8.5×11   → 0.773 (default)
+    //   A4     210×297  → 0.707 (slightly taller)
+    //   Legal  8.5×14   → 0.607 (much taller)
+    // We hold WIDTH constant at 200px and adjust HEIGHT.
+    const pageSizeMap: Record<string, number> = {
+      letter: 260,        // 200 / 0.773
+      a4: 283,            // 200 / 0.707
+      legal: 330,         // 200 / 0.607
+      current: 260,       // default = Letter
+    };
+    const pageHeight = pageSizeMap[opts.pageSize ?? "current"] ?? 260;
+    page.style.height = `${pageHeight}px`;
+
     // Page-margin visualization — adjust inner padding.
     const margin = opts.pageMargin ?? "normal";
     page.classList.add(`mockup-margin-${margin}`);

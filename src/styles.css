@@ -1087,6 +1087,8 @@
 }
 .slides-ng-export-pdf-mockup-page {
   width: 200px;
+  /* v0.11.63: height set inline by buildMockup() based on page size
+   * (Letter 260, A4 283, Legal 330). Fallback below for safety. */
   height: 260px;
   background: #ffffff;
   border: 1px solid #c0c0c0;
@@ -1099,6 +1101,7 @@
   overflow: hidden;
   position: relative;
   color: #222;
+  transition: height 120ms ease;
 }
 .slides-ng-export-pdf-mockup-page.mockup-margin-narrow { padding: 7px; }
 .slides-ng-export-pdf-mockup-page.mockup-margin-wide { padding: 22px; }
