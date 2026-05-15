@@ -61,6 +61,8 @@ const COMBOS = [
   // --- aspect ratio (within slides-notes) ---
   { name: "slides-notes-16x9", pdfStyle: "slides-notes", aspectRatio: "16:9" },
   { name: "slides-notes-4x3", pdfStyle: "slides-notes", aspectRatio: "4:3" },
+  { name: "slides-plain-16x9", pdfStyle: "slides", aspectRatio: "16:9" },
+  { name: "slides-plain-4x3", pdfStyle: "slides", aspectRatio: "4:3" },
 
   // --- page size ---
   { name: "slides-notes-A4", pdfStyle: "slides-notes", pageSize: "a4" },
@@ -217,9 +219,14 @@ function renderMockup(opts, currentTheme = "black") {
       pageBgOverride = cardBg;
       pageColorOverride = cardColor;
     }
+    // v0.11.74: plain slides mode now keeps the aspect-ratio set by
+    // the .card rule so changing aspect ratio actually changes the
+    // rectangle shape in the mockup. Background goes transparent
+    // (the page already has theme bg) and the border becomes a
+    // subtle dashed outline marking the slide rectangle.
     const cardInline = isNotesEmphasis
       ? "" // .card class handles all styling
-      : "background:transparent;border:none;width:auto;flex:1 1 auto;align-self:stretch;padding:0;aspect-ratio:auto;";
+      : `background:transparent;border:1px dashed ${cardColor === "#fff" ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.22)"};align-self:center;flex:0 0 auto;`;
     page1Inner = `<div class="card" style="${cardInline}">
         <div class="title">BUILDING RESILIENT SYSTEMS</div>
         <div class="subtitle">Lessons from running production for a decade</div>

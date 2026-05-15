@@ -1331,17 +1331,35 @@
 .mockup-slide-card.mockup-slide-card-small {
   width: 140px !important;
 }
-/* v0.11.68: plain "slides" mode = page IS the slide. The card
- * mockup has no separate frame — it's just the slide content
- * centered on the themed page bg. */
+/* v0.11.68: plain "slides" mode = page IS the slide. The page itself
+ * is themed; the slide content sits in a centered aspect-ratio'd box
+ * (with a subtle dashed outline so the user can see where reveal
+ * renders the slide rectangle vs the surrounding theme bg).
+ *
+ * v0.11.74: the card NO LONGER overrides aspect-ratio with auto. We
+ * want changing the Aspect ratio dropdown to visibly change the
+ * shape of the inner slide rectangle so the option doesn\'t feel
+ * like a silent no-op. */
 .mockup-slide-card.mockup-slide-card-fullpage {
-  border: none !important;
   background: transparent !important;
-  width: auto !important;
-  aspect-ratio: auto !important;
-  flex: 1 1 auto !important;
-  align-self: stretch !important;
-  padding: 0 !important;
+  border: 1px dashed rgba(255, 255, 255, 0.22) !important;
+  align-self: center !important;
+  flex: 0 0 auto !important;
+  /* Each aspect-ratio class (.mockup-slide-aspect-16-9 etc.) sets the
+   * concrete width/aspect-ratio below. Keep this rule background-only
+   * so those win on shape. */
+}
+/* In light themes the white-on-white dashed outline is invisible.
+ * Switch to a dark dashed outline when the page parent indicates a
+ * light theme. */
+.mockup-doc-page[data-doc-theme="white"] .mockup-slide-card-fullpage,
+.mockup-doc-page[data-doc-theme="white-contrast"] .mockup-slide-card-fullpage,
+.mockup-doc-page[data-doc-theme="beige"] .mockup-slide-card-fullpage,
+.mockup-doc-page[data-doc-theme="simple"] .mockup-slide-card-fullpage,
+.mockup-doc-page[data-doc-theme="serif"] .mockup-slide-card-fullpage,
+.mockup-doc-page[data-doc-theme="sky"] .mockup-slide-card-fullpage,
+.mockup-doc-page[data-doc-theme="solarized"] .mockup-slide-card-fullpage {
+  border-color: rgba(0, 0, 0, 0.22) !important;
 }
 .mockup-slide-card.mockup-slide-auto-shrink .mockup-slide-title {
   font-size: 8px;
