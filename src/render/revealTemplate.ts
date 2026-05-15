@@ -1964,13 +1964,18 @@ ${sectionsHtml}
                   '.notes { padding: 0.6rem 0.8rem; overflow-y: auto; flex: 1 1 auto; font-size: 1em; line-height: 1.5; }',
                   '.notes .empty { color: #666; font-style: italic; }',
                   '.notes br { display: block; margin-bottom: 0.5em; }',
-                  /* v0.11.80/v0.11.81: panel overflow + min-height: 0
+                  /* v0.11.80/v0.11.81/v0.11.82: panel overflow + min-height: 0
                    * so the timer panel can\\'t push its 3.5em digit
-                   * display past its grid cell. justify-content moved
-                   * to space-around so when the panel is short, the
-                   * buttons + digits + dropdown share remaining space
-                   * proportionally instead of all-or-nothing clipping. */
-                  '.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: space-around; flex: 1 1 auto; gap: 0.2rem; min-height: 0; padding: 0.3rem 0.4rem; }',
+                   * display past its grid cell. justify-content
+                   * space-around distributes the three timer children
+                   * proportionally when the panel is short. */
+                  '.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: space-around; flex: 1 1 auto; gap: 0.15rem; min-height: 0; padding: 0.15rem 0.3rem; }',
+                  /* v0.11.82: shrink the timer chrome (mode dropdown +
+                   * Start/Reset buttons) when the panel is short.
+                   * Without this the mode + buttons take ~70px even
+                   * before the digits, leaving zero room for "00:00". */
+                  '.timer-wrap select { background:#222; color:#ccc; border:1px solid #444; padding:0.15rem 0.3rem; border-radius:4px; font-size: clamp(0.65em, 1.6vh, 0.85em); }',
+                  '.timer-wrap button { background:#222; color:#ccc; border:1px solid #444; padding:clamp(0.05rem, 0.5vh, 0.25rem) clamp(0.3rem, 1vh, 0.6rem); border-radius:4px; cursor:pointer; font-size: clamp(0.65em, 1.6vh, 0.85em); }',
                   /* clamp the timer between 1.6em and 3.5em — scales
                    * down on short popups (vh = viewport height) but
                    * never below the readable floor. Avoids
@@ -2190,25 +2195,48 @@ ${sectionsHtml}
                    * decks; that is why this is opt-in. */
                   '    if (getGridMode() === "visual") {',
                   '      var deckUrlBase = "' + deckUrl + '";',
+                  /* v0.11.82: read the deck\\'s natural slide
+                   * dimensions from the opener\\'s Reveal config.
+                   * Used to render each iframe at full deck size
+                   * then transform: scale() it down to the tile\\'s
+                   * actual width — proportionally shrinking the
+                   * reveal chrome (menu, controls) along with the
+                   * slide content. Fallback to 1280x720 if opener
+                   * config unreadable. */
+                  '      var deckW = 1280, deckH = 720;',
+                  '      try {',
+                  '        if (window.opener && window.opener.Reveal && typeof window.opener.Reveal.getConfig === "function") {',
+                  '          var cfg = window.opener.Reveal.getConfig();',
+                  '          if (cfg && cfg.width) deckW = cfg.width;',
+                  '          if (cfg && cfg.height) deckH = cfg.height;',
+                  '        }',
+                  '      } catch (_) {}',
+                  '      var tileAspect = deckW + "/" + deckH;',
                   '      grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(180px, 1fr))";',
                   '      for (var i = 0; i < sections.length; i++) {',
                   '        var tile = document.createElement("button");',
                   '        tile.setAttribute("data-idx", String(i));',
                   '        tile.className = "slide-tile";',
-                  '        tile.style.cssText = "background:#000;border:1px solid #333;border-radius:4px;padding:0;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;overflow:hidden;transition:border-color 80ms ease;aspect-ratio:16/9;position:relative;";',
+                  '        tile.style.cssText = "background:#000;border:1px solid #333;border-radius:4px;padding:0;cursor:pointer;font-family:inherit;overflow:hidden;transition:border-color 80ms ease;aspect-ratio:" + tileAspect + ";position:relative;";',
+                  /* Inner div fixed at deck natural size + scaled
+                   * via transform. transform-origin: top left so the
+                   * scale anchors to the tile\\'s corner. */
+                  '        var inner = document.createElement("div");',
+                  '        inner.className = "slide-tile-inner";',
+                  '        inner.style.cssText = "position:absolute;top:0;left:0;width:" + deckW + "px;height:" + deckH + "px;transform-origin:top left;pointer-events:none;";',
                   '        var fr = document.createElement("iframe");',
                   '        fr.src = deckUrlBase + "?slidesNgPinSlide=" + i;',
                   /* v0.11.78: minimum sandbox — scripts for reveal
                    * init, same-origin so reveal can fetch its
-                   * relative theme/script paths. No allow-popups,
-                   * no allow-forms, no allow-top-navigation, etc. */
+                   * relative theme/script paths. */
                   '        fr.setAttribute("sandbox", "allow-scripts allow-same-origin");',
                   '        fr.setAttribute("loading", "lazy");',
-                  '        fr.style.cssText = "border:0;width:100%;height:100%;pointer-events:none;background:#000;";',
+                  '        fr.style.cssText = "border:0;width:100%;height:100%;background:#000;display:block;";',
+                  '        inner.appendChild(fr);',
                   '        var badge = document.createElement("div");',
                   '        badge.textContent = String(i + 1);',
-                  '        badge.style.cssText = "position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.65);color:#fff;font-size:0.7em;padding:1px 5px;border-radius:3px;font-weight:600;pointer-events:none;";',
-                  '        tile.appendChild(fr);',
+                  '        badge.style.cssText = "position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.65);color:#fff;font-size:0.7em;padding:1px 5px;border-radius:3px;font-weight:600;pointer-events:none;z-index:2;";',
+                  '        tile.appendChild(inner);',
                   '        tile.appendChild(badge);',
                   '        tile.addEventListener("click", (function (idx) {',
                   '          return function () { navCmd("goto", idx); };',
@@ -2217,6 +2245,26 @@ ${sectionsHtml}
                   '        tile.addEventListener("mouseleave", function () { var cur = this.classList.contains("current"); this.style.borderColor = cur ? "#42affa" : "#333"; });',
                   '        grid.appendChild(tile);',
                   '      }',
+                  /* v0.11.82: scale every tile inner so the deck-
+                   * sized iframe shrinks proportionally to the
+                   * tile\\'s current width. Run on initial layout
+                   * + on viewport resize so user-resizing the popup
+                   * re-scales correctly. */
+                  '      function updateTileScales() {',
+                  '        var tiles = grid.querySelectorAll(".slide-tile");',
+                  '        tiles.forEach(function (t) {',
+                  '          var inner = t.querySelector(".slide-tile-inner");',
+                  '          if (!inner) return;',
+                  '          var rect = t.getBoundingClientRect();',
+                  '          if (!rect.width) return;',
+                  '          var s = rect.width / deckW;',
+                  '          inner.style.transform = "scale(" + s + ")";',
+                  '        });',
+                  '      }',
+                  '      setTimeout(updateTileScales, 50);',
+                  '      window.removeEventListener("resize", window.__slidesNgUpdateTileScales || (function(){}));',
+                  '      window.__slidesNgUpdateTileScales = updateTileScales;',
+                  '      window.addEventListener("resize", updateTileScales);',
                   '      return;',
                   '    }',
                   /* Default text-only grid (cheap, no extra iframes). */

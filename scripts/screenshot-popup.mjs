@@ -29,7 +29,9 @@ body { display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) aut
 .frame-aspect { aspect-ratio: 960 / 700; background: #000; border: 1px solid #222; max-width: 100%; max-height: 100%; position: relative; display: flex; align-items: center; justify-content: center; color: #555; font-size: 0.85em; }
 .notes { padding: 0.6rem 0.8rem; overflow-y: auto; flex: 1 1 auto; font-size: 1em; line-height: 1.5; }
 .notes .empty { color: #666; font-style: italic; }
-.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: space-around; flex: 1 1 auto; gap: 0.2rem; min-height: 0; padding: 0.3rem 0.4rem; }
+.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: space-around; flex: 1 1 auto; gap: 0.15rem; min-height: 0; padding: 0.15rem 0.3rem; }
+.timer-wrap select { background:#222; color:#ccc; border:1px solid #444; padding:0.15rem 0.3rem; border-radius:4px; font-size: clamp(0.65em, 1.6vh, 0.85em); }
+.timer-wrap button { background:#222; color:#ccc; border:1px solid #444; padding:clamp(0.05rem, 0.5vh, 0.25rem) clamp(0.3rem, 1vh, 0.6rem); border-radius:4px; cursor:pointer; font-size: clamp(0.65em, 1.6vh, 0.85em); }
 .timer { font-family: monospace; font-size: clamp(1.6em, 6vh, 3.5em); color: #e0e0e0; line-height: 1; }
 .timer-controls { display: flex; gap: 0.4rem; margin-top: 0.5rem; justify-content: center; }
 .timer-controls button { background: #222; color: #ccc; border: 1px solid #444; padding: 0.25rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
@@ -75,8 +77,14 @@ body { display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) aut
     </span>
     <span style="color:#999;font-size:0.85em;font-weight:normal;text-transform:none;letter-spacing:normal;flex:0 0 auto;white-space:nowrap;">Slide 3 of 12</span>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;padding:0.4rem 0.6rem;min-height:0;flex:1 1 auto;overflow-y:auto;">
-    ${Array.from({length: 12}, (_, i) => `<button class="scene-btn" style="text-align:left;font-size:0.78em;line-height:1.25;min-height:48px;display:flex;flex-direction:column;gap:3px;padding:6px 8px;"><div style="color:#888;font-size:0.85em;font-weight:600;">${i+1}</div><div>Slide title ${i+1}</div></button>`).join("\\n")}
+  <div id="slide-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;padding:0.4rem 0.6rem;min-height:0;flex:1 1 auto;overflow-y:auto;">
+    ${Array.from({length: 12}, (_, i) => `<div class="slide-tile" style="background:#000;border:1px solid #333;border-radius:4px;padding:0;overflow:hidden;aspect-ratio:1280/720;position:relative;">
+      <div class="slide-tile-inner" style="position:absolute;top:0;left:0;width:1280px;height:720px;transform-origin:top left;transform:scale(0.14);background:#191919;color:#fff;display:flex;align-items:center;justify-content:center;font-size:48px;">
+        Slide ${i+1} content
+        <button style="position:absolute;top:20px;right:20px;background:rgba(0,0,0,0.55);color:#fff;border:1px solid #444;padding:6px 8px;font-size:14px;">☰</button>
+      </div>
+      <div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.65);color:#fff;font-size:0.7em;padding:1px 5px;border-radius:3px;font-weight:600;z-index:2;">${i+1}</div>
+    </div>`).join("")}
   </div>
   <div style="display:flex;gap:0.4rem;padding:0.3rem 0.6rem;border-top:1px solid #333;">
     <button class="scene-btn">← Prev</button>
