@@ -6,6 +6,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.46] — 2026-05-15
+
+### Added — PDF export experimentation knobs
+
+The Export PDF modal grew an **Experimental** section with eight
+new toggles / dropdowns. All default off / "no override" so the
+existing flow is unchanged. The goal is "try everything, then
+optimize once we know what works" — bundle size will get a pass
+in a later release once the patterns settle.
+
+- **Auto-shrink overflowing slides** — measures each slide's
+  natural `scrollHeight` against the slide-card height after
+  Reveal init; if content overflows, applies a proportional
+  `font-size: NN%` so the slide visually fits. Best-effort —
+  code blocks and images may not scale cleanly.
+- **Page size** — Current / A4 / Letter / Legal. Emits an
+  `@page { size: ... }` rule.
+- **Page margin** — Normal / Narrow / Wide / None. Emits
+  `@page { margin: ... }`. "None" lets you go edge-to-edge.
+- **Grayscale** — CSS `filter: grayscale(1)` for B&W printers.
+- **Hide slide backgrounds** — drops per-slide bg color/image
+  so the deck prints on white paper. Saves ink for dark themes.
+- **Slide number stamp** — prints `Slide N / M` in the top-right
+  of each page via `::before` pseudo-element + `data-*` attrs.
+- **Page header text** — small text band at the top of every
+  page (e.g. course name, date). HTML-escaped on the way through.
+- **Page footer text** — same but at the bottom (e.g. "Draft
+  — do not distribute").
+
+### Fixed
+
+- **Speaker popup: current/next slide iframes now mirror the
+  deck aspect ratio.** Previously the iframes filled their
+  panel cell at whatever ratio the grid happened to produce,
+  so reveal scaled the slides differently in the popup vs the
+  main window — same slide, different apparent content +
+  clipping. Now each iframe sits in an aspect-locked wrapper
+  whose `--slides-ng-aspect` CSS variable is read from the
+  opener's Reveal config at popup boot.
+
+### Tests
+
+- 3 new tests: all-knobs-on emission check, header/footer
+  HTML escaping, popup-iframe aspect lock. 424 pass.
+
+### Technical
+
+- `src/export/exportStandalone.ts` — `PdfExportOptions` gained
+  eight new fields; export pipeline maps them to
+  `force*` flags.
+- `src/render/revealTemplate.ts` — eight new template options;
+  CSS rules for grayscale / hide-bg / slide-number stamp /
+  header band / footer band; runtime `@page` rule for size +
+  margin; post-init JS that walks sections to set
+  `data-slide-number` / `data-slide-total`, inject header /
+  footer bands, and run auto-shrink. Popup template wraps
+  iframes in `.frame-aspect` divs and reads opener's reveal
+  config to set the aspect CSS variable.
+- `src/render/renderDeck.ts` — all new flags flow through
+  `RenderDefaults`.
+- `src/ExportPdfOptionsModal.ts` — new "Experimental" section
+  with the eight controls.
+
+### Bundle
+
+- `main.js` is now 2.2 MB (was 2.1 MB). PROJECT_BRIEF soft
+  cap is 2 MB — per user direction, optimization deferred
+  until the working-knob set is identified.
+
 ## [0.11.45] — 2026-05-15
 
 ### Added

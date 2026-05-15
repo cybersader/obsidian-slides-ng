@@ -73,6 +73,22 @@ export interface DeckRenderOptions {
    * time when the user picks the "Slides (notes emphasis)" layout.
    */
   forceNotesEmphasis?: boolean;
+  /** v0.11.46: auto-shrink slide content via JS-measured CSS scale. */
+  forceAutoShrink?: boolean;
+  /** v0.11.46: override @page paper size. */
+  forcePageSize?: "a4" | "letter" | "legal";
+  /** v0.11.46: override @page margin. */
+  forcePageMargin?: "normal" | "narrow" | "wide" | "none";
+  /** v0.11.46: grayscale via CSS filter. */
+  forceGrayscale?: boolean;
+  /** v0.11.46: drop per-slide backgrounds. */
+  forceHideBackgrounds?: boolean;
+  /** v0.11.46: stamp "Slide N / M" in the top-right of each page. */
+  forceSlideNumberStamp?: boolean;
+  /** v0.11.46: page header text (rendered above slide content). */
+  forceHeaderText?: string;
+  /** v0.11.46: page footer text. */
+  forceFooterText?: string;
   /** Column split ratio for image-left / image-right layouts. */
   imageLayoutSplit?: "50/50" | "60/40" | "40/60";
   /** Line-step dimming opacity (0–1). */
@@ -137,6 +153,32 @@ export function buildIframeHtml(
   const forceMaxPagesPerSlide = options.forceMaxPagesPerSlide ?? 0;
   const forcePrintDocument = options.forcePrintDocument ?? false;
   const forceNotesEmphasis = options.forceNotesEmphasis ?? false;
+  const forceAutoShrink = options.forceAutoShrink ?? false;
+  const forcePageSize = options.forcePageSize ?? "";
+  const forcePageMargin = options.forcePageMargin ?? "";
+  const forceGrayscale = options.forceGrayscale ?? false;
+  const forceHideBackgrounds = options.forceHideBackgrounds ?? false;
+  const forceSlideNumberStamp = options.forceSlideNumberStamp ?? false;
+  const forceHeaderText = options.forceHeaderText ?? "";
+  const forceFooterText = options.forceFooterText ?? "";
+  const PAGE_SIZE_MAP: Record<string, string> = {
+    a4: "210mm 297mm",
+    letter: "8.5in 11in",
+    legal: "8.5in 14in",
+  };
+  const PAGE_MARGIN_MAP: Record<string, string> = {
+    normal: "0.75in",
+    narrow: "0.4in",
+    wide: "1.25in",
+    none: "0",
+  };
+  const pageSizeCss = forcePageSize ? PAGE_SIZE_MAP[forcePageSize] : "";
+  const pageMarginCss = forcePageMargin ? PAGE_MARGIN_MAP[forcePageMargin] : "";
+  // Escape header/footer text for safe HTML embedding.
+  const escapeHtml = (s: string): string =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const headerTextSafe = forceHeaderText ? escapeHtml(forceHeaderText) : "";
+  const footerTextSafe = forceFooterText ? escapeHtml(forceFooterText) : "";
   const imageSplit = options.imageLayoutSplit ?? "50/50";
   const lineStepDim = options.lineStepDimOpacity ?? 0.32;
   const codeBlockMaxHeight = options.codeBlockMaxHeight ?? "60vh";
@@ -701,6 +743,62 @@ export function buildIframeHtml(
       break-inside: auto !important;
     }
 
+    /* v0.11.46: PDF experimentation knobs. Each rule is gated on
+     * a class added by the forcePrintMode init branch, so off-by-
+     * default; user opts in via the export modal. */
+    html.pdf-grayscale body {
+      filter: grayscale(1) !important;
+    }
+    html.pdf-hide-backgrounds .reveal .backgrounds,
+    html.pdf-hide-backgrounds .reveal section[data-background],
+    html.pdf-hide-backgrounds .reveal section[data-background-image],
+    html.pdf-hide-backgrounds .reveal section[data-background-color] {
+      background-color: #fff !important;
+      background-image: none !important;
+    }
+    html.pdf-hide-backgrounds body {
+      background: #fff !important;
+    }
+    /* Slide number stamp. JS sets data-slide-number on each section
+     * (via Reveal slide indices) at render. Pseudo-element prints it
+     * unobtrusively top-right. */
+    html.pdf-slide-number-stamp .reveal .slides > section::before {
+      content: "Slide " attr(data-slide-number) " / " attr(data-slide-total);
+      position: absolute;
+      top: 0.4rem;
+      right: 0.6rem;
+      font-size: 0.7em;
+      color: rgba(0, 0, 0, 0.55);
+      background: rgba(255, 255, 255, 0.7);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: var(--r-main-font, sans-serif);
+      z-index: 5;
+      pointer-events: none;
+    }
+    /* Page header + footer bands. Anchored to the top/bottom of each
+     * slide section so they appear on every printed page. */
+    html.print-pdf .slides-ng-page-header,
+    html.print-pdf .slides-ng-page-footer {
+      position: absolute;
+      left: 0;
+      right: 0;
+      font-size: 0.7em;
+      color: rgba(0, 0, 0, 0.65);
+      background: rgba(255, 255, 255, 0.75);
+      padding: 4px 1rem;
+      font-family: var(--r-main-font, sans-serif);
+      z-index: 4;
+      pointer-events: none;
+      text-align: center;
+    }
+    html.print-pdf .slides-ng-page-header { top: 0; border-bottom: 1px solid rgba(0,0,0,0.08); }
+    html.print-pdf .slides-ng-page-footer { bottom: 0; border-top: 1px solid rgba(0,0,0,0.08); }
+    ${pageSizeCss || pageMarginCss ? `@page {
+      ${pageSizeCss ? `size: ${pageSizeCss};` : ""}
+      ${pageMarginCss ? `margin: ${pageMarginCss};` : ""}
+    }` : ""}
+
     /* v0.11.44: document-layout mode for PDF export. The deck flows
      * as a regular document — no fixed slide-card dimensions, no
      * theme background, sections page-break between content blocks.
@@ -902,6 +1000,9 @@ ${sectionsHtml}
            * to the top ~35vh and gives the notes the bottom ~60vh.
            * Implies showNotes (caller already set forceShowNotes). */
           document.documentElement.classList.add('notes-emphasis');` : ""}
+          ${forceGrayscale ? `document.documentElement.classList.add('pdf-grayscale');` : ""}
+          ${forceHideBackgrounds ? `document.documentElement.classList.add('pdf-hide-backgrounds');` : ""}
+          ${forceSlideNumberStamp ? `document.documentElement.classList.add('pdf-slide-number-stamp');` : ""}
         } catch (_) {}
         ${forceMaxPagesPerSlide > 0 ? `/* v0.11.44: bake pdfMaxPagesPerSlide
          * directly into initOpts so reveal splits overflowing slides
@@ -954,6 +1055,56 @@ ${sectionsHtml}
           initOpts.plugins = (initOpts.plugins || []).concat([RevealMenu]);
         }` : ""}
         var revealInit = Reveal.initialize(initOpts);
+        ${!embedded && (forceAutoShrink || forceSlideNumberStamp || forceHeaderText || forceFooterText) ? `
+        /* v0.11.46: post-init PDF tweaks. Hook into Reveal\\'s 'ready'
+         * so slide DOM exists. Cheap — only runs in standalone-export
+         * mode and only if the user picked one of these options. */
+        function pdfPostInit() {
+          try {
+            var sections = document.querySelectorAll('.reveal .slides > section');
+            ${forceSlideNumberStamp ? `var total = sections.length;
+            for (var si = 0; si < sections.length; si++) {
+              sections[si].setAttribute('data-slide-number', String(si + 1));
+              sections[si].setAttribute('data-slide-total', String(total));
+            }` : ""}
+            ${forceHeaderText || forceFooterText ? `for (var hi = 0; hi < sections.length; hi++) {
+              ${forceHeaderText ? `var h = document.createElement('div');
+              h.className = 'slides-ng-page-header';
+              h.textContent = ${JSON.stringify(forceHeaderText)};
+              sections[hi].insertBefore(h, sections[hi].firstChild);` : ""}
+              ${forceFooterText ? `var f = document.createElement('div');
+              f.className = 'slides-ng-page-footer';
+              f.textContent = ${JSON.stringify(forceFooterText)};
+              sections[hi].appendChild(f);` : ""}
+            }` : ""}
+            ${forceAutoShrink ? `/* Auto-shrink: measure each section\\'s
+             * natural content height (a wrapper-div inside the section
+             * holds the original content) and apply a CSS scale so
+             * everything fits within the slide-card height. Only
+             * scales DOWN; never up — content smaller than the slide
+             * stays at its natural size. */
+            for (var ai = 0; ai < sections.length; ai++) {
+              var sec = sections[ai];
+              var maxH = sec.clientHeight;
+              var natH = sec.scrollHeight;
+              if (natH > maxH && natH > 0) {
+                var factor = (maxH / natH) * 0.97;
+                sec.style.transformOrigin = 'top left';
+                /* Apply scale to a wrapper to avoid clipping by reveal\\'s
+                 * own transform on the section. */
+                sec.style.fontSize = (factor * 100) + '%';
+              }
+            }` : ""}
+          } catch (err) { console.warn('[slides-ng] pdfPostInit error', err); }
+        }
+        if (revealInit && typeof revealInit.then === 'function') {
+          revealInit.then(function () { setTimeout(pdfPostInit, 50); });
+        } else if (typeof Reveal.on === 'function') {
+          Reveal.on('ready', function () { setTimeout(pdfPostInit, 50); });
+        } else {
+          setTimeout(pdfPostInit, 500);
+        }
+        ` : ""}
         ${showMenu ? `/* v0.11.32: reveal-menu's init() blocks on loading
          * menu.css via the network — its DOM-construction callback
          * only fires inside the stylesheet load handler. We bundle
@@ -1205,8 +1356,17 @@ ${sectionsHtml}
                   '.scene-btn.clear { margin-left: auto; background: transparent; border-color: #555; }',
                   '.panel { background: #0a0a0a; border: 1px solid #333; overflow: hidden; display: flex; flex-direction: column; border-radius: 6px; min-height: 0; }',
                   '.label { font-size: 0.75em; color: #999; padding: 0.3rem 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; flex: 0 0 auto; }',
-                  '.frame-wrap { position: relative; flex: 1 1 auto; }',
-                  '.frame-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }',
+                  /* v0.11.46: lock the iframe's aspect ratio to the
+                   * deck's slide aspect so reveal scales it identically
+                   * to the main window. Without this lock the iframe
+                   * filled the panel cell at whatever ratio the cell
+                   * happened to be, and reveal scaled differently in
+                   * the popup vs the main window — same slide, different
+                   * apparent content / clipping. The wrapper centers
+                   * the aspect-locked box within the panel cell. */
+                  '.frame-wrap { position: relative; flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-height: 0; }',
+                  '.frame-aspect { position: relative; width: 100%; max-height: 100%; aspect-ratio: var(--slides-ng-aspect, 960 / 700); background: #000; }',
+                  '.frame-aspect iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }',
                   '.notes { padding: 0.6rem 0.8rem; overflow-y: auto; flex: 1 1 auto; font-size: 1em; line-height: 1.5; }',
                   '.notes .empty { color: #666; font-style: italic; }',
                   '.notes br { display: block; margin-bottom: 0.5em; }',
@@ -1224,11 +1384,11 @@ ${sectionsHtml}
                   '</div>',
                   '<div class="panel">',
                   '  <div class="label">Current slide</div>',
-                  '  <div class="frame-wrap"><iframe id="current-frame" src="' + deckUrl + '" sandbox="allow-scripts allow-same-origin"></iframe><div class="slide-counter" id="current-counter">—</div></div>',
+                  '  <div class="frame-wrap"><div class="frame-aspect"><iframe id="current-frame" src="' + deckUrl + '" sandbox="allow-scripts allow-same-origin"></iframe><div class="slide-counter" id="current-counter">—</div></div></div>',
                   '</div>',
                   '<div class="panel">',
                   '  <div class="label">Next slide</div>',
-                  '  <div class="frame-wrap"><iframe id="next-frame" src="' + deckUrl + '" sandbox="allow-scripts allow-same-origin"></iframe><div class="slide-counter" id="next-counter">—</div></div>',
+                  '  <div class="frame-wrap"><div class="frame-aspect"><iframe id="next-frame" src="' + deckUrl + '" sandbox="allow-scripts allow-same-origin"></iframe><div class="slide-counter" id="next-counter">—</div></div></div>',
                   '</div>',
                   '<div class="panel">',
                   '  <div class="label">Speaker notes</div>',
@@ -1256,6 +1416,20 @@ ${sectionsHtml}
                   '  </div>',
                   '</div>',
                   '<script>',
+                  /* v0.11.46: read the deck\\'s authored slide width/
+                   * height from the opener\\'s Reveal config so the
+                   * popup iframes mirror the deck\\'s slide aspect. */
+                  '(function () {',
+                  '  try {',
+                  '    var w = 960, h = 700;',
+                  '    if (window.opener && window.opener.Reveal && typeof window.opener.Reveal.getConfig === "function") {',
+                  '      var cfg = window.opener.Reveal.getConfig();',
+                  '      if (cfg && cfg.width) w = cfg.width;',
+                  '      if (cfg && cfg.height) h = cfg.height;',
+                  '    }',
+                  '    document.documentElement.style.setProperty("--slides-ng-aspect", w + " / " + h);',
+                  '  } catch (_) {}',
+                  '})();',
                   /* v0.11.42: timer defaults to paused at 00:00. Counts
                    * elapsed time since the user explicitly clicks Start.
                    * Reset returns to 00:00 + paused. */

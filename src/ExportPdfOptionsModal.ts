@@ -16,6 +16,15 @@ export class ExportPdfOptionsModal extends Modal {
     themeOverride: null,
     maxPagesPerSlide: 1,
     pdfStyle: "slides",
+    // v0.11.46 experimentation knobs — all default off / "no override".
+    autoShrink: false,
+    pageSize: "current",
+    pageMargin: "normal",
+    grayscale: false,
+    hideBackgrounds: false,
+    slideNumberStamp: false,
+    headerText: "",
+    footerText: "",
   };
   private onSubmit: (options: PdfExportOptions | null) => void;
   /** Theme that the deck would render with by default — shown as the active option. */
@@ -107,6 +116,97 @@ export class ExportPdfOptionsModal extends Modal {
             this.options.maxPagesPerSlide = n;
           }
         });
+      });
+
+    // ---------- Experimental options (v0.11.46) ----------
+    new Setting(contentEl).setName("Experimental").setHeading();
+
+    new Setting(contentEl)
+      .setName("Auto-shrink overflowing slides")
+      .setDesc(
+        "Measure each slide's natural content height and scale its font down if the content is taller than the slide-card area. Best-effort — code blocks and images may not scale cleanly."
+      )
+      .addToggle((t) => {
+        t.setValue(!!this.options.autoShrink).onChange((v) => {
+          this.options.autoShrink = v;
+        });
+      });
+
+    new Setting(contentEl)
+      .setName("Page size")
+      .setDesc("Override the paper size used by the browser print dialog.")
+      .addDropdown((d) => {
+        d.addOption("current", "Current (browser default)");
+        d.addOption("a4", "A4 (210×297 mm)");
+        d.addOption("letter", "Letter (8.5×11 in)");
+        d.addOption("legal", "Legal (8.5×14 in)");
+        d.setValue(this.options.pageSize ?? "current").onChange((v) => {
+          this.options.pageSize = v as PdfExportOptions["pageSize"];
+        });
+      });
+
+    new Setting(contentEl)
+      .setName("Page margin")
+      .setDesc("@page margin override. None = edge-to-edge slides.")
+      .addDropdown((d) => {
+        d.addOption("normal", "Normal (0.75 in)");
+        d.addOption("narrow", "Narrow (0.4 in)");
+        d.addOption("wide", "Wide (1.25 in)");
+        d.addOption("none", "None (edge-to-edge)");
+        d.setValue(this.options.pageMargin ?? "normal").onChange((v) => {
+          this.options.pageMargin = v as PdfExportOptions["pageMargin"];
+        });
+      });
+
+    new Setting(contentEl)
+      .setName("Grayscale")
+      .setDesc("Render the PDF in grayscale (CSS filter). For B&W printers.")
+      .addToggle((t) => {
+        t.setValue(!!this.options.grayscale).onChange((v) => {
+          this.options.grayscale = v;
+        });
+      });
+
+    new Setting(contentEl)
+      .setName("Hide slide backgrounds")
+      .setDesc(
+        "Drop per-slide background colors / images so each page prints on white. Saves ink for dark-themed decks."
+      )
+      .addToggle((t) => {
+        t.setValue(!!this.options.hideBackgrounds).onChange((v) => {
+          this.options.hideBackgrounds = v;
+        });
+      });
+
+    new Setting(contentEl)
+      .setName("Slide number stamp")
+      .setDesc("Print 'Slide N / M' in the top-right corner of each page.")
+      .addToggle((t) => {
+        t.setValue(!!this.options.slideNumberStamp).onChange((v) => {
+          this.options.slideNumberStamp = v;
+        });
+      });
+
+    new Setting(contentEl)
+      .setName("Page header text")
+      .setDesc("Optional text printed at the top of every page. Empty = none.")
+      .addText((t) => {
+        t.setValue(this.options.headerText ?? "")
+          .setPlaceholder("e.g. CS-101 Lecture 5")
+          .onChange((v) => {
+            this.options.headerText = v;
+          });
+      });
+
+    new Setting(contentEl)
+      .setName("Page footer text")
+      .setDesc("Optional text printed at the bottom of every page. Empty = none.")
+      .addText((t) => {
+        t.setValue(this.options.footerText ?? "")
+          .setPlaceholder("e.g. Draft — do not distribute")
+          .onChange((v) => {
+            this.options.footerText = v;
+          });
       });
 
     const actions = contentEl.createDiv({ cls: "slides-ng-export-pdf-actions" });

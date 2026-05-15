@@ -46,6 +46,56 @@ export interface PdfExportOptions {
    *   Better for text-heavy decks where slides keep overflowing.
    */
   pdfStyle?: "slides" | "slides-notes" | "document";
+
+  /**
+   * v0.11.46: auto-shrink slide content to fit the slide-card area.
+   * Measures every slide section's natural height at script load
+   * and applies a CSS scale transform to make it fit. Fixes the
+   * "content gets clipped" issue when authored slides have too
+   * many bullets / too much text for the configured aspect ratio.
+   * Default off (preserves authored sizes; user opts in).
+   */
+  autoShrink?: boolean;
+
+  /**
+   * v0.11.46: override page paper size. `"current"` lets reveal /
+   * the browser decide (defaults to A4 in EU, Letter in US, …).
+   */
+  pageSize?: "current" | "a4" | "letter" | "legal";
+
+  /** v0.11.46: override the @page margin. */
+  pageMargin?: "normal" | "narrow" | "wide" | "none";
+
+  /**
+   * v0.11.46: render the whole PDF in grayscale via CSS
+   * `filter: grayscale(1)`. For B&W laser printers.
+   */
+  grayscale?: boolean;
+
+  /**
+   * v0.11.46: drop per-slide background colors / images so each
+   * page prints on white paper. Saves ink for dark-themed decks.
+   * Independent of `themeOverride`.
+   */
+  hideBackgrounds?: boolean;
+
+  /**
+   * v0.11.46: stamp "Slide N / M" in the top-right corner of each
+   * page. Useful for cross-referencing during a talk.
+   */
+  slideNumberStamp?: boolean;
+
+  /**
+   * v0.11.46: small text printed at the top of every page (e.g.
+   * a course name, date, draft watermark). Empty = no header.
+   */
+  headerText?: string;
+
+  /**
+   * v0.11.46: small text printed at the bottom of every page.
+   * Empty = no footer.
+   */
+  footerText?: string;
 }
 
 /**
@@ -246,6 +296,20 @@ export async function exportAndOpenForPdf(
     merged.forceNotesEmphasis = true;
     merged.forceShowNotes = true;
   }
+  // v0.11.46: pass through all the new tweak options. Each one is
+  // a CSS / JS branch in the iframe template; they all default to
+  // off (or the deck's natural value) so this just expands the
+  // surface area for experimentation, not the default behavior.
+  if (pdfOptions.autoShrink) merged.forceAutoShrink = true;
+  if (pdfOptions.pageSize && pdfOptions.pageSize !== "current") {
+    merged.forcePageSize = pdfOptions.pageSize;
+  }
+  if (pdfOptions.pageMargin) merged.forcePageMargin = pdfOptions.pageMargin;
+  if (pdfOptions.grayscale) merged.forceGrayscale = true;
+  if (pdfOptions.hideBackgrounds) merged.forceHideBackgrounds = true;
+  if (pdfOptions.slideNumberStamp) merged.forceSlideNumberStamp = true;
+  if (pdfOptions.headerText) merged.forceHeaderText = pdfOptions.headerText;
+  if (pdfOptions.footerText) merged.forceFooterText = pdfOptions.footerText;
   const result = await exportDeckToFile(app, file, timestamp, merged);
   const suffix = buildPdfUrlSuffix(pdfOptions);
   const opened = await openExternalInBrowser(result.absolutePath, suffix);

@@ -124,6 +124,62 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain('fill="currentColor"');
   });
 
+  test("v0.11.46 experimentation knobs all emit conditionally", () => {
+    // Off-by-default: with no knobs set, none of their markers appear.
+    const off = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+    });
+    expect(off).not.toContain("classList.add('pdf-grayscale')");
+    expect(off).not.toContain("classList.add('pdf-hide-backgrounds')");
+    expect(off).not.toContain("classList.add('pdf-slide-number-stamp')");
+    expect(off).not.toContain("setAttribute('data-slide-number'");
+
+    // Every knob on: each marker / behavior should appear.
+    const on = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+      forceAutoShrink: true,
+      forcePageSize: "a4",
+      forcePageMargin: "narrow",
+      forceGrayscale: true,
+      forceHideBackgrounds: true,
+      forceSlideNumberStamp: true,
+      forceHeaderText: "CS-101",
+      forceFooterText: "Draft",
+    });
+    expect(on).toContain("classList.add('pdf-grayscale')");
+    expect(on).toContain("classList.add('pdf-hide-backgrounds')");
+    expect(on).toContain("classList.add('pdf-slide-number-stamp')");
+    expect(on).toContain("210mm 297mm"); // a4
+    expect(on).toContain("0.4in"); // narrow margin
+    expect(on).toContain("data-slide-number");
+    expect(on).toContain("data-slide-total");
+    // Auto-shrink + header/footer logic
+    expect(on).toContain("scrollHeight");
+    expect(on).toContain("CS-101");
+    expect(on).toContain("Draft");
+  });
+
+  test("v0.11.46 header/footer text is HTML-escaped", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+      forceHeaderText: '<script>alert("xss")</script>',
+    });
+    // The CSS rule and JS-side text injection both run through
+    // JSON.stringify (JS) and HTML escaping (template), so the raw
+    // `<script>` literal must NOT appear in the emitted HTML.
+    expect(html).not.toContain('<script>alert("xss")</script>');
+  });
+
+  test("popup HTML wraps the speaker-view iframes in aspect-locked containers (v0.11.46)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {});
+    // The `.frame-aspect` div is the aspect-ratio guard — its CSS
+    // variable comes from the deck's reveal config (read at popup
+    // boot from window.opener).
+    expect(html).toContain("frame-aspect");
+    expect(html).toContain("--slides-ng-aspect");
+    expect(html).toContain("aspect-ratio: var(--slides-ng-aspect");
+  });
+
   test("forceNotesEmphasis adds notes-emphasis class + bigger-notes CSS (v0.11.45)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {
       forcePrintMode: true,

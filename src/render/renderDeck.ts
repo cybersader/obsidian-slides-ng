@@ -106,6 +106,15 @@ export interface RenderDefaults {
   forcePrintDocument?: boolean;
   /** v0.11.45: notes-emphasis PDF layout (slide on top, notes large). */
   forceNotesEmphasis?: boolean;
+  /** v0.11.46: misc PDF experimentation knobs. */
+  forceAutoShrink?: boolean;
+  forcePageSize?: "a4" | "letter" | "legal";
+  forcePageMargin?: "normal" | "narrow" | "wide" | "none";
+  forceGrayscale?: boolean;
+  forceHideBackgrounds?: boolean;
+  forceSlideNumberStamp?: boolean;
+  forceHeaderText?: string;
+  forceFooterText?: string;
   /** Max-height for code blocks before they scroll. CSS length. */
   codeBlockMaxHeight?: string;
   /** Whether code blocks scroll overflow when capped. */
@@ -239,6 +248,15 @@ export function renderDeckFromAst(
   if (defaults.forceNotesEmphasis !== undefined) {
     defaultLayer.forceNotesEmphasis = defaults.forceNotesEmphasis;
   }
+  // v0.11.46: thread the experiment knobs through.
+  if (defaults.forceAutoShrink) defaultLayer.forceAutoShrink = true;
+  if (defaults.forcePageSize) defaultLayer.forcePageSize = defaults.forcePageSize;
+  if (defaults.forcePageMargin) defaultLayer.forcePageMargin = defaults.forcePageMargin;
+  if (defaults.forceGrayscale) defaultLayer.forceGrayscale = true;
+  if (defaults.forceHideBackgrounds) defaultLayer.forceHideBackgrounds = true;
+  if (defaults.forceSlideNumberStamp) defaultLayer.forceSlideNumberStamp = true;
+  if (defaults.forceHeaderText) defaultLayer.forceHeaderText = defaults.forceHeaderText;
+  if (defaults.forceFooterText) defaultLayer.forceFooterText = defaults.forceFooterText;
   if (defaults.codeBlockMaxHeight) {
     defaultLayer.codeBlockMaxHeight = defaults.codeBlockMaxHeight;
   }
