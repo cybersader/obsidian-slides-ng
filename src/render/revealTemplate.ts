@@ -1940,7 +1940,7 @@ ${sectionsHtml}
                   '.notes { padding: 0.6rem 0.8rem; overflow-y: auto; flex: 1 1 auto; font-size: 1em; line-height: 1.5; }',
                   '.notes .empty { color: #666; font-style: italic; }',
                   '.notes br { display: block; margin-bottom: 0.5em; }',
-                  '.timer-wrap { display: flex; align-items: center; justify-content: center; flex: 1 1 auto; }',
+                  '.timer-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1 1 auto; gap: 0.3rem; }',
                   '.timer { font-family: monospace; font-size: 3.5em; color: #e0e0e0; }',
                   '.timer-controls { display: flex; gap: 0.4rem; margin-top: 0.5rem; justify-content: center; }',
                   '.timer-controls button { background: #222; color: #ccc; border: 1px solid #444; padding: 0.25rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.85em; }',
