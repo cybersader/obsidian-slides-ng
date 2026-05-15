@@ -54,6 +54,19 @@ export interface DeckRenderOptions {
   forcePrintMode?: boolean;
   /** v0.11.43: when forcePrintMode is on, also reserve room for notes. */
   forceShowNotes?: boolean;
+  /**
+   * v0.11.44: bake pdfMaxPagesPerSlide into initOpts so reveal will
+   * split overflowing slides across N pages. Defaults to 1
+   * (no splitting; overflow is clipped).
+   */
+  forceMaxPagesPerSlide?: number;
+  /**
+   * v0.11.44: render the deck as a flowing document (sections become
+   * headings, notes inline, no slide chrome) instead of as slide
+   * cards. Useful for text-heavy decks where slides keep
+   * overflowing — gives a more handout-like layout.
+   */
+  forcePrintDocument?: boolean;
   /** Column split ratio for image-left / image-right layouts. */
   imageLayoutSplit?: "50/50" | "60/40" | "40/60";
   /** Line-step dimming opacity (0–1). */
@@ -115,6 +128,8 @@ export function buildIframeHtml(
   const clickToProgress = options.clickToProgress ?? false;
   const forcePrintMode = options.forcePrintMode ?? false;
   const forceShowNotes = options.forceShowNotes ?? false;
+  const forceMaxPagesPerSlide = options.forceMaxPagesPerSlide ?? 0;
+  const forcePrintDocument = options.forcePrintDocument ?? false;
   const imageSplit = options.imageLayoutSplit ?? "50/50";
   const lineStepDim = options.lineStepDimOpacity ?? 0.32;
   const codeBlockMaxHeight = options.codeBlockMaxHeight ?? "60vh";
@@ -660,6 +675,99 @@ export function buildIframeHtml(
     html.print-pdf.show-notes .reveal .slides > section {
       height: 70vh !important;
     }
+
+    /* v0.11.44: document-layout mode for PDF export. The deck flows
+     * as a regular document — no fixed slide-card dimensions, no
+     * theme background, sections page-break between content blocks.
+     * Engaged by the forcePrintDocument template flag (added to
+     * html as .print-document class). Layered ON TOP of the
+     * .print-pdf rules above, so it overrides them where needed.
+     * Higher !important specificity by virtue of being later in the
+     * cascade. */
+    html.print-document {
+      background: #fff !important;
+    }
+    html.print-document body {
+      background: #fff !important;
+      color: #222 !important;
+    }
+    html.print-document .reveal {
+      position: static !important;
+      background: #fff !important;
+      color: #222 !important;
+    }
+    html.print-document .reveal .slides {
+      position: static !important;
+      display: block !important;
+      width: auto !important;
+      height: auto !important;
+      transform: none !important;
+      left: 0 !important;
+      top: 0 !important;
+    }
+    html.print-document .reveal .slides > section {
+      position: static !important;
+      display: block !important;
+      width: 100% !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      padding: 1.5rem 2rem !important;
+      margin: 0 0 1rem 0 !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      transform: none !important;
+      background: #fff !important;
+      color: #222 !important;
+      border-bottom: 1px solid #ddd;
+      page-break-after: always !important;
+      break-after: page !important;
+      page-break-inside: auto !important;
+      break-inside: auto !important;
+    }
+    html.print-document .reveal .slides > section:last-of-type {
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+      border-bottom: none;
+    }
+    html.print-document .reveal .slides > section h1,
+    html.print-document .reveal .slides > section h2,
+    html.print-document .reveal .slides > section h3 {
+      color: #111 !important;
+      text-transform: none !important;
+    }
+    html.print-document .reveal .slides > section p,
+    html.print-document .reveal .slides > section li,
+    html.print-document .reveal .slides > section td {
+      color: #222 !important;
+    }
+    html.print-document .reveal aside.notes {
+      position: static !important;
+      display: block !important;
+      visibility: visible !important;
+      background: #f7f7f7 !important;
+      color: #555 !important;
+      padding: 0.85rem 1.2rem !important;
+      margin-top: 1.25rem !important;
+      border-left: 4px solid #ccc !important;
+      border-top: none !important;
+      font-size: 0.9em !important;
+      font-style: italic;
+      page-break-inside: avoid !important;
+    }
+    html.print-document #slides-ng-grid-btn,
+    html.print-document .reveal .slide-menu-button,
+    html.print-document .reveal .controls,
+    html.print-document .reveal .progress,
+    html.print-document .reveal .backgrounds {
+      display: none !important;
+    }
+    html.print-document .reveal section[data-background-color],
+    html.print-document .reveal section[data-background],
+    html.print-document .reveal section[data-background-image] {
+      background-color: #fff !important;
+      background-image: none !important;
+    }
     /* v0.11.34: hamburger button contrast. The default reveal-menu
      * button is too transparent and disappears against light slide
      * backgrounds (user-reported). Give it a solid translucent
@@ -760,7 +868,16 @@ ${sectionsHtml}
           document.documentElement.classList.add('reveal-print');
           ${forceShowNotes ? `document.documentElement.classList.add('show-notes');
           initOpts.showNotes = true;` : ""}
+          ${forcePrintDocument ? `/* v0.11.44: document-layout mode —
+           * adds .print-document marker so CSS flattens sections into
+           * a flowing document instead of slide cards. */
+          document.documentElement.classList.add('print-document');` : ""}
         } catch (_) {}
+        ${forceMaxPagesPerSlide > 0 ? `/* v0.11.44: bake pdfMaxPagesPerSlide
+         * directly into initOpts so reveal splits overflowing slides
+         * across multiple pages. Was URL-only — same query-string-
+         * stripping concern as forcePrintMode. */
+        initOpts.pdfMaxPagesPerSlide = ${forceMaxPagesPerSlide};` : ""}
         ` : ""}${!embedded ? `/* v0.11.35/v0.11.37/v0.11.38: print-pdf
          * detection is now STRICTLY gated to standalone mode at
          * render time. Embedded preview never sees this branch
@@ -2090,24 +2207,31 @@ ${sectionsHtml}
           if (cs.backgroundColor) bg = cs.backgroundColor;
           if (cs.color) color = cs.color;
         }
-        // v0.11.43: parent the scene overlay to reveal\\'s viewport
+        // v0.11.43/v0.11.44: parent the scene overlay to reveal viewport
         // element instead of document.body. Reveal sizes
         // .reveal-viewport to the slide aspect (16:9 / 4:3 / configured)
         // so the scene inherits the same shape as the slides —
         // previously it filled the iframe viewport, which often
-        // doesn\\'t match the slide aspect (the user-reported "not in
+        // does not match the slide aspect (the user-reported "not in
         // the right ratio as the actual slides" bug, esp. visible in
         // the speaker popup where iframes are roughly square).
-        // Fall back to body when .reveal-viewport hasn\\'t been
+        // Fall back to body when .reveal-viewport has not been
         // built yet (very early scene calls).
+        // v0.11.44: font-size uses vmin units so the scene scales
+        // with the viewport size — fixes the user-reported
+        // "scrollbar shows up in speaker view" issue where the small
+        // popup iframe was too narrow for the fixed 2em font.
+        // overflow: hidden so even if the content does exceed the
+        // available space, it clips cleanly with no scrollbar.
         var viewport = document.querySelector('.reveal-viewport');
         var positionMode = viewport ? 'absolute' : 'fixed';
         el.style.cssText =
           'position:' + positionMode + ';inset:0;background:' + bg + ';color:' + color + ';' +
           'z-index:9999;display:none;flex-direction:column;align-items:center;' +
-          'justify-content:center;text-align:center;padding:5%;overflow:auto;' +
+          'justify-content:center;text-align:center;padding:5%;overflow:hidden;' +
+          'box-sizing:border-box;max-width:100%;max-height:100%;' +
           'font-family:var(--r-main-font, "Source Sans Pro", sans-serif);' +
-          'font-size:2em;line-height:1.4;gap:0.5em;';
+          'font-size:clamp(0.9rem, 4vmin, 2em);line-height:1.4;gap:0.5em;';
         (viewport || document.body).appendChild(el);
         return el;
       }

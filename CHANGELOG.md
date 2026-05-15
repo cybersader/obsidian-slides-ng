@@ -6,6 +6,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.11.44] — 2026-05-15
+
+### Added
+
+- **PDF export: "Document" layout option.** The PDF modal now
+  has a Layout dropdown:
+  - **Slides (cards with theme)** — current default. Each slide
+    on its own page with full theme styling.
+  - **Document (flowing handout)** — sections flow as a regular
+    document on white background. Page breaks between slides
+    but content can flow naturally without being forced into a
+    slide-card box. Notes appear inline beneath each section
+    (italic, gray sidebar). Better for text-heavy decks that
+    keep overflowing.
+- **forceMaxPagesPerSlide baked into HTML.** The Max-pages-per-
+  slide option (controls reveal's overflow split) now bakes
+  into `initOpts.pdfMaxPagesPerSlide` at export time — same
+  reason as forcePrintMode (URL query was unreliable).
+
+### Fixed
+
+- **Speaker popup: scene scrollbar / scale mismatch in small
+  panels.** The scene overlay used a fixed `2em` font and
+  `overflow: auto`, which produced a scrollbar in the popup's
+  half-screen iframes. Switched to `clamp(0.9rem, 4vmin, 2em)`
+  so the font scales with the viewport, and `overflow: hidden`
+  so any leftover overflow clips cleanly instead of scrolling.
+
+### Tests
+
+- 3 new tests covering `forceMaxPagesPerSlide` initOpts
+  injection, `forcePrintDocument` class addition + CSS rule
+  presence, and conditional-only-when-on emission. 420 pass.
+
+### Technical
+
+- `src/export/exportStandalone.ts` — `PdfExportOptions.pdfStyle`
+  added; export pipeline maps `pdfStyle: "document"` →
+  `forcePrintDocument` and `maxPagesPerSlide` →
+  `forceMaxPagesPerSlide`.
+- `src/render/revealTemplate.ts` — new `forceMaxPagesPerSlide`
+  and `forcePrintDocument` template options. Document-mode
+  CSS rules added (~3KB, layered after print-pdf rules so they
+  override). Scene overlay font now uses `clamp(...vmin...)`.
+- `src/render/renderDeck.ts` — both new flags flow through
+  `RenderDefaults`.
+- `src/ExportPdfOptionsModal.ts` — new Layout dropdown.
+
 ## [0.11.43] — 2026-05-15
 
 ### Fixed

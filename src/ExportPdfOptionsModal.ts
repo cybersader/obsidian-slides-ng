@@ -15,6 +15,7 @@ export class ExportPdfOptionsModal extends Modal {
     aspectRatio: "current",
     themeOverride: null,
     maxPagesPerSlide: 1,
+    pdfStyle: "slides",
   };
   private onSubmit: (options: PdfExportOptions | null) => void;
   /** Theme that the deck would render with by default — shown as the active option. */
@@ -39,6 +40,19 @@ export class ExportPdfOptionsModal extends Modal {
       cls: "slides-ng-export-pdf-modal-hint",
       text: "Pick how the printed pages should look. Cancel to abort.",
     });
+
+    new Setting(contentEl)
+      .setName("Layout")
+      .setDesc(
+        "Slides: render as slide cards with theme styling, one per page. Document: flow content as a regular handout — sections become headings, notes inline, no slide chrome. Document mode is better for text-heavy decks that keep overflowing."
+      )
+      .addDropdown((d) => {
+        d.addOption("slides", "Slides (cards with theme)");
+        d.addOption("document", "Document (flowing handout)");
+        d.setValue(this.options.pdfStyle ?? "slides").onChange((v) => {
+          this.options.pdfStyle = v as PdfExportOptions["pdfStyle"];
+        });
+      });
 
     new Setting(contentEl)
       .setName("Include speaker notes")

@@ -28,6 +28,17 @@ export interface PdfExportOptions {
    * `pdfMaxPagesPerSlide` URL param). Default 1.
    */
   maxPagesPerSlide?: number;
+  /**
+   * v0.11.44: how the printed pages should look.
+   *
+   * - `"slides"` (default) — render as slide cards, one per page,
+   *   with theme styling. Best for handouts that match the deck.
+   * - `"document"` — render as a flowing document with no slide
+   *   chrome. Sections become headings; content flows naturally;
+   *   notes appear inline beneath each section. Better for
+   *   text-heavy decks where slides keep overflowing.
+   */
+  pdfStyle?: "slides" | "document";
 }
 
 /**
@@ -209,6 +220,18 @@ export async function exportAndOpenForPdf(
   // strips the query.
   merged.forcePrintMode = true;
   if (pdfOptions.showNotes) merged.forceShowNotes = true;
+  // v0.11.44: also bake pdfMaxPagesPerSlide. Was URL-only; users
+  // saw slides splitting onto 2+ pages because the URL param wasn't
+  // reaching reveal either.
+  if (pdfOptions.maxPagesPerSlide && pdfOptions.maxPagesPerSlide > 1) {
+    merged.forceMaxPagesPerSlide = pdfOptions.maxPagesPerSlide;
+  }
+  // v0.11.44: document-layout mode. Renders the deck as a flowing
+  // document instead of slide cards — sections flow naturally, notes
+  // inline, page breaks between slides. Better for text-heavy decks.
+  if (pdfOptions.pdfStyle === "document") {
+    merged.forcePrintDocument = true;
+  }
   const result = await exportDeckToFile(app, file, timestamp, merged);
   const suffix = buildPdfUrlSuffix(pdfOptions);
   const opened = await openExternalInBrowser(result.absolutePath, suffix);

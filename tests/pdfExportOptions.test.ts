@@ -124,6 +124,40 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain('fill="currentColor"');
   });
 
+  test("forceMaxPagesPerSlide bakes pdfMaxPagesPerSlide into initOpts (v0.11.44)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+      forceMaxPagesPerSlide: 3,
+    });
+    // The split-on-overflow option now flows through the HTML, not
+    // just the URL query — same reason as forcePrintMode (the URL
+    // query string isn't reliable through the Obsidian/shell/browser
+    // pipeline on Windows for some path characters).
+    expect(html).toContain("initOpts.pdfMaxPagesPerSlide = 3");
+  });
+
+  test("forcePrintDocument adds print-document class for the flowing-doc layout (v0.11.44)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+      forcePrintDocument: true,
+    });
+    expect(html).toContain("classList.add('print-document')");
+    // The CSS rules that make the doc-layout work should be in the
+    // exported HTML.
+    expect(html).toContain("html.print-document .reveal .slides > section");
+    expect(html).toContain("page-break-after: always");
+  });
+
+  test("forcePrintDocument is NOT emitted in regular slides-mode export (v0.11.44)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+    });
+    expect(html).not.toContain("classList.add('print-document')");
+    // The CSS rules themselves are in every export (cheap, ~1KB),
+    // but the class that activates them only gets added when the
+    // user picks Document mode.
+  });
+
   test("forcePrintMode bakes print-pdf into the HTML — no URL query needed (v0.11.43)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {
       forcePrintMode: true,

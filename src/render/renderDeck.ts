@@ -100,6 +100,10 @@ export interface RenderDefaults {
   forcePrintMode?: boolean;
   /** v0.11.43: when forcePrintMode, also force showNotes. */
   forceShowNotes?: boolean;
+  /** v0.11.44: bake pdfMaxPagesPerSlide into the exported HTML. */
+  forceMaxPagesPerSlide?: number;
+  /** v0.11.44: render as flowing document instead of slide cards. */
+  forcePrintDocument?: boolean;
   /** Max-height for code blocks before they scroll. CSS length. */
   codeBlockMaxHeight?: string;
   /** Whether code blocks scroll overflow when capped. */
@@ -223,6 +227,12 @@ export function renderDeckFromAst(
   }
   if (defaults.forceShowNotes !== undefined) {
     defaultLayer.forceShowNotes = defaults.forceShowNotes;
+  }
+  if (typeof defaults.forceMaxPagesPerSlide === "number") {
+    defaultLayer.forceMaxPagesPerSlide = defaults.forceMaxPagesPerSlide;
+  }
+  if (defaults.forcePrintDocument !== undefined) {
+    defaultLayer.forcePrintDocument = defaults.forcePrintDocument;
   }
   if (defaults.codeBlockMaxHeight) {
     defaultLayer.codeBlockMaxHeight = defaults.codeBlockMaxHeight;
