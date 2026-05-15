@@ -1235,15 +1235,34 @@
   max-width: 90%;
   line-height: 1.4;
 }
-/* v0.11.62: aspect-ratio mockups — adjust slide card flex-basis
- * to differentiate 16:9 vs 4:3 visually. */
+/* v0.11.64: aspect-ratio mockups — use CSS aspect-ratio property
+ * with auto width so the card actually changes shape. Centered
+ * inside the page outline. Previous max-height approach didn\'t
+ * visibly differentiate 16:9 vs 4:3 (user-reported). */
+.mockup-slide-card {
+  align-self: center;
+  flex: 0 0 auto !important;
+}
 .mockup-slide-card.mockup-slide-aspect-16-9 {
-  /* widescreen — slightly shorter */
-  max-height: 110px;
+  aspect-ratio: 16 / 9;
+  width: 170px;
+  height: auto;
 }
 .mockup-slide-card.mockup-slide-aspect-4-3 {
-  /* squarer — slightly taller */
-  max-height: 140px;
+  aspect-ratio: 4 / 3;
+  width: 150px;
+  height: auto;
+}
+.mockup-slide-card.mockup-slide-aspect-current {
+  /* deck default 960:700 ≈ 1.37 (between 4:3 and 16:9) */
+  aspect-ratio: 960 / 700;
+  width: 160px;
+  height: auto;
+}
+/* For slides-notes mode, the slide is smaller because notes get the
+ * rest of the page. */
+.mockup-slide-card.mockup-slide-card-small {
+  width: 140px !important;
 }
 .mockup-slide-card.mockup-slide-auto-shrink .mockup-slide-title {
   font-size: 8px;

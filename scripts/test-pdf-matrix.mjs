@@ -150,10 +150,22 @@ function renderMockup(opts, currentTheme = "black") {
     .card {
       background: ${cardBg}; color: ${cardColor};
       border-radius: 3px; border: 1px solid #444;
-      padding: 8px 10px; flex: 1; min-height: 0;
+      padding: 8px 10px;
       display: flex; flex-direction: column; justify-content: center; align-items: center;
       text-align: center; position: relative; overflow: hidden;
-      ${isNotesEmphasis ? "flex: 0 0 35%;" : ""}
+      align-self: center; flex: 0 0 auto;
+      aspect-ratio: ${
+        opts.aspectRatio === "16:9" ? "16 / 9" :
+        opts.aspectRatio === "4:3"  ? "4 / 3"  :
+        "960 / 700"
+      };
+      width: ${
+        isNotesEmphasis ? 140 :
+        opts.aspectRatio === "16:9" ? 170 :
+        opts.aspectRatio === "4:3"  ? 150 :
+        160
+      }px;
+      height: auto;
     }
     .title { font-weight: 800; font-size: 10px; line-height: 1.1; }
     .subtitle { font-size: 6px; margin-top: 3px; opacity: 0.85; }
