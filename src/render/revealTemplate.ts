@@ -2223,7 +2223,15 @@ ${sectionsHtml}
                    * scale anchors to the tile\\'s corner. */
                   '        var inner = document.createElement("div");',
                   '        inner.className = "slide-tile-inner";',
-                  '        inner.style.cssText = "position:absolute;top:0;left:0;width:" + deckW + "px;height:" + deckH + "px;transform-origin:top left;pointer-events:none;";',
+                  /* v0.11.83: bake in an initial scale BEFORE the
+                   * grid lays out. 180px is the minmax min for the
+                   * tile column, so this is the worst-case (smallest)
+                   * tile width. Actual updateTileScales runs later
+                   * via requestAnimationFrame and bumps to the true
+                   * width. Prevents the initial 1280x720 natural-size
+                   * render leaking past overflow:hidden on the tile. */
+                  '        var initialScale = 180 / deckW;',
+                  '        inner.style.cssText = "position:absolute;top:0;left:0;width:" + deckW + "px;height:" + deckH + "px;transform-origin:top left;transform:scale(" + initialScale + ");pointer-events:none;";',
                   '        var fr = document.createElement("iframe");',
                   '        fr.src = deckUrlBase + "?slidesNgPinSlide=" + i;',
                   /* v0.11.78: minimum sandbox — scripts for reveal
@@ -2261,7 +2269,17 @@ ${sectionsHtml}
                   '          inner.style.transform = "scale(" + s + ")";',
                   '        });',
                   '      }',
-                  '      setTimeout(updateTileScales, 50);',
+                  /* v0.11.83: wait for layout via double rAF, then
+                   * compute the real scale. Also kick off a
+                   * ResizeObserver so the scale tracks the tile when
+                   * the user resizes the popup. */
+                  '      requestAnimationFrame(function () { requestAnimationFrame(updateTileScales); });',
+                  '      try {',
+                  '        if (typeof ResizeObserver === "function") {',
+                  '          var ro = new ResizeObserver(updateTileScales);',
+                  '          grid.querySelectorAll(".slide-tile").forEach(function (t) { ro.observe(t); });',
+                  '        }',
+                  '      } catch (_) {}',
                   '      window.removeEventListener("resize", window.__slidesNgUpdateTileScales || (function(){}));',
                   '      window.__slidesNgUpdateTileScales = updateTileScales;',
                   '      window.addEventListener("resize", updateTileScales);',
