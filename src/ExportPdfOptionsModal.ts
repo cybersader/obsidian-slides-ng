@@ -30,21 +30,18 @@ export class ExportPdfOptionsModal extends Modal {
   /** Theme that the deck would render with by default — shown as the active option. */
   private currentTheme: string;
   /**
-   * v0.11.57: render-preview callback. The view passes in a
-   * function that takes the current options and returns the
-   * exported HTML; the modal pumps that into a sandboxed iframe
-   * so the user sees a live preview of what the PDF will look
-   * like before they hit Export.
+   * v0.11.57: render-preview callback (unused as of v0.11.61).
+   * Kept in the type signature for backwards compat — the modal
+   * now renders a static HTML mockup that visualises the chosen
+   * options. The iframe + full-deck render approach was too
+   * fragile (the popup speaker UI sometimes leaked into the
+   * preview frame).
    */
   private renderPreview?: (options: PdfExportOptions, zoom: number) => Promise<string>;
-  /** DOM ref for the preview iframe so we can update its srcdoc. */
-  private previewIframe?: HTMLIFrameElement;
-  /** Debounce timer for the preview re-render. */
+  /** v0.11.61: DOM ref for the static-mockup preview container. */
+  private previewMockup?: HTMLDivElement;
+  /** Debounce timer for the preview redraw. */
   private previewTimer: number | null = null;
-  /** v0.11.59: zoom level for the preview iframe (0.1–1.0). Persisted in localStorage. */
-  private previewZoom: number = 0.4;
-  /** DOM ref for the zoom-level readout. */
-  private previewZoomLabel?: HTMLSpanElement;
 
   constructor(
     app: App,
@@ -68,87 +65,25 @@ export class ExportPdfOptionsModal extends Modal {
       text: "Pick how the printed pages should look. Cancel to abort.",
     });
 
-    // v0.11.57: live preview pane. Sandboxed iframe that renders
-    // the deck through the export pipeline with the currently-
-    // selected options. v0.11.59: with a zoom slider so the user
-    // can dial in 1-page-at-a-glance vs see-multiple-pages.
-    if (this.renderPreview) {
-      // Restore persisted zoom (if any).
-      const storedZoom = parseFloat(window.localStorage.getItem("slides-ng-pdf-preview-zoom") ?? "");
-      if (Number.isFinite(storedZoom) && storedZoom > 0.05 && storedZoom <= 1.5) {
-        this.previewZoom = storedZoom;
-      }
-
-      const previewWrap = contentEl.createDiv({ cls: "slides-ng-export-pdf-preview" });
-
-      const previewHeader = previewWrap.createDiv({ cls: "slides-ng-export-pdf-preview-header" });
-      previewHeader.createEl("div", {
-        cls: "slides-ng-export-pdf-preview-label",
-        text: "Live preview",
-      });
-
-      const zoomGroup = previewHeader.createDiv({ cls: "slides-ng-export-pdf-preview-zoom" });
-      const zoomOut = zoomGroup.createEl("button", {
-        cls: "slides-ng-export-pdf-preview-zoom-btn",
-        text: "−",
-        attr: { type: "button", title: "Zoom out" },
-      });
-      const zoomSlider = zoomGroup.createEl("input", {
-        cls: "slides-ng-export-pdf-preview-zoom-slider",
-        attr: {
-          type: "range",
-          min: "10",
-          max: "100",
-          step: "5",
-          value: String(Math.round(this.previewZoom * 100)),
-          title: "Preview zoom",
-        },
-      });
-      const zoomIn = zoomGroup.createEl("button", {
-        cls: "slides-ng-export-pdf-preview-zoom-btn",
-        text: "+",
-        attr: { type: "button", title: "Zoom in" },
-      });
-      this.previewZoomLabel = zoomGroup.createEl("span", {
-        cls: "slides-ng-export-pdf-preview-zoom-readout",
-        text: `${Math.round(this.previewZoom * 100)}%`,
-      });
-
-      const applyZoom = (zoom: number) => {
-        this.previewZoom = Math.max(0.1, Math.min(1.0, zoom));
-        zoomSlider.value = String(Math.round(this.previewZoom * 100));
-        if (this.previewZoomLabel) {
-          this.previewZoomLabel.textContent = `${Math.round(this.previewZoom * 100)}%`;
-        }
-        window.localStorage.setItem("slides-ng-pdf-preview-zoom", String(this.previewZoom));
-        this.schedulePreviewRefresh();
-      };
-      zoomSlider.addEventListener("input", (e) => {
-        const v = parseInt((e.target as HTMLInputElement).value, 10);
-        if (Number.isFinite(v)) applyZoom(v / 100);
-      });
-      zoomOut.addEventListener("click", () => applyZoom(this.previewZoom - 0.05));
-      zoomIn.addEventListener("click", () => applyZoom(this.previewZoom + 0.05));
-
-      this.previewIframe = previewWrap.createEl("iframe", {
-        cls: "slides-ng-export-pdf-preview-iframe",
-        attr: { sandbox: "allow-scripts", title: "PDF preview" },
-      });
-      // Kick off initial render after the modal lays out.
-      window.setTimeout(() => this.schedulePreviewRefresh(), 50);
-      // Bubble-listen for any user interaction so we don\'t have
-      // to wire `schedulePreviewRefresh()` into every individual
-      // option\'s onChange handler. Both `input` (for text fields)
-      // and `change` (for dropdowns/toggles) cover the set. We
-      // skip the zoom slider so its native `input` events don\'t
-      // double-trigger (applyZoom already calls schedulePreviewRefresh).
-      const refresh = (ev: Event) => {
-        if (ev.target === zoomSlider) return;
-        this.schedulePreviewRefresh();
-      };
-      contentEl.addEventListener("change", refresh);
-      contentEl.addEventListener("input", refresh);
-    }
+    // v0.11.61: STATIC mockup preview — a pure-DOM representation
+    // of what one PDF page will look like with the chosen options.
+    // No iframe, no script execution, no full-deck render. Gives
+    // the user a mental model: "ah, slide card on top, big notes
+    // block below, grayscale + slide-number stamp visible." The
+    // earlier iframe-based live preview kept rendering the speaker
+    // popup HTML by accident — too many moving parts.
+    const previewWrap = contentEl.createDiv({ cls: "slides-ng-export-pdf-preview" });
+    previewWrap.createEl("div", {
+      cls: "slides-ng-export-pdf-preview-label",
+      text: "Preview (mockup of one page)",
+    });
+    this.previewMockup = previewWrap.createDiv({ cls: "slides-ng-export-pdf-mockup" });
+    // Kick off initial draw.
+    window.setTimeout(() => this.schedulePreviewRefresh(), 50);
+    // Re-draw on any option change.
+    const refresh = () => this.schedulePreviewRefresh();
+    contentEl.addEventListener("change", refresh);
+    contentEl.addEventListener("input", refresh);
 
     new Setting(contentEl)
       .setName("Layout")
@@ -339,24 +274,166 @@ export class ExportPdfOptionsModal extends Modal {
   }
 
   /**
-   * v0.11.57: debounced live-preview refresh. Re-renders the deck
-   * with the currently-selected options and pumps the resulting
-   * HTML into the preview iframe\'s srcdoc.
+   * v0.11.61: debounced redraw of the static-mockup preview. Pure
+   * DOM, no iframe, no full-deck render. Produces a small Letter-
+   * proportioned page outline with the slide-card / notes block /
+   * margins / header / footer / grayscale / slide-number stamp
+   * positioned to visualise the chosen layout.
    */
   private schedulePreviewRefresh(): void {
-    if (!this.renderPreview || !this.previewIframe) return;
+    if (!this.previewMockup) return;
     if (this.previewTimer !== null) window.clearTimeout(this.previewTimer);
-    this.previewTimer = window.setTimeout(async () => {
+    this.previewTimer = window.setTimeout(() => {
       this.previewTimer = null;
-      if (!this.renderPreview || !this.previewIframe) return;
-      try {
-        const html = await this.renderPreview(this.options, this.previewZoom);
-        this.previewIframe.srcdoc = html;
-      } catch (err) {
-        // Failure here shouldn\'t break the modal — just log.
-        // eslint-disable-next-line no-console
-        console.warn("[slides-ng] PDF preview render failed", err);
+      if (!this.previewMockup) return;
+      this.previewMockup.empty();
+      this.previewMockup.appendChild(this.buildMockup());
+    }, 120);
+  }
+
+  /**
+   * v0.11.61: build the static page-mockup DOM. Layout depends on
+   * `pdfStyle`:
+   *   slides         — full-page slide card with theme styling.
+   *                    Notes block below if showNotes is on (~25%).
+   *   slides-notes   — small slide card on top (~35%), big notes
+   *                    block below (~55%).
+   *   document       — flowing handout: section header, body lines,
+   *                    notes inline. No slide card.
+   * Page margins, grayscale, header/footer, slide-number stamp are
+   * all visualised when their options are on.
+   */
+  private buildMockup(): HTMLElement {
+    const opts = this.options;
+    const page = document.createElement("div");
+    page.className = "slides-ng-export-pdf-mockup-page";
+    page.setAttribute("data-style", opts.pdfStyle ?? "slides");
+
+    // Page-margin visualization — adjust inner padding.
+    const margin = opts.pageMargin ?? "normal";
+    page.classList.add(`mockup-margin-${margin}`);
+
+    // Grayscale wrapper.
+    if (opts.grayscale) page.classList.add("mockup-grayscale");
+
+    // Page header strip (if forceHeaderText set).
+    if (opts.headerText) {
+      const h = document.createElement("div");
+      h.className = "mockup-page-header";
+      h.textContent = opts.headerText;
+      page.appendChild(h);
+    }
+
+    // Inner content scaffolding depends on layout.
+    const inner = document.createElement("div");
+    inner.className = "mockup-page-inner";
+    page.appendChild(inner);
+
+    if (opts.pdfStyle === "document") {
+      // Flowing document — section header + body + notes
+      const heading = document.createElement("div");
+      heading.className = "mockup-doc-heading";
+      heading.textContent = "Building Resilient Systems";
+      inner.appendChild(heading);
+      const body = document.createElement("div");
+      body.className = "mockup-doc-body";
+      for (let i = 0; i < 4; i++) {
+        const line = document.createElement("div");
+        line.className = "mockup-line";
+        body.appendChild(line);
       }
-    }, 350);
+      inner.appendChild(body);
+      if (opts.showNotes) {
+        const notes = document.createElement("div");
+        notes.className = "mockup-doc-notes";
+        notes.appendChild(this.makeLabel("Notes"));
+        for (let i = 0; i < 2; i++) {
+          const line = document.createElement("div");
+          line.className = "mockup-line mockup-line-notes";
+          notes.appendChild(line);
+        }
+        inner.appendChild(notes);
+      }
+    } else {
+      // Slides modes — render a slide card with theme styling.
+      const isNotesEmphasis = opts.pdfStyle === "slides-notes";
+      const card = document.createElement("div");
+      card.className = `mockup-slide-card mockup-slide-aspect-${(opts.aspectRatio ?? "current").replace(":", "-")}`;
+      if (isNotesEmphasis) card.classList.add("mockup-slide-card-small");
+      // Theme override or "Current"
+      const themeName = opts.themeOverride ?? this.currentTheme ?? "black";
+      card.setAttribute("data-theme", themeName);
+      // Slide content placeholder
+      const title = document.createElement("div");
+      title.className = "mockup-slide-title";
+      title.textContent = "BUILDING RESILIENT SYSTEMS";
+      card.appendChild(title);
+      const subtitle = document.createElement("div");
+      subtitle.className = "mockup-slide-subtitle";
+      subtitle.textContent = "Lessons from running production for a decade";
+      card.appendChild(subtitle);
+      // Slide-number stamp.
+      if (opts.slideNumberStamp) {
+        const stamp = document.createElement("div");
+        stamp.className = "mockup-slide-stamp";
+        stamp.textContent = "Slide 1 / 12";
+        card.appendChild(stamp);
+      }
+      inner.appendChild(card);
+      // Notes block — only if showNotes OR slides-notes mode.
+      const showsNotes = isNotesEmphasis || opts.showNotes;
+      if (showsNotes) {
+        const notes = document.createElement("div");
+        notes.className = isNotesEmphasis
+          ? "mockup-notes mockup-notes-big"
+          : "mockup-notes mockup-notes-small";
+        notes.appendChild(this.makeLabel("Speaker notes"));
+        const lineCount = isNotesEmphasis ? 6 : 3;
+        for (let i = 0; i < lineCount; i++) {
+          const line = document.createElement("div");
+          line.className = "mockup-line mockup-line-notes";
+          notes.appendChild(line);
+        }
+        inner.appendChild(notes);
+      }
+    }
+
+    // Page footer strip.
+    if (opts.footerText) {
+      const f = document.createElement("div");
+      f.className = "mockup-page-footer";
+      f.textContent = opts.footerText;
+      page.appendChild(f);
+    }
+
+    // Wrap with a label noting the active config.
+    const wrap = document.createElement("div");
+    wrap.className = "slides-ng-export-pdf-mockup-wrap";
+    wrap.appendChild(page);
+    const note = document.createElement("div");
+    note.className = "slides-ng-export-pdf-mockup-summary";
+    const layoutLabel = opts.pdfStyle === "slides-notes"
+      ? "Slides + notes emphasis"
+      : opts.pdfStyle === "document"
+        ? "Document handout"
+        : "Slides (cards with theme)";
+    const bits = [layoutLabel];
+    if (opts.aspectRatio && opts.aspectRatio !== "current") bits.push(opts.aspectRatio);
+    if (opts.pageSize && opts.pageSize !== "current") bits.push(opts.pageSize.toUpperCase());
+    if (opts.pageMargin && opts.pageMargin !== "normal") bits.push(`${opts.pageMargin} margin`);
+    if (opts.grayscale) bits.push("grayscale");
+    if (opts.hideBackgrounds) bits.push("no bg");
+    if (opts.autoShrink) bits.push("auto-shrink");
+    if (opts.maxPagesPerSlide && opts.maxPagesPerSlide > 1) bits.push(`max ${opts.maxPagesPerSlide} pgs/slide`);
+    note.textContent = bits.join(" · ");
+    wrap.appendChild(note);
+    return wrap;
+  }
+
+  private makeLabel(text: string): HTMLElement {
+    const l = document.createElement("div");
+    l.className = "mockup-label";
+    l.textContent = text;
+    return l;
   }
 }

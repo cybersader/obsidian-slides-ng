@@ -1042,74 +1042,184 @@
   color: var(--text-muted);
   font-size: 0.9em;
 }
-/* v0.11.57: live-preview pane in the export-for-PDF modal */
+/* v0.11.61: static mockup preview in the export-for-PDF modal.
+ * Replaced the v0.11.57 iframe live-render approach — the iframe
+ * sometimes loaded the speaker-popup HTML by accident. Static
+ * mockup gives the user a mental model of the layout without
+ * the rendering fragility. */
 .slides-ng-export-pdf-preview {
   margin-bottom: 1rem;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
   background: var(--background-secondary);
-  padding: 0.5rem;
-}
-.slides-ng-export-pdf-preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.35rem;
-  padding: 0 0.15rem;
-  gap: 0.5rem;
+  padding: 0.6rem;
 }
 .slides-ng-export-pdf-preview-label {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  padding: 0 0.15rem;
 }
-.slides-ng-export-pdf-preview-zoom {
+.slides-ng-export-pdf-mockup {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
 }
-.slides-ng-export-pdf-preview-zoom-btn {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--interactive-normal);
-  color: var(--text-normal);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
-  line-height: 1;
-  display: inline-flex;
+.slides-ng-export-pdf-mockup-wrap {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-}
-.slides-ng-export-pdf-preview-zoom-btn:hover {
-  background: var(--interactive-hover);
-}
-.slides-ng-export-pdf-preview-zoom-slider {
-  width: 100px;
-  height: 4px;
-  margin: 0;
-}
-.slides-ng-export-pdf-preview-zoom-readout {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  min-width: 2.5rem;
-  text-align: right;
-}
-.slides-ng-export-pdf-preview-iframe {
+  gap: 0.4rem;
   width: 100%;
-  height: 240px;
-  border: 1px solid var(--background-modifier-border);
+}
+.slides-ng-export-pdf-mockup-page {
+  width: 200px;
+  height: 260px;
+  background: #ffffff;
+  border: 1px solid #c0c0c0;
   border-radius: 4px;
-  background: #fff;
-  display: block;
-  /* v0.11.58: the rendered preview is zoomed-out internally via CSS
-   * `zoom` so multiple pages fit. Keep the iframe scroll for
-   * decks longer than ~2 pages — user can drag to see later pages. */
-  overflow: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+  color: #222;
+}
+.slides-ng-export-pdf-mockup-page.mockup-margin-narrow { padding: 7px; }
+.slides-ng-export-pdf-mockup-page.mockup-margin-wide { padding: 22px; }
+.slides-ng-export-pdf-mockup-page.mockup-margin-none { padding: 2px; }
+.slides-ng-export-pdf-mockup-page.mockup-grayscale { filter: grayscale(1); }
+.mockup-page-header,
+.mockup-page-footer {
+  font-size: 6px;
+  color: #888;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  padding: 2px 4px;
+  margin-bottom: 4px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mockup-page-footer { margin-bottom: 0; margin-top: auto; }
+.mockup-page-inner {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 4px;
+}
+.mockup-slide-card {
+  background: #191919;
+  color: #ffffff;
+  border-radius: 3px;
+  border: 1px solid #444;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.mockup-slide-card.mockup-slide-card-small { flex: 0 0 35%; }
+.mockup-slide-card[data-theme="white"],
+.mockup-slide-card[data-theme="beige"],
+.mockup-slide-card[data-theme="simple"],
+.mockup-slide-card[data-theme="serif"] {
+  background: #f5f5f0;
+  color: #222;
+  border-color: #c0c0c0;
+}
+.mockup-slide-card[data-theme="dracula"] { background: #282a36; }
+.mockup-slide-card[data-theme="solarized"] { background: #fdf6e3; color: #586e75; }
+.mockup-slide-title {
+  font-weight: 800;
+  font-size: 10px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+.mockup-slide-subtitle {
+  font-size: 6px;
+  margin-top: 3px;
+  opacity: 0.85;
+}
+.mockup-slide-stamp {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 5px;
+  padding: 1px 3px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.mockup-notes {
+  background: #fafafa;
+  border-top: 1px solid #ccc;
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mockup-notes-big { flex: 1 1 auto; min-height: 0; }
+.mockup-notes-small { flex: 0 0 25%; }
+.mockup-label {
+  font-size: 5px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+}
+.mockup-line {
+  height: 3px;
+  background: #999;
+  border-radius: 1px;
+  opacity: 0.55;
+}
+.mockup-line:nth-child(2) { width: 100%; }
+.mockup-line:nth-child(3) { width: 88%; }
+.mockup-line:nth-child(4) { width: 95%; }
+.mockup-line:nth-child(5) { width: 78%; }
+.mockup-line:nth-child(6) { width: 92%; }
+.mockup-line:nth-child(7) { width: 84%; }
+.mockup-line-notes { height: 2px; background: #aaa; }
+.mockup-doc-heading {
+  font-size: 9px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 4px;
+}
+.mockup-doc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.mockup-doc-notes {
+  border-top: 1px dashed #aaa;
+  padding-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.slides-ng-export-pdf-mockup-summary {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  max-width: 90%;
+  line-height: 1.4;
 }
 .slides-ng-export-pdf-actions {
   display: flex;
