@@ -583,7 +583,68 @@ export class SlidesNGView extends ItemView {
   private showPlaceholder(message: string): void {
     if (!this.iframeEl) return;
     const safe = escapeHtml(message);
-    this.iframeEl.srcdoc = `<!doctype html><meta charset="utf-8"><body style="font-family:sans-serif;padding:2rem;color:#888;background:#111;height:100%;margin:0;display:flex;align-items:center;justify-content:center;text-align:center"><p>${safe}</p></body>`;
+    // v0.11.51: HIGH-contrast empty-state placeholder. The previous
+    // gray-on-dark-gray (color:#888;background:#111) was so subtle
+    // the user kept reading it as a black-screen render failure.
+    // Now: clear "Slides NG" branding so the user knows it\'s the
+    // placeholder and not an unexpected blank pane.
+    this.iframeEl.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        background: #1e1e2e;
+        color: #e8e8f0;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 2rem;
+        box-sizing: border-box;
+      }
+      .badge {
+        font-size: 0.75rem;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: #8b8b9e;
+        margin-bottom: 1rem;
+      }
+      .icon {
+        font-size: 3rem;
+        line-height: 1;
+        margin-bottom: 1rem;
+        opacity: 0.55;
+      }
+      .msg {
+        font-size: 1.05rem;
+        line-height: 1.5;
+        max-width: 32rem;
+        color: #e8e8f0;
+      }
+      .hint {
+        margin-top: 1.5rem;
+        font-size: 0.85rem;
+        color: #9090a8;
+        max-width: 28rem;
+        line-height: 1.5;
+      }
+      kbd {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 3px;
+        padding: 1px 6px;
+        font-family: ui-monospace, monospace;
+        font-size: 0.85em;
+      }
+    </style></head><body>
+      <div class="badge">Slides NG · preview</div>
+      <div class="icon">▣</div>
+      <div class="msg">${safe}</div>
+      <div class="hint">Once a markdown file is open, click <kbd>Use current</kbd> or <kbd>Reload</kbd> in the toolbar above.</div>
+    </body></html>`;
   }
 
   async openInBrowser(): Promise<void> {

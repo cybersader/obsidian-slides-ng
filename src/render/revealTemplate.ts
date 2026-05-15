@@ -775,35 +775,77 @@ export function buildIframeHtml(
       break-after: avoid !important;
     }
     /* The "slide visual" — block at top of each page, sized like an
-     * actual rendered slide (~ 16:9, ~45% of page height). Keeps
-     * the deck's theme styling inside the slide-card so it actually
-     * looks like a slide. */
+     * actual rendered slide. Explicit height + width so reveal print
+     * stylesheet cannot collapse it. Hardcoded dark background +
+     * light text so the card always looks like a slide even if CSS
+     * variables do not resolve (v0.11.50 had aspect-ratio +
+     * var(--r-background-color) and the user saw the slide card
+     * render entirely INVISIBLE with the headings missing — root
+     * cause was the variable not resolving in the cascade combined
+     * with media:print CSS interactions). */
     html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout {
-      display: block !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+      align-items: center !important;
+      text-align: center !important;
       width: 100% !important;
-      aspect-ratio: 16 / 9 !important;
-      max-height: 4.4in !important;
-      background: var(--r-background-color, #191919) !important;
-      color: var(--r-main-color, #fff) !important;
+      height: 4in !important;
+      min-height: 4in !important;
+      max-height: 4in !important;
+      background: #191919 !important;
+      background-color: #191919 !important;
+      color: #ffffff !important;
       padding: 0.35in 0.5in !important;
       box-sizing: border-box !important;
       overflow: hidden !important;
-      border: 1px solid #aaa !important;
+      border: 1px solid #444 !important;
       border-radius: 4px !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
+      margin: 0 !important;
+      gap: 0.2in !important;
     }
-    /* Restore theme heading colors inside the slide card. The
-     * default print-pdf rules above force body to #fff/#222 black;
-     * the slide card needs its own theme colors restored. */
+    /* Headings inside the slide card — explicit light color so the
+     * H1 doesn\\'t inherit the page-body dark color and disappear
+     * against the dark slide card. */
     html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h1,
     html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h2,
     html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h3,
     html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h4,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h5,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h6 {
+      color: #ffffff !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      line-height: 1.15 !important;
+      text-shadow: none !important;
+    }
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h1 {
+      font-size: 28pt !important;
+      font-weight: 800 !important;
+      letter-spacing: 0.02em !important;
+    }
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h2 {
+      font-size: 22pt !important;
+      font-weight: 700 !important;
+    }
     html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout p,
     html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout li,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout span {
-      color: inherit !important;
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout span,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout strong,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout em {
+      color: #e8e8e8 !important;
+      font-size: 14pt !important;
+      line-height: 1.4 !important;
+      margin: 0 !important;
+    }
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout ul,
+    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout ol {
+      color: #e8e8e8 !important;
+      text-align: left !important;
+      margin: 0 !important;
+      padding-left: 1.2em !important;
     }
     /* Notes flow naturally below the slide card, no fixed sizes.
      * Can overflow to the next page if too long. */

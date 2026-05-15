@@ -187,13 +187,19 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
       forceNotesEmphasis: true,
     });
     expect(html).toContain("classList.add('notes-emphasis')");
-    // v0.11.50: notes-emphasis is now a Notes Pages handout layout.
-    // - section becomes a block-flow page container (position:static)
-    // - .slides-ng-layout (the slide visual) is sized like a slide card
-    // - aside.notes flows naturally below, no fixed sizes, can wrap
+    // v0.11.50/v0.11.51: notes-emphasis = Notes Pages handout.
+    // - section is a block-flow page container (position:static)
+    // - .slides-ng-layout is the slide visual at top, hardcoded
+    //   dark bg + light text (v0.11.51: hardcoded after v0.11.50
+    //   `aspect-ratio + var(--r-background-color)` rendered the
+    //   slide card INVISIBLE — variable did not resolve in print
+    //   media context, leaving white card with light headings).
+    // - aside.notes flows below, can wrap to next page.
     expect(html).toContain("html.print-pdf.notes-emphasis .reveal .slides > section");
-    expect(html).toContain("aspect-ratio: 16 / 9");
     expect(html).toContain("page-break-after: always");
+    // Hardcoded dark bg + light text (v0.11.51).
+    expect(html).toMatch(/notes-emphasis[\s\S]{0,2000}\.slides-ng-layout\s*\{[\s\S]{0,800}background-color:\s*#191919/);
+    expect(html).toMatch(/notes-emphasis[\s\S]{0,4000}\.slides-ng-layout h1\b[\s\S]{0,500}color:\s*#ffffff/);
     // Notes block: NO fixed min-height (the v0.11.45 bug),
     // page-break-inside auto so they can flow.
     expect(html).toMatch(/notes-emphasis[^{}]*aside\.notes\s*\{[\s\S]{0,1500}?min-height:\s*0/);
