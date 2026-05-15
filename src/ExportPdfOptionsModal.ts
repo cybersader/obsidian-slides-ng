@@ -442,14 +442,18 @@ export class ExportPdfOptionsModal extends Modal {
       }
       inner.appendChild(card);
       // Notes block — only if showNotes OR slides-notes mode.
+      // v0.11.66: "NOTES" label (matches actual export, not
+      // "SPEAKER NOTES"). Notes block size reduced — the actual
+      // print rendering shows notes as just a few lines under the
+      // slide card, not a half-page block.
       const showsNotes = isNotesEmphasis || opts.showNotes;
       if (showsNotes) {
         const notes = document.createElement("div");
         notes.className = isNotesEmphasis
           ? "mockup-notes mockup-notes-big"
           : "mockup-notes mockup-notes-small";
-        notes.appendChild(this.makeLabel("Speaker notes"));
-        const lineCount = isNotesEmphasis ? 6 : 3;
+        notes.appendChild(this.makeLabel("Notes"));
+        const lineCount = isNotesEmphasis ? 3 : 2;
         for (let i = 0; i < lineCount; i++) {
           const line = document.createElement("div");
           line.className = "mockup-line mockup-line-notes";

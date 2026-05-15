@@ -1186,8 +1186,11 @@
   flex-direction: column;
   gap: 2px;
 }
-.mockup-notes-big { flex: 1 1 auto; min-height: 0; }
-.mockup-notes-small { flex: 0 0 25%; }
+/* v0.11.66: notes block sizes calibrated against actual PDF render
+ * (matrix scaffold). The actual print output shows notes as a thin
+ * strip under the slide card, NOT a half-page block. */
+.mockup-notes-big { flex: 0 0 auto; min-height: 0; }
+.mockup-notes-small { flex: 0 0 auto; min-height: 0; }
 .mockup-label {
   font-size: 5px;
   color: #888;

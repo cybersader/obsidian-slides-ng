@@ -214,8 +214,8 @@ function renderMockup(opts, currentTheme = "black") {
         ${opts.slideNumberStamp ? `<div class="stamp">Slide 1 / 12</div>` : ""}
       </div>
       ${showsNotes ? `<div class="notes">
-        <div class="label">Speaker notes</div>
-        ${"<div class='line line-notes'></div>".repeat(isNotesEmphasis ? 6 : 3)}
+        <div class="label">Notes</div>
+        ${"<div class='line line-notes'></div>".repeat(isNotesEmphasis ? 3 : 2)}
       </div>` : ""}`;
   }
   // optional overflow continuation
@@ -320,16 +320,22 @@ for (const combo of filtered) {
   // v0.11.63: suppress auto-print so it doesn't collide with
   // headless Chrome's own print-to-pdf flag.
   const url = `file://${exportPath}?print-pdf&slidesNgNoAutoPrint=1${combo.showNotes || combo.pdfStyle === "slides-notes" ? "&showNotes=true" : ""}`;
+  // v0.11.66: use --emulate-media-type=print for the screenshot
+  // so we see what the actual PRINTED output looks like (the
+  // primary thing we want to verify). Without this flag, the
+  // screen-mode reveal layout doesn't reflect the PDF.
+  // Window 816x1056 ≈ one Letter page @ 96dpi.
   await chrome([
     "--window-size=816,1056",
+    "--emulate-media-type=print",
     `--screenshot=${dir}/actual.png`,
-    "--virtual-time-budget=2500",
+    "--virtual-time-budget=4000",
     url,
   ]);
   await chrome([
     `--print-to-pdf=${dir}/actual.pdf`,
     "--no-pdf-header-footer",
-    "--virtual-time-budget=2500",
+    "--virtual-time-budget=4000",
     url,
   ]);
 
@@ -349,7 +355,7 @@ const indexHtml = `<!doctype html><html><head><meta charset="utf-8">
   .combo .opts { color: #aaa; font-size: 0.85rem; font-family: ui-monospace, monospace; margin-bottom: 0.75rem; }
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   .pair > div { text-align: center; }
-  .pair img { max-width: 100%; max-height: 600px; background: #fff; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+  .pair img { max-width: 100%; max-height: 700px; background: #fff; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
   .pair .label { font-size: 0.85rem; text-transform: uppercase; color: #aaa; margin-bottom: 0.35rem; letter-spacing: 0.08em; }
   a { color: #82b1ff; text-decoration: none; }
   a:hover { text-decoration: underline; }
@@ -362,14 +368,14 @@ ${filtered.map(c => `
     <div class="opts">${JSON.stringify(c)}</div>
     <div class="pair">
       <div>
-        <div class="label">Mockup (what the modal shows)</div>
+        <div class="label">Mockup (modal preview)</div>
         <img src="${c.name}/mockup.png" alt="${c.name} mockup">
-        <div><a href="${c.name}/mockup.html">open mockup html</a></div>
+        <div><a href="${c.name}/mockup.html">mockup html</a></div>
       </div>
       <div>
-        <div class="label">Actual export (Chrome render)</div>
+        <div class="label">Actual print page 1 (Chrome --emulate-media=print)</div>
         <img src="${c.name}/actual.png" alt="${c.name} actual">
-        <div><a href="${c.name}/export.html">open export html</a> · <a href="${c.name}/actual.pdf">open PDF</a></div>
+        <div><a href="${c.name}/actual.pdf">open full PDF</a> · <a href="${c.name}/export.html">export html</a></div>
       </div>
     </div>
   </div>
