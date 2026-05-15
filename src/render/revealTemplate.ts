@@ -2112,7 +2112,7 @@ ${sectionsHtml}
                    * sandboxed iframes pinned to slide N (visual
                    * thumbnails). Default false renders text-only
                    * "N — title" tiles (cheap; the safe default). */
-                  'var SLIDES_NG_RENDERED_GRID = ' + (popupRenderedGrid ? 'true' : 'false') + ';',
+                  'var SLIDES_NG_RENDERED_GRID = ${popupRenderedGrid ? "true" : "false"};',
                   'function buildSlideGrid() {',
                   '  var grid = document.getElementById("slide-grid");',
                   '  if (!grid) return;',

@@ -143,7 +143,7 @@ export class ExportPdfOptionsModal extends Modal {
     const aspectSetting = new Setting(contentEl)
       .setName("Slide aspect ratio")
       .setDesc(
-        "Shape of the slide content area. Only meaningful in Slides layout (each page is the slide). In Slides + notes emphasis the slide card is a fixed-height block; in Document mode the page reflows content. 'Current' uses the deck's authored dimensions."
+        "Shape of the slide content area. Most visible in plain Slides layout (each page is the slide). In Slides + notes emphasis the slide card has fixed outer size but reveal still uses this ratio for internal content layout (subtle effect). In Document mode the page reflows content; ratio is not used."
       )
       .addDropdown((d) => {
         d.addOption("current", "Current (deck default)");
@@ -325,14 +325,18 @@ export class ExportPdfOptionsModal extends Modal {
    * plain slides mode).
    */
   private updateAspectRatioEnabled(): void {
-    const isPlainSlides = this.options.pdfStyle === "slides";
+    const isDoc = this.options.pdfStyle === "document";
     const isNotesEmphasis = this.options.pdfStyle === "slides-notes";
 
-    // Aspect ratio: only meaningful in plain slides.
+    // Aspect ratio: only fully meaningless in Document mode (page
+    // reflows content; no aspect-ratio-bound slide rectangle). In
+    // notes-emphasis the slide-card outer size is fixed but reveal
+    // still uses the aspect ratio to lay content out internally —
+    // subtle effect, but real. Keep it enabled there.
     if (this.aspectDropdown && this.aspectDropdown.selectEl) {
-      this.aspectDropdown.selectEl.disabled = !isPlainSlides;
+      this.aspectDropdown.selectEl.disabled = isDoc;
     }
-    this.aspectSetting?.settingEl.toggleClass("slides-ng-setting-disabled", !isPlainSlides);
+    this.aspectSetting?.settingEl.toggleClass("slides-ng-setting-disabled", isDoc);
 
     // Include speaker notes: forced ON in notes-emphasis.
     if (this.showNotesToggleEl) {
