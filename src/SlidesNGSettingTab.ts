@@ -416,6 +416,20 @@ export class SlidesNGSettingTab extends PluginSettingTab {
         );
       });
 
+    new Setting(containerEl)
+      .setName("Experimental: live PDF export preview")
+      .setDesc(
+        "Adds a sandboxed iframe that renders the actual export HTML alongside the static mockup in the Export-for-PDF modal. The iframe sometimes leaks the speaker-popup HTML; mockup is the safe default."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.experimentalLivePdfPreview).onChange(
+          async (v) => {
+            this.plugin.settings.experimentalLivePdfPreview = v;
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
     // ---------- Speaker panels ----------
     new Setting(containerEl).setName("Speaker panels").setHeading();
     new Setting(containerEl)

@@ -737,7 +737,9 @@ export class SlidesNGView extends ItemView {
         return rendered.includes("</head>")
           ? rendered.replace("</head>", `${previewStyle}</head>`)
           : previewStyle + rendered;
-      }
+      },
+      // v0.11.62: experimental live iframe preview, opt-in via Settings.
+      settings.experimentalLivePdfPreview
     ).open();
   }
 

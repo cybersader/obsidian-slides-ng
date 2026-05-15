@@ -253,6 +253,17 @@ export interface SlidesNGSettings {
    * it behind a lazy-loaded module.
    */
   experimentalGridSpeakerView: boolean;
+
+  /**
+   * v0.11.62: enable the live iframe-render preview in the
+   * Export-for-PDF modal IN ADDITION TO the static mockup. The
+   * iframe shows the actual export HTML (smaller fidelity for
+   * the new "Notes Pages" handouts, but a true preview). Was the
+   * default v0.11.57-v0.11.60 but caused popup-HTML-leakage
+   * surprises; now opt-in for users who want to spot-check the
+   * real output.
+   */
+  experimentalLivePdfPreview: boolean;
 }
 
 /** All draggable/toggleable speaker-view panels. */
@@ -421,4 +432,5 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   autoH1Breaks: false,
   sceneInheritThemeBg: true,
   experimentalGridSpeakerView: false,
+  experimentalLivePdfPreview: false,
 };

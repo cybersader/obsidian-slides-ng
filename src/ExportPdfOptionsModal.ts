@@ -42,17 +42,22 @@ export class ExportPdfOptionsModal extends Modal {
   private previewMockup?: HTMLDivElement;
   /** Debounce timer for the preview redraw. */
   private previewTimer: number | null = null;
+  /** v0.11.62: experimental iframe preview (opt-in via settings). */
+  private experimentalIframe?: HTMLIFrameElement;
+  private experimentalIframeEnabled: boolean = false;
 
   constructor(
     app: App,
     currentTheme: string,
     onSubmit: (options: PdfExportOptions | null) => void,
-    renderPreview?: (options: PdfExportOptions, zoom: number) => Promise<string>
+    renderPreview?: (options: PdfExportOptions, zoom: number) => Promise<string>,
+    experimentalIframeEnabled?: boolean
   ) {
     super(app);
     this.onSubmit = onSubmit;
     this.currentTheme = currentTheme;
     this.renderPreview = renderPreview;
+    this.experimentalIframeEnabled = !!experimentalIframeEnabled;
   }
 
   onOpen(): void {
@@ -78,6 +83,22 @@ export class ExportPdfOptionsModal extends Modal {
       text: "Preview (mockup of one page)",
     });
     this.previewMockup = previewWrap.createDiv({ cls: "slides-ng-export-pdf-mockup" });
+
+    // v0.11.62: experimental iframe live-render (opt-in via
+    // Settings). Sits below the mockup. Re-rendered alongside the
+    // mockup on every option change.
+    if (this.experimentalIframeEnabled && this.renderPreview) {
+      const expWrap = previewWrap.createDiv({ cls: "slides-ng-export-pdf-preview-experimental" });
+      expWrap.createEl("div", {
+        cls: "slides-ng-export-pdf-preview-experimental-label",
+        text: "Experimental: live render (real export HTML)",
+      });
+      this.experimentalIframe = expWrap.createEl("iframe", {
+        cls: "slides-ng-export-pdf-preview-iframe",
+        attr: { sandbox: "allow-scripts", title: "PDF preview (live render)" },
+      });
+    }
+
     // Kick off initial draw.
     window.setTimeout(() => this.schedulePreviewRefresh(), 50);
     // Re-draw on any option change.
@@ -283,11 +304,21 @@ export class ExportPdfOptionsModal extends Modal {
   private schedulePreviewRefresh(): void {
     if (!this.previewMockup) return;
     if (this.previewTimer !== null) window.clearTimeout(this.previewTimer);
-    this.previewTimer = window.setTimeout(() => {
+    this.previewTimer = window.setTimeout(async () => {
       this.previewTimer = null;
-      if (!this.previewMockup) return;
-      this.previewMockup.empty();
-      this.previewMockup.appendChild(this.buildMockup());
+      if (this.previewMockup) {
+        this.previewMockup.empty();
+        this.previewMockup.appendChild(this.buildMockup());
+      }
+      // v0.11.62: also refresh the experimental iframe if enabled.
+      if (this.experimentalIframe && this.renderPreview) {
+        try {
+          const html = await this.renderPreview(this.options, 0.4);
+          this.experimentalIframe.srcdoc = html;
+        } catch {
+          /* ignore */
+        }
+      }
     }, 120);
   }
 
@@ -358,11 +389,12 @@ export class ExportPdfOptionsModal extends Modal {
       // Slides modes — render a slide card with theme styling.
       const isNotesEmphasis = opts.pdfStyle === "slides-notes";
       const card = document.createElement("div");
-      card.className = `mockup-slide-card mockup-slide-aspect-${(opts.aspectRatio ?? "current").replace(":", "-")}`;
+      const aspectClass = `mockup-slide-aspect-${(opts.aspectRatio ?? "current").replace(":", "-")}`;
+      card.className = `mockup-slide-card ${aspectClass}`;
       if (isNotesEmphasis) card.classList.add("mockup-slide-card-small");
-      // Theme override or "Current"
+      // Theme override or "Current". Hide-backgrounds forces white.
       const themeName = opts.themeOverride ?? this.currentTheme ?? "black";
-      card.setAttribute("data-theme", themeName);
+      card.setAttribute("data-theme", opts.hideBackgrounds ? "white" : themeName);
       // Slide content placeholder
       const title = document.createElement("div");
       title.className = "mockup-slide-title";
@@ -378,6 +410,11 @@ export class ExportPdfOptionsModal extends Modal {
         stamp.className = "mockup-slide-stamp";
         stamp.textContent = "Slide 1 / 12";
         card.appendChild(stamp);
+      }
+      // v0.11.62: auto-shrink visualization — when off, mark the
+      // text as overflowing the card; when on, mark it shrunk.
+      if (opts.autoShrink) {
+        card.classList.add("mockup-slide-auto-shrink");
       }
       inner.appendChild(card);
       // Notes block — only if showNotes OR slides-notes mode.
@@ -406,10 +443,35 @@ export class ExportPdfOptionsModal extends Modal {
       page.appendChild(f);
     }
 
-    // Wrap with a label noting the active config.
+    // v0.11.62: when maxPagesPerSlide > 1, show a 2nd page mockup
+    // depicting the OVERFLOW continuing on the next page (with a
+    // "(cont.)" marker). When = 1 (default), one page only — but
+    // if the slide content overflows the card, show clipping.
     const wrap = document.createElement("div");
     wrap.className = "slides-ng-export-pdf-mockup-wrap";
-    wrap.appendChild(page);
+    const pagesRow = document.createElement("div");
+    pagesRow.className = "slides-ng-export-pdf-mockup-pages-row";
+    pagesRow.appendChild(page);
+
+    if (opts.maxPagesPerSlide && opts.maxPagesPerSlide > 1) {
+      // Side-by-side continuation page mockup
+      const cont = page.cloneNode(false) as HTMLDivElement;
+      cont.classList.add("mockup-page-overflow-continued");
+      const contInner = document.createElement("div");
+      contInner.className = "mockup-page-inner";
+      const contLabel = this.makeLabel("(cont.)");
+      contInner.appendChild(contLabel);
+      // Overflow body lines
+      for (let i = 0; i < 8; i++) {
+        const line = document.createElement("div");
+        line.className = "mockup-line";
+        contInner.appendChild(line);
+      }
+      cont.appendChild(contInner);
+      pagesRow.appendChild(cont);
+    }
+    wrap.appendChild(pagesRow);
+
     const note = document.createElement("div");
     note.className = "slides-ng-export-pdf-mockup-summary";
     const layoutLabel = opts.pdfStyle === "slides-notes"

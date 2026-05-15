@@ -1074,6 +1074,17 @@
   gap: 0.4rem;
   width: 100%;
 }
+/* v0.11.62: side-by-side pages row (for max-pages-per-slide
+ * overflow comparison). */
+.slides-ng-export-pdf-mockup-pages-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.6rem;
+}
+.mockup-page-overflow-continued {
+  opacity: 0.92;
+}
 .slides-ng-export-pdf-mockup-page {
   width: 200px;
   height: 260px;
@@ -1220,6 +1231,46 @@
   text-align: center;
   max-width: 90%;
   line-height: 1.4;
+}
+/* v0.11.62: aspect-ratio mockups — adjust slide card flex-basis
+ * to differentiate 16:9 vs 4:3 visually. */
+.mockup-slide-card.mockup-slide-aspect-16-9 {
+  /* widescreen — slightly shorter */
+  max-height: 110px;
+}
+.mockup-slide-card.mockup-slide-aspect-4-3 {
+  /* squarer — slightly taller */
+  max-height: 140px;
+}
+.mockup-slide-card.mockup-slide-auto-shrink .mockup-slide-title {
+  font-size: 8px;
+}
+.mockup-slide-card.mockup-slide-auto-shrink .mockup-slide-subtitle {
+  font-size: 5px;
+}
+/* v0.11.62: experimental live iframe preview (below the mockup
+ * when opt-in via Settings). */
+.slides-ng-export-pdf-preview-experimental {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--background-modifier-border);
+}
+.slides-ng-export-pdf-preview-experimental-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+  padding: 0 0.15rem;
+}
+.slides-ng-export-pdf-preview-iframe {
+  width: 100%;
+  height: 200px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: #fff;
+  display: block;
+  overflow: auto;
 }
 .slides-ng-export-pdf-actions {
   display: flex;
