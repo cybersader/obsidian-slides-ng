@@ -1042,6 +1042,30 @@
   color: var(--text-muted);
   font-size: 0.9em;
 }
+/* v0.11.57: live-preview pane in the export-for-PDF modal */
+.slides-ng-export-pdf-preview {
+  margin-bottom: 1rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+  padding: 0.5rem;
+}
+.slides-ng-export-pdf-preview-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+  padding: 0 0.15rem;
+}
+.slides-ng-export-pdf-preview-iframe {
+  width: 100%;
+  height: 240px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: #fff;
+  display: block;
+}
 .slides-ng-export-pdf-actions {
   display: flex;
   justify-content: flex-end;

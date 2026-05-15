@@ -29,15 +29,29 @@ export class ExportPdfOptionsModal extends Modal {
   private onSubmit: (options: PdfExportOptions | null) => void;
   /** Theme that the deck would render with by default — shown as the active option. */
   private currentTheme: string;
+  /**
+   * v0.11.57: render-preview callback. The view passes in a
+   * function that takes the current options and returns the
+   * exported HTML; the modal pumps that into a sandboxed iframe
+   * so the user sees a live preview of what the PDF will look
+   * like before they hit Export.
+   */
+  private renderPreview?: (options: PdfExportOptions) => Promise<string>;
+  /** DOM ref for the preview iframe so we can update its srcdoc. */
+  private previewIframe?: HTMLIFrameElement;
+  /** Debounce timer for the preview re-render. */
+  private previewTimer: number | null = null;
 
   constructor(
     app: App,
     currentTheme: string,
-    onSubmit: (options: PdfExportOptions | null) => void
+    onSubmit: (options: PdfExportOptions | null) => void,
+    renderPreview?: (options: PdfExportOptions) => Promise<string>
   ) {
     super(app);
     this.onSubmit = onSubmit;
     this.currentTheme = currentTheme;
+    this.renderPreview = renderPreview;
   }
 
   onOpen(): void {
@@ -49,6 +63,31 @@ export class ExportPdfOptionsModal extends Modal {
       cls: "slides-ng-export-pdf-modal-hint",
       text: "Pick how the printed pages should look. Cancel to abort.",
     });
+
+    // v0.11.57: live preview pane. Sandboxed iframe that renders
+    // the deck through the export pipeline with the currently-
+    // selected options. Updates 350ms after any option change so
+    // we don\'t re-render on every keystroke.
+    if (this.renderPreview) {
+      const previewWrap = contentEl.createDiv({ cls: "slides-ng-export-pdf-preview" });
+      previewWrap.createEl("div", {
+        cls: "slides-ng-export-pdf-preview-label",
+        text: "Live preview (first slide)",
+      });
+      this.previewIframe = previewWrap.createEl("iframe", {
+        cls: "slides-ng-export-pdf-preview-iframe",
+        attr: { sandbox: "allow-scripts", title: "PDF preview" },
+      });
+      // Kick off initial render after the modal lays out.
+      window.setTimeout(() => this.schedulePreviewRefresh(), 50);
+      // Bubble-listen for any user interaction so we don\'t have
+      // to wire `schedulePreviewRefresh()` into every individual
+      // option\'s onChange handler. Both `input` (for text fields)
+      // and `change` (for dropdowns/toggles) cover the set.
+      const refresh = () => this.schedulePreviewRefresh();
+      contentEl.addEventListener("change", refresh);
+      contentEl.addEventListener("input", refresh);
+    }
 
     new Setting(contentEl)
       .setName("Layout")
@@ -231,6 +270,32 @@ export class ExportPdfOptionsModal extends Modal {
   }
 
   onClose(): void {
+    if (this.previewTimer !== null) {
+      window.clearTimeout(this.previewTimer);
+      this.previewTimer = null;
+    }
     this.contentEl.empty();
+  }
+
+  /**
+   * v0.11.57: debounced live-preview refresh. Re-renders the deck
+   * with the currently-selected options and pumps the resulting
+   * HTML into the preview iframe\'s srcdoc.
+   */
+  private schedulePreviewRefresh(): void {
+    if (!this.renderPreview || !this.previewIframe) return;
+    if (this.previewTimer !== null) window.clearTimeout(this.previewTimer);
+    this.previewTimer = window.setTimeout(async () => {
+      this.previewTimer = null;
+      if (!this.renderPreview || !this.previewIframe) return;
+      try {
+        const html = await this.renderPreview(this.options);
+        this.previewIframe.srcdoc = html;
+      } catch (err) {
+        // Failure here shouldn\'t break the modal — just log.
+        // eslint-disable-next-line no-console
+        console.warn("[slides-ng] PDF preview render failed", err);
+      }
+    }, 350);
   }
 }

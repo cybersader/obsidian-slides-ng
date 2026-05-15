@@ -679,6 +679,48 @@ export class SlidesNGView extends ItemView {
           return;
         }
         void this.runPdfExport(file, pdfOptions);
+      },
+      // v0.11.57: preview callback — modal calls this with the
+      // currently-selected options after each change. We render
+      // the deck through the export pipeline + return the HTML;
+      // the modal pumps it into a sandboxed iframe.
+      async (previewOptions) => {
+        const markdown = await this.app.vault.read(file);
+        const { renderDeckStandalone } = await import("./render/renderDeck");
+        const merged: import("./render/renderDeck").RenderDefaults = {
+          ...this.renderDefaults(),
+        };
+        // Mirror exportAndOpenForPdf's merging so the preview
+        // matches what the export will produce.
+        if (previewOptions.themeOverride) merged.defaultTheme = previewOptions.themeOverride;
+        if (previewOptions.aspectRatio === "16:9") {
+          merged.pdfAspectWidth = 1280;
+          merged.pdfAspectHeight = 720;
+        } else if (previewOptions.aspectRatio === "4:3") {
+          merged.pdfAspectWidth = 1024;
+          merged.pdfAspectHeight = 768;
+        }
+        merged.forcePrintMode = true;
+        if (previewOptions.showNotes) merged.forceShowNotes = true;
+        if (previewOptions.pdfStyle === "document") merged.forcePrintDocument = true;
+        if (previewOptions.pdfStyle === "slides-notes") {
+          merged.forceNotesEmphasis = true;
+          merged.forceShowNotes = true;
+          merged.forceMaxPagesPerSlide = 1;
+        } else if (previewOptions.maxPagesPerSlide && previewOptions.maxPagesPerSlide > 1) {
+          merged.forceMaxPagesPerSlide = previewOptions.maxPagesPerSlide;
+        }
+        if (previewOptions.autoShrink) merged.forceAutoShrink = true;
+        if (previewOptions.pageSize && previewOptions.pageSize !== "current") {
+          merged.forcePageSize = previewOptions.pageSize;
+        }
+        if (previewOptions.pageMargin) merged.forcePageMargin = previewOptions.pageMargin;
+        if (previewOptions.grayscale) merged.forceGrayscale = true;
+        if (previewOptions.hideBackgrounds) merged.forceHideBackgrounds = true;
+        if (previewOptions.slideNumberStamp) merged.forceSlideNumberStamp = true;
+        if (previewOptions.headerText) merged.forceHeaderText = previewOptions.headerText;
+        if (previewOptions.footerText) merged.forceFooterText = previewOptions.footerText;
+        return renderDeckStandalone(markdown, file.path, merged);
       }
     ).open();
   }

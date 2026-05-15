@@ -2867,38 +2867,50 @@ ${sectionsHtml}
         var bg = '#000';
         var color = '#fff';
         if (SCENE_INHERIT_THEME_BG && window.getComputedStyle) {
-          /* v0.11.50: reveal applies the theme background-color to
-           * .reveal-viewport (and main color via CSS variable),
-           * NOT to body. Reading from body returns the default
-           * rgba(0, 0, 0, 0) (transparent) which our previous code
-           * stored as bg — making the scene overlay transparent,
-           * which then showed the slide content underneath. The
-           * user-reported "Stand by" scene rendering dark-on-dark
-           * came from this: bg=transparent, color also resolving to
-           * inherited dark theme color → unreadable.
+          /* v0.11.57: PREFER THE THEME CSS VARIABLES. Reading
+           * getComputedStyle(.reveal-viewport).color returns the
+           * hardcoded "rgb(0, 0, 0)" from reveal core CSS — the
+           * black theme defines --r-background-color and
+           * --r-main-color but never APPLIES them to .reveal-viewport
+           * (variables are just declared). So the probe order needs
+           * to be:
+           *   1. :root CSS variable (theme intent, authoritative)
+           *   2. body / viewport computed style (fallback)
+           *   3. hardcoded defaults
            *
-           * Probe in order: body, .reveal-viewport, then :root CSS
-           * variable. The first one to produce a non-transparent
-           * value wins. */
+           * The previous v0.11.50 order hit the viewport computed
+           * style first, picking up reveal core CSS\\'s hardcoded
+           * white/black — causing the user-reported
+           * "Be right back" scene rendering with black text on
+           * light bg in the browser speaker popup. In-Obsidian
+           * worked because the iframe\\'s body had different
+           * computed styles. */
           function isUseful(c) {
-            return c && c !== 'transparent' && c !== 'rgba(0, 0, 0, 0)';
+            return c
+              && c !== 'transparent'
+              && c !== 'rgba(0, 0, 0, 0)'
+              && c.length > 0;
           }
+          var rootCs = getComputedStyle(document.documentElement);
+          var rootBg = rootCs.getPropertyValue('--r-background-color').trim();
+          var rootColor = rootCs.getPropertyValue('--r-main-color').trim();
           var bodyCs = getComputedStyle(document.body);
           var viewportEl = document.querySelector('.reveal-viewport') || document.querySelector('.reveal');
           var viewportCs = viewportEl ? getComputedStyle(viewportEl) : null;
-          var rootCs = getComputedStyle(document.documentElement);
-          if (isUseful(bodyCs.backgroundColor)) bg = bodyCs.backgroundColor;
+          /* Background: theme variable first. */
+          if (isUseful(rootBg)) bg = rootBg;
+          else if (viewportCs && isUseful(viewportCs.getPropertyValue('--r-background-color').trim())) {
+            bg = viewportCs.getPropertyValue('--r-background-color').trim();
+          }
+          else if (isUseful(bodyCs.backgroundColor)) bg = bodyCs.backgroundColor;
           else if (viewportCs && isUseful(viewportCs.backgroundColor)) bg = viewportCs.backgroundColor;
-          else {
-            var rootBg = rootCs.getPropertyValue('--r-background-color').trim();
-            if (isUseful(rootBg)) bg = rootBg;
+          /* Text color: theme variable first. */
+          if (isUseful(rootColor)) color = rootColor;
+          else if (viewportCs && isUseful(viewportCs.getPropertyValue('--r-main-color').trim())) {
+            color = viewportCs.getPropertyValue('--r-main-color').trim();
           }
-          if (isUseful(bodyCs.color)) color = bodyCs.color;
+          else if (isUseful(bodyCs.color)) color = bodyCs.color;
           else if (viewportCs && isUseful(viewportCs.color)) color = viewportCs.color;
-          else {
-            var rootColor = rootCs.getPropertyValue('--r-main-color').trim();
-            if (isUseful(rootColor)) color = rootColor;
-          }
         }
         // v0.11.43/v0.11.44: parent the scene overlay to reveal viewport
         // element instead of document.body. Reveal sizes
