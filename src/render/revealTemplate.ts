@@ -2294,10 +2294,23 @@ ${sectionsHtml}
                   '          if (innerEl) innerEl.style.transform = "scale(" + newScale + ")";',
                   '        });',
                   '      }',
+                  /* v0.11.91: disconnect any previous ResizeObserver
+                   * from an earlier visual-mode build before creating
+                   * a new one (audit issue 38). Without this, switching
+                   * text → visual → text accumulates observers that
+                   * keep firing on the new text tiles and try to force
+                   * pixel widths on them. */
                   '      try {',
+                  '        if (window.__slidesNgTileRO && typeof window.__slidesNgTileRO.disconnect === "function") {',
+                  '          window.__slidesNgTileRO.disconnect();',
+                  '        }',
                   '        if (typeof ResizeObserver === "function") {',
-                  '          var ro = new ResizeObserver(relayoutTiles);',
+                  '          var ro = new ResizeObserver(function () {',
+                  '            if (getGridMode() !== "visual") return;',
+                  '            relayoutTiles();',
+                  '          });',
                   '          ro.observe(grid);',
+                  '          window.__slidesNgTileRO = ro;',
                   '        }',
                   '      } catch (_) {}',
                   '      window.removeEventListener("resize", window.__slidesNgUpdateTileScales || (function(){}));',
@@ -2305,28 +2318,40 @@ ${sectionsHtml}
                   '      window.addEventListener("resize", relayoutTiles);',
                   '      return;',
                   '    }',
-                  /* Default text-only grid (cheap, no extra iframes). */
+                  /* v0.11.91: Text mode — disconnect any lingering
+                   * visual-mode ResizeObserver before building, and
+                   * reset gridTemplateColumns to the tighter text
+                   * default so the inline visual override (e.g.
+                   * repeat(4, 220px)) doesn\\'t persist. */
+                  '    try { if (window.__slidesNgTileRO) { window.__slidesNgTileRO.disconnect(); window.__slidesNgTileRO = null; } } catch (_) {}',
+                  /* Text mode: compact single-row tiles with bold
+                   * slide number on the left, ellipsised title on
+                   * the right. Smaller min column (85px) packs more
+                   * slides per row than visual mode. */
+                  '    grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(85px, 1fr))";',
                   '    for (var i = 0; i < sections.length; i++) {',
                   '      var sec = sections[i];',
                   '      var heading = sec.querySelector("h1, h2, h3");',
-                  '      var title = heading ? (heading.textContent || "").trim().slice(0, 60) : "(slide " + (i + 1) + ")";',
+                  '      var title = heading ? (heading.textContent || "").trim().slice(0, 40) : "";',
                   '      var tile = document.createElement("button");',
                   '      tile.setAttribute("data-idx", String(i));',
                   '      tile.className = "slide-tile";',
-                  '      tile.style.cssText = "background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:6px 8px;cursor:pointer;text-align:left;font-family:inherit;font-size:0.78em;line-height:1.25;min-height:48px;display:flex;flex-direction:column;gap:3px;transition:background 80ms ease, border-color 80ms ease;";',
-                  '      var num = document.createElement("div");',
+                  '      tile.style.cssText = "background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:4px 6px;cursor:pointer;text-align:left;font-family:inherit;font-size:0.75em;line-height:1.2;display:flex;align-items:center;gap:5px;min-height:26px;transition:background 80ms ease, border-color 80ms ease;overflow:hidden;";',
+                  '      var num = document.createElement("span");',
                   '      num.textContent = String(i + 1);',
-                  '      num.style.cssText = "color:#888;font-size:0.85em;font-weight:600;";',
-                  '      var ttl = document.createElement("div");',
-                  '      ttl.textContent = title;',
-                  '      ttl.style.cssText = "color:#e0e0e0;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;";',
+                  '      num.style.cssText = "color:#fff;font-weight:700;font-size:0.95em;flex:0 0 auto;font-variant-numeric:tabular-nums;min-width:1.2em;text-align:right;";',
                   '      tile.appendChild(num);',
-                  '      tile.appendChild(ttl);',
+                  '      if (title) {',
+                  '        var ttl = document.createElement("span");',
+                  '        ttl.textContent = title;',
+                  '        ttl.style.cssText = "color:#bbb;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";',
+                  '        tile.appendChild(ttl);',
+                  '      }',
                   '      tile.addEventListener("click", (function (idx) {',
                   '        return function () { navCmd("goto", idx); };',
                   '      })(i));',
                   '      tile.addEventListener("mouseenter", function () { this.style.background = "#2a2a2a"; this.style.borderColor = "#444"; });',
-                  '      tile.addEventListener("mouseleave", function () { this.style.background = "#1a1a1a"; this.style.borderColor = "#333"; });',
+                  '      tile.addEventListener("mouseleave", function () { var cur = this.classList.contains("current"); this.style.background = "#1a1a1a"; this.style.borderColor = cur ? "#42affa" : "#333"; });',
                   '      grid.appendChild(tile);',
                   '    }',
                   '  } catch (e) {',
