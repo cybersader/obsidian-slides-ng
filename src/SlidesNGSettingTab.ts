@@ -435,6 +435,20 @@ export class SlidesNGSettingTab extends PluginSettingTab {
         );
       });
 
+    new Setting(containerEl)
+      .setName("Experimental: smart-wrap by header structure")
+      .setDesc(
+        "When using the \"Insert HTML snippet\" command with a selection, distribute the selection's H2-delimited sections into the snippet's child slots. Two-deep: H1 → snippet title, each H2 → one child slot. Only fires when section count matches slot count exactly; otherwise falls back to the basic wrap (selection at cursor marker)."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.experimentalSmartWrap).onChange(
+          async (v) => {
+            this.plugin.settings.experimentalSmartWrap = v;
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
 
     // ---------- Speaker panels ----------
     new Setting(containerEl).setName("Speaker panels").setHeading();

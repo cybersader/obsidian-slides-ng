@@ -153,10 +153,10 @@ export default class SlidesNGPlugin extends Plugin {
       // Selection-aware — if the user has text selected when they invoke,
       // the selection gets wrapped/encased in the snippet body. With no
       // selection it just drops the snippet at the caret like the
-      // autocomplete does. See src/SnippetInsertModal.ts for the modal
-      // class.
+      // autocomplete does. v0.12.2: when experimentalSmartWrap is on,
+      // also tries header-structure distribution for multi-slot snippets.
       editorCallback: () => {
-        openSnippetInsertModal(this.app);
+        openSnippetInsertModal(this.app, this.settings.experimentalSmartWrap);
       },
     });
 

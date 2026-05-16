@@ -21,13 +21,16 @@
 
 import { App, Editor, FuzzySuggestModal, MarkdownView, Notice } from "obsidian";
 import { TEMPLATES, type SnippetTemplate, locateCursor } from "./templates";
+import { smartWrap } from "./smartWrap";
 
 export class SnippetInsertModal extends FuzzySuggestModal<SnippetTemplate> {
   private editor: Editor;
+  private smartWrapEnabled: boolean;
 
-  constructor(app: App, editor: Editor) {
+  constructor(app: App, editor: Editor, smartWrapEnabled = false) {
     super(app);
     this.editor = editor;
+    this.smartWrapEnabled = smartWrapEnabled;
     this.setPlaceholder("Type to filter snippets (hero, twocol, callout, …)");
     this.setInstructions([
       { command: "↑↓", purpose: "navigate" },
@@ -49,20 +52,23 @@ export class SnippetInsertModal extends FuzzySuggestModal<SnippetTemplate> {
     const selection = this.editor.getSelection();
 
     if (selection && selection.length > 0) {
-      // Wrap mode: drop selection where the cursor marker is, then
-      // place the caret AT THE END of the wrapped content so the
-      // user can keep typing immediately after.
-      const wrapped =
-        text.slice(0, cursorOffset) + selection + text.slice(cursorOffset);
-      this.editor.replaceSelection(wrapped);
-      // Position the cursor right after the inserted selection.
+      // Wrap mode. v0.12.2: if experimentalSmartWrap is on, try
+      // header-structure distribution first (H2 sections → child
+      // slots). Falls back to basic wrap if structure doesn\'t match.
+      const result = this.smartWrapEnabled
+        ? smartWrap(text, cursorOffset, selection)
+        : {
+            text: text.slice(0, cursorOffset) + selection + text.slice(cursorOffset),
+            cursorOffset: cursorOffset + selection.length,
+            applied: false,
+          };
+      this.editor.replaceSelection(result.text);
       const from = this.editor.getCursor("from");
-      const insertedEnd = locateCursor(
-        from.line,
-        wrapped,
-        cursorOffset + selection.length
-      );
+      const insertedEnd = locateCursor(from.line, result.text, result.cursorOffset);
       this.editor.setCursor(insertedEnd);
+      if (this.smartWrapEnabled && result.applied) {
+        new Notice("Smart-wrap: distributed selection by header structure.");
+      }
     } else {
       // Insert mode: snippet body at caret with marker removed,
       // caret moved to where the marker was.
@@ -79,7 +85,7 @@ export class SnippetInsertModal extends FuzzySuggestModal<SnippetTemplate> {
  * Markdown editor and opens the modal, or shows a Notice if there's
  * nowhere to insert into.
  */
-export function openSnippetInsertModal(app: App): void {
+export function openSnippetInsertModal(app: App, smartWrapEnabled = false): void {
   const view = app.workspace.getActiveViewOfType(MarkdownView);
   if (!view || !view.editor) {
     new Notice(
@@ -87,5 +93,5 @@ export function openSnippetInsertModal(app: App): void {
     );
     return;
   }
-  new SnippetInsertModal(app, view.editor).open();
+  new SnippetInsertModal(app, view.editor, smartWrapEnabled).open();
 }

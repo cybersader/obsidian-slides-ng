@@ -264,6 +264,16 @@ export interface SlidesNGSettings {
    * real output.
    */
   experimentalLivePdfPreview: boolean;
+
+  /**
+   * v0.12.2: when "Insert HTML snippet" is invoked WITH a selection,
+   * try to distribute the selection's H2-delimited sections into the
+   * snippet's child slots (`::::` blocks). Only fires when the
+   * section count matches the slot count exactly — otherwise falls
+   * back to the simple wrap behaviour. "Two-deep" model: H1 maps to
+   * the snippet's title slot, each H2 maps to one child slot.
+   */
+  experimentalSmartWrap: boolean;
 }
 
 /** All draggable/toggleable speaker-view panels. */
@@ -433,4 +443,5 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   sceneInheritThemeBg: true,
   experimentalGridSpeakerView: false,
   experimentalLivePdfPreview: false,
+  experimentalSmartWrap: false,
 };
