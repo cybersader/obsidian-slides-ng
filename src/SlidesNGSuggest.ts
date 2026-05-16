@@ -116,8 +116,13 @@ interface SlotSuggestion {
 }
 
 export class SlotMarkerSuggest extends EditorSuggest<SlotSuggestion> {
-  constructor(app: App) {
+  private getUseShortcode: () => boolean;
+
+  // v0.13.0: getter returns the live experimentalShortcodeSnippets
+  // setting so we pick HTML or `::: …` form per insertion.
+  constructor(app: App, getUseShortcode: () => boolean = () => false) {
     super(app);
+    this.getUseShortcode = getUseShortcode;
   }
 
   onTrigger(
@@ -246,10 +251,15 @@ export class SlotMarkerSuggest extends EditorSuggest<SlotSuggestion> {
       return;
     }
     // Template: fully replace the `::name` typed text with the
-    // template's expansion. Cursor lands at the template's marker.
+    // template\'s expansion. Cursor lands at the template\'s marker.
+    // v0.13.0: pick HTML or shortcode form based on the setting.
     const template = findTemplate(s.name);
     if (!template) return;
-    const { text, cursorOffset } = template.expand();
+    const useShortcode = this.getUseShortcode();
+    const { text, cursorOffset } =
+      useShortcode && template.expandShortcode
+        ? template.expandShortcode()
+        : template.expand();
     this.context.editor.replaceRange(text, lineStart, this.context.end);
     const cursorPos = locateCursor(lineStart.line, text, cursorOffset);
     this.context.editor.setCursor(cursorPos);

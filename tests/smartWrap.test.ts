@@ -46,38 +46,41 @@ describe("parseSelection", () => {
   });
 });
 
+/**
+ * v0.13.0: smart-wrap operates on the SHORTCODE form (`::: …`)
+ * because it detects child slots via `::::` open lines. Use
+ * `expandShortcode()` in these tests since smart-wrap is only
+ * meaningful when the user has opted into shortcode-mode snippets.
+ */
+function getShortcodeBody(name: string): { text: string; cursorOffset: number } {
+  const tpl = TEMPLATES.find((t) => t.name === name)!;
+  if (!tpl.expandShortcode) {
+    throw new Error(`snippet "${name}" has no expandShortcode()`);
+  }
+  return tpl.expandShortcode();
+}
+
 describe("countChildSlots", () => {
-  test("twocol has 2 child slots", () => {
-    const tpl = TEMPLATES.find((t) => t.name === "twocol");
-    const { text } = tpl!.expand();
-    expect(countChildSlots(text)).toBe(2);
+  test("twocol has 2 child slots (shortcode form)", () => {
+    expect(countChildSlots(getShortcodeBody("twocol").text)).toBe(2);
   });
   test("threecol has 3 child slots", () => {
-    const tpl = TEMPLATES.find((t) => t.name === "threecol");
-    const { text } = tpl!.expand();
-    expect(countChildSlots(text)).toBe(3);
+    expect(countChildSlots(getShortcodeBody("threecol").text)).toBe(3);
   });
   test("callout has 0 child slots (single-slot snippet)", () => {
-    const tpl = TEMPLATES.find((t) => t.name === "callout");
-    const { text } = tpl!.expand();
-    expect(countChildSlots(text)).toBe(0);
+    expect(countChildSlots(getShortcodeBody("callout").text)).toBe(0);
   });
   test("hero has 0 child slots", () => {
-    const tpl = TEMPLATES.find((t) => t.name === "hero");
-    const { text } = tpl!.expand();
-    expect(countChildSlots(text)).toBe(0);
+    expect(countChildSlots(getShortcodeBody("hero").text)).toBe(0);
   });
   test("stat-grid has 3 child slots", () => {
-    const tpl = TEMPLATES.find((t) => t.name === "stat-grid");
-    const { text } = tpl!.expand();
-    expect(countChildSlots(text)).toBe(3);
+    expect(countChildSlots(getShortcodeBody("stat-grid").text)).toBe(3);
   });
 });
 
 describe("smartWrap", () => {
   test("twocol + 2 H2 sections: distributes to slots", () => {
-    const tpl = TEMPLATES.find((t) => t.name === "twocol")!;
-    const { text, cursorOffset } = tpl.expand();
+    const { text, cursorOffset } = getShortcodeBody("twocol");
     const selection = [
       "# Big Idea",
       "",
@@ -95,13 +98,11 @@ describe("smartWrap", () => {
     expect(r.text).toContain("fast, cheap");
     expect(r.text).toContain("## Cons");
     expect(r.text).toContain("fragile");
-    // Pros should appear before Cons (slot order preserved)
     expect(r.text.indexOf("Pros")).toBeLessThan(r.text.indexOf("Cons"));
   });
 
   test("threecol + 3 H2 sections: distributes to slots", () => {
-    const tpl = TEMPLATES.find((t) => t.name === "threecol")!;
-    const { text, cursorOffset } = tpl.expand();
+    const { text, cursorOffset } = getShortcodeBody("threecol");
     const selection = "## A\n\nbody a\n\n## B\n\nbody b\n\n## C\n\nbody c";
     const r = smartWrap(text, cursorOffset, selection);
     expect(r.applied).toBe(true);
@@ -111,28 +112,35 @@ describe("smartWrap", () => {
   });
 
   test("twocol + 3 H2 sections (mismatch): falls back to simple wrap", () => {
-    const tpl = TEMPLATES.find((t) => t.name === "twocol")!;
-    const { text, cursorOffset } = tpl.expand();
+    const { text, cursorOffset } = getShortcodeBody("twocol");
     const selection = "## A\nbody\n## B\nbody\n## C\nbody";
     const r = smartWrap(text, cursorOffset, selection);
     expect(r.applied).toBe(false);
-    // Fallback puts whole selection at cursor marker
     expect(r.text).toContain(selection);
   });
 
   test("callout (0 slots) + 2 H2 sections: falls back to simple wrap", () => {
-    const tpl = TEMPLATES.find((t) => t.name === "callout")!;
-    const { text, cursorOffset } = tpl.expand();
+    const { text, cursorOffset } = getShortcodeBody("callout");
     const selection = "## A\nbody\n## B\nbody";
     const r = smartWrap(text, cursorOffset, selection);
     expect(r.applied).toBe(false);
   });
 
   test("plain selection (no H2): falls back to simple wrap", () => {
-    const tpl = TEMPLATES.find((t) => t.name === "twocol")!;
-    const { text, cursorOffset } = tpl.expand();
+    const { text, cursorOffset } = getShortcodeBody("twocol");
     const r = smartWrap(text, cursorOffset, "just some text");
     expect(r.applied).toBe(false);
     expect(r.text).toContain("just some text");
+  });
+
+  test("HTML default (expand): no ::: slots → smartWrap falls back", () => {
+    // Regression guard: when shortcode mode is OFF and snippets emit
+    // raw HTML, smart-wrap can\'t find :::: slots so it MUST fall back
+    // to simple wrap rather than crashing or doing nothing.
+    const tpl = TEMPLATES.find((t) => t.name === "twocol")!;
+    const { text, cursorOffset } = tpl.expand();
+    expect(countChildSlots(text)).toBe(0);
+    const r = smartWrap(text, cursorOffset, "## A\nx\n## B\ny");
+    expect(r.applied).toBe(false);
   });
 });

@@ -274,6 +274,17 @@ export interface SlidesNGSettings {
    * the snippet's title slot, each H2 maps to one child slot.
    */
   experimentalSmartWrap: boolean;
+
+  /**
+   * v0.13.0: emit Pandoc-style fenced-div shortcode (`::: classname …
+   * :::`) instead of raw HTML when inserting layout snippets. Shortcode
+   * is more compact and parses markdown inside naturally — but
+   * requires the in-bundle marked extension at render time. The
+   * default (raw HTML in source) needs no parser extension and works
+   * in any markdown tool. Markup-foundations principle: the source-
+   * of-truth IS the expanded HTML.
+   */
+  experimentalShortcodeSnippets: boolean;
 }
 
 /** All draggable/toggleable speaker-view panels. */
@@ -444,4 +455,5 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   experimentalGridSpeakerView: false,
   experimentalLivePdfPreview: false,
   experimentalSmartWrap: false,
+  experimentalShortcodeSnippets: false,
 };

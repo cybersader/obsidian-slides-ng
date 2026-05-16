@@ -20,7 +20,20 @@
 export interface SnippetTemplate {
   name: string;
   description: string;
+  /**
+   * Default expansion. v0.13.0+: returns raw HTML for layout
+   * snippets so the source file is the final form — no parse-time
+   * shortcode extension needed downstream. Non-layout templates
+   * (note, cover, code blocks, etc.) emit plain markdown as before.
+   */
   expand(): { text: string; cursorOffset: number };
+  /**
+   * Optional Pandoc-style fenced-div expansion (`::: classname …
+   * :::`). Only the structural layout snippets define this. Caller
+   * uses it instead of `expand()` when the user opts into
+   * `experimentalShortcodeSnippets` in settings.
+   */
+  expandShortcode?(): { text: string; cursorOffset: number };
 }
 
 /** Place a `█` in the snippet body to mark where the cursor should land. */
@@ -125,35 +138,53 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
   },
 
   // ===========================================================================
-  // v0.12.0 — HTML structural snippets using Pandoc fenced divs (`::: name`).
+  // v0.12.0 / v0.13.0 — layout snippets.
   //
-  // These compose with reveal.js without requiring any custom parse-time
-  // logic: marked treats `::: classname` as a `<div class="classname">`
-  // wrapper, the body is parsed as normal markdown. CSS for each class
-  // lives in src/render/revealTemplate.ts (so it ships inside the iframe)
-  // and uses --r-link-color etc. so it picks up the active reveal theme.
+  // DEFAULT (expand): raw HTML in the source file. Markup-foundations
+  // principle: the source IS the expanded form — no parse-time
+  // shortcode extension needed. Any markdown tool that supports block
+  // HTML (every CommonMark-compliant one) renders these.
   //
-  // Convention rules:
-  //  1. Always blank line after the opening `:::name` and before the
-  //     closing `:::`. (Standard Pandoc behaviour.)
-  //  2. Body content is regular markdown — paragraphs, headings, lists,
-  //     code blocks all parse normally.
-  //  3. em/fr/% units only inside the body — no fixed px. Reveal scales
-  //     the whole slide; relative units keep proportions intact.
-  //  4. For coloured accents prefer the .callout warn/danger/success
-  //     variants over inline styles — they survive theme switches.
+  // EXPERIMENTAL (expandShortcode): Pandoc fenced-div form (`::: classname
+  // ... :::`). Cleaner source, lets you write markdown inside without
+  // <h2>/<p> tags, but requires the marked extension to render.
+  //
+  // CSS for each class lives in src/render/revealTemplate.ts and uses
+  // reveal CSS vars (--r-link-color etc.) so accents follow the theme.
+  // Both forms produce identical rendered output — same .hero, .twocol,
+  // .callout etc. classes get applied either way.
   // ===========================================================================
 
   {
     name: "hero",
     description: "Centred hero / cover title with subtitle",
     expand: () =>
+      withCursor(
+        '<div class="hero">\n<h1>█</h1>\n<p>Subtitle goes here</p>\n</div>\n'
+      ),
+    expandShortcode: () =>
       withCursor("::: hero\n\n# █\n\nSubtitle goes here\n\n:::\n"),
   },
   {
     name: "twocol",
     description: "Two equal columns (50/50)",
     expand: () =>
+      withCursor(
+        [
+          '<div class="twocol">',
+          "<div>",
+          "<h2>Left heading</h2>",
+          "<p>█</p>",
+          "</div>",
+          "<div>",
+          "<h2>Right heading</h2>",
+          "<p></p>",
+          "</div>",
+          "</div>",
+          "",
+        ].join("\n")
+      ),
+    expandShortcode: () =>
       withCursor(
         [
           "::: twocol",
@@ -185,6 +216,22 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
     expand: () =>
       withCursor(
         [
+          '<div class="twocol-60">',
+          "<div>",
+          "<h2>Main</h2>",
+          "<p>█</p>",
+          "</div>",
+          "<div>",
+          "<h2>Aside</h2>",
+          "<p></p>",
+          "</div>",
+          "</div>",
+          "",
+        ].join("\n")
+      ),
+    expandShortcode: () =>
+      withCursor(
+        [
           "::: twocol-60",
           "",
           ":::: { }",
@@ -212,6 +259,26 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
     name: "threecol",
     description: "Three equal columns",
     expand: () =>
+      withCursor(
+        [
+          '<div class="threecol">',
+          "<div>",
+          "<h3>One</h3>",
+          "<p>█</p>",
+          "</div>",
+          "<div>",
+          "<h3>Two</h3>",
+          "<p></p>",
+          "</div>",
+          "<div>",
+          "<h3>Three</h3>",
+          "<p></p>",
+          "</div>",
+          "</div>",
+          "",
+        ].join("\n")
+      ),
+    expandShortcode: () =>
       withCursor(
         [
           "::: threecol",
@@ -251,6 +318,19 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
     expand: () =>
       withCursor(
         [
+          '<div class="image-left">',
+          '<img src="█" alt="">',
+          "<div>",
+          "<h2>Heading</h2>",
+          "<p>Text body alongside the image.</p>",
+          "</div>",
+          "</div>",
+          "",
+        ].join("\n")
+      ),
+    expandShortcode: () =>
+      withCursor(
+        [
           "::: image-left",
           "",
           "![](█)",
@@ -274,6 +354,19 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
     expand: () =>
       withCursor(
         [
+          '<div class="image-right">',
+          '<img src="█" alt="">',
+          "<div>",
+          "<h2>Heading</h2>",
+          "<p>Text body alongside the image.</p>",
+          "</div>",
+          "</div>",
+          "",
+        ].join("\n")
+      ),
+    expandShortcode: () =>
+      withCursor(
+        [
           "::: image-right",
           "",
           "![](█)",
@@ -295,24 +388,40 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
     name: "callout",
     description: "Coloured side-bar callout (theme link colour)",
     expand: () =>
+      withCursor(
+        '<div class="callout">\n<p><strong>Note:</strong> █</p>\n</div>\n'
+      ),
+    expandShortcode: () =>
       withCursor("::: callout\n\n**Note:** █\n\n:::\n"),
   },
   {
     name: "callout-warn",
     description: "Amber warning callout",
     expand: () =>
+      withCursor(
+        '<div class="callout warn">\n<p><strong>Warning:</strong> █</p>\n</div>\n'
+      ),
+    expandShortcode: () =>
       withCursor("::: { .callout .warn }\n\n**Warning:** █\n\n:::\n"),
   },
   {
     name: "callout-danger",
     description: "Red danger callout",
     expand: () =>
+      withCursor(
+        '<div class="callout danger">\n<p><strong>Danger:</strong> █</p>\n</div>\n'
+      ),
+    expandShortcode: () =>
       withCursor("::: { .callout .danger }\n\n**Danger:** █\n\n:::\n"),
   },
   {
     name: "callout-success",
     description: "Green success callout",
     expand: () =>
+      withCursor(
+        '<div class="callout success">\n<p><strong>Tip:</strong> █</p>\n</div>\n'
+      ),
+    expandShortcode: () =>
       withCursor("::: { .callout .success }\n\n**Tip:** █\n\n:::\n"),
   },
   {
@@ -320,22 +429,37 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
     description: "Big number with a label below",
     expand: () =>
       withCursor(
-        [
-          "::: bignum",
-          "",
-          "█",
-          "",
-          "label / unit",
-          "",
-          ":::",
-          "",
-        ].join("\n")
+        '<div class="bignum">\n<p>█</p>\n<p>label / unit</p>\n</div>\n'
+      ),
+    expandShortcode: () =>
+      withCursor(
+        ["::: bignum", "", "█", "", "label / unit", "", ":::", ""].join("\n")
       ),
   },
   {
     name: "stat-grid",
     description: "Auto-fitting grid of stat cards (number + label each)",
     expand: () =>
+      withCursor(
+        [
+          '<div class="stat-grid">',
+          '<div class="stat-card">',
+          "<p>█</p>",
+          "<p>users</p>",
+          "</div>",
+          '<div class="stat-card">',
+          "<p></p>",
+          "<p>uptime</p>",
+          "</div>",
+          '<div class="stat-card">',
+          "<p></p>",
+          "<p>p99</p>",
+          "</div>",
+          "</div>",
+          "",
+        ].join("\n")
+      ),
+    expandShortcode: () =>
       withCursor(
         [
           "::: stat-grid",
@@ -375,6 +499,22 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
     expand: () =>
       withCursor(
         [
+          '<div class="compare">',
+          '<div class="compare-good">',
+          "<h3>Good</h3>",
+          "<p>█</p>",
+          "</div>",
+          '<div class="compare-bad">',
+          "<h3>Avoid</h3>",
+          "<p></p>",
+          "</div>",
+          "</div>",
+          "",
+        ].join("\n")
+      ),
+    expandShortcode: () =>
+      withCursor(
+        [
           "::: compare",
           "",
           ":::: compare-good",
@@ -402,6 +542,8 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
     name: "accent-box",
     description: "Solid accent-coloured emphasis block",
     expand: () =>
+      withCursor('<div class="accent-box">\n<h1>█</h1>\n</div>\n'),
+    expandShortcode: () =>
       withCursor("::: accent-box\n\n# █\n\n:::\n"),
   },
 ];

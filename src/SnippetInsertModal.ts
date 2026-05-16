@@ -26,17 +26,36 @@ import { smartWrap } from "./smartWrap";
 export class SnippetInsertModal extends FuzzySuggestModal<SnippetTemplate> {
   private editor: Editor;
   private smartWrapEnabled: boolean;
+  private useShortcode: boolean;
 
-  constructor(app: App, editor: Editor, smartWrapEnabled = false) {
+  constructor(
+    app: App,
+    editor: Editor,
+    smartWrapEnabled = false,
+    useShortcode = false
+  ) {
     super(app);
     this.editor = editor;
     this.smartWrapEnabled = smartWrapEnabled;
+    this.useShortcode = useShortcode;
     this.setPlaceholder("Type to filter snippets (hero, twocol, callout, …)");
     this.setInstructions([
       { command: "↑↓", purpose: "navigate" },
       { command: "↵", purpose: "insert" },
       { command: "esc", purpose: "cancel" },
     ]);
+  }
+
+  /**
+   * Pick the right expansion form for `tpl` based on settings.
+   * Layout templates have both an HTML expand() and a Pandoc
+   * expandShortcode(); non-layout templates only have expand().
+   */
+  private expandFor(tpl: SnippetTemplate): { text: string; cursorOffset: number } {
+    if (this.useShortcode && tpl.expandShortcode) {
+      return tpl.expandShortcode();
+    }
+    return tpl.expand();
   }
 
   getItems(): SnippetTemplate[] {
@@ -48,7 +67,7 @@ export class SnippetInsertModal extends FuzzySuggestModal<SnippetTemplate> {
   }
 
   onChooseItem(tpl: SnippetTemplate): void {
-    const { text, cursorOffset } = tpl.expand();
+    const { text, cursorOffset } = this.expandFor(tpl);
     const selection = this.editor.getSelection();
 
     if (selection && selection.length > 0) {
@@ -85,7 +104,11 @@ export class SnippetInsertModal extends FuzzySuggestModal<SnippetTemplate> {
  * Markdown editor and opens the modal, or shows a Notice if there's
  * nowhere to insert into.
  */
-export function openSnippetInsertModal(app: App, smartWrapEnabled = false): void {
+export function openSnippetInsertModal(
+  app: App,
+  smartWrapEnabled = false,
+  useShortcode = false
+): void {
   const view = app.workspace.getActiveViewOfType(MarkdownView);
   if (!view || !view.editor) {
     new Notice(
@@ -93,5 +116,10 @@ export function openSnippetInsertModal(app: App, smartWrapEnabled = false): void
     );
     return;
   }
-  new SnippetInsertModal(app, view.editor, smartWrapEnabled).open();
+  new SnippetInsertModal(
+    app,
+    view.editor,
+    smartWrapEnabled,
+    useShortcode
+  ).open();
 }

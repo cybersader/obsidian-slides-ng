@@ -96,7 +96,12 @@ export default class SlidesNGPlugin extends Plugin {
 
     // In-editor autocomplete for deck authoring.
     this.registerEditorSuggest(new LayoutNameSuggest(this.app));
-    this.registerEditorSuggest(new SlotMarkerSuggest(this.app));
+    // v0.13.0: pass a live getter so SlotMarkerSuggest picks the
+    // right snippet expansion form (HTML default vs ::: shortcode)
+    // based on the user\'s current setting.
+    this.registerEditorSuggest(
+      new SlotMarkerSuggest(this.app, () => this.settings.experimentalShortcodeSnippets)
+    );
     this.registerEditorSuggest(new VClickSuggest(this.app));
 
     this.addRibbonIcon("presentation", "Open slides preview", () => {
@@ -156,7 +161,11 @@ export default class SlidesNGPlugin extends Plugin {
       // autocomplete does. v0.12.2: when experimentalSmartWrap is on,
       // also tries header-structure distribution for multi-slot snippets.
       editorCallback: () => {
-        openSnippetInsertModal(this.app, this.settings.experimentalSmartWrap);
+        openSnippetInsertModal(
+          this.app,
+          this.settings.experimentalSmartWrap,
+          this.settings.experimentalShortcodeSnippets
+        );
       },
     });
 

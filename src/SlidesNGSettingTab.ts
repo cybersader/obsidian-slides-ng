@@ -449,6 +449,23 @@ export class SlidesNGSettingTab extends PluginSettingTab {
         );
       });
 
+    new Setting(containerEl)
+      .setName("Experimental: shortcode-style snippets (::: name)")
+      .setDesc(
+        "Insert layout snippets as Pandoc fenced-div shortcodes (`::: hero ... :::`) instead of raw HTML. Source is more compact and you can write markdown inside the wrappers naturally, but rendering depends on the in-bundle marked extension. The default (raw HTML) is the durable choice — your source IS the final form and works in any markdown tool."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.experimentalShortcodeSnippets).onChange(
+          async (v) => {
+            this.plugin.settings.experimentalShortcodeSnippets = v;
+            await this.plugin.saveSettings();
+            // Refresh the snippet reference UI so the previewed
+            // source switches between HTML and shortcode form.
+            this.display();
+          }
+        );
+      });
+
 
     // ---------- Speaker panels ----------
     new Setting(containerEl).setName("Speaker panels").setHeading();
@@ -817,16 +834,29 @@ body markdown`,
    * <details> per snippet with its source visible on expand.
    */
   private renderSnippetReference(containerEl: HTMLElement): void {
+    const useShortcode = this.plugin.settings.experimentalShortcodeSnippets;
+
     // Intro / conventions explainer.
     const intro = containerEl.createDiv({ cls: "slides-ng-snippet-intro" });
-    intro.createEl("p", {
-      text:
-        "Type `::` at the start of a line in a deck and pick a snippet from the autocomplete to insert. Snippets are plain markdown — no special parser pass — so they read fine in any markdown tool. They use the Pandoc fenced-div convention (`::: classname ... :::`) to wrap regular markdown in a styled block.",
-    });
-    intro.createEl("p", {
-      text:
-        "Rules: keep a blank line after the opening `:::name` and before the closing `:::` so the inner content parses as markdown. Sizing uses em/fr units so layouts scale with the slide. Accent colours pull from the active reveal theme via CSS variables — switch theme and snippets follow.",
-    });
+    if (useShortcode) {
+      intro.createEl("p", {
+        text:
+          "EXPERIMENTAL: Shortcode mode is ON. Snippets insert as Pandoc fenced divs (`::: classname ... :::`). The marked extension transforms them to HTML at render time. Lets you write markdown inside wrappers naturally.",
+      });
+      intro.createEl("p", {
+        text:
+          "Rules: keep a blank line after the opening `:::name` and before the closing `:::` so the inner content parses as markdown. Sizing uses em/fr units so layouts scale with the slide. Accent colours pull from the active reveal theme.",
+      });
+    } else {
+      intro.createEl("p", {
+        text:
+          "Type `::` at the start of a line in a deck and pick a snippet from the autocomplete to insert. Snippets expand to raw HTML directly in your source file — the source IS the final form. Works in any markdown tool, no parser extension required.",
+      });
+      intro.createEl("p", {
+        text:
+          "Each snippet uses a `<div class=\"…\">` wrapper that the bundled CSS in the deck iframe styles. Sizing uses em/fr units so layouts scale with the slide. Accent colours pull from the active reveal theme via CSS variables — switch theme and snippets follow.",
+      });
+    }
 
     // Per-snippet details/summary collapsibles.
     const list = containerEl.createDiv({ cls: "slides-ng-snippet-list" });
@@ -837,8 +867,13 @@ body markdown`,
       summary.createEl("span", { text: tpl.description, cls: "slides-ng-snippet-desc" });
 
       const body = item.createDiv({ cls: "slides-ng-snippet-body" });
-      const { text } = tpl.expand();
-      // Strip the cursor marker character for the preview (we replaced it).
+      // Pick the active form: shortcode if setting is on AND the
+      // template has a shortcode variant, otherwise the default HTML.
+      const { text } =
+        useShortcode && tpl.expandShortcode
+          ? tpl.expandShortcode()
+          : tpl.expand();
+      // Strip the cursor marker character for the preview.
       const display = text.replace(/█/g, "");
       const pre = body.createEl("pre", { cls: "slides-ng-snippet-source" });
       pre.createEl("code", { text: display });

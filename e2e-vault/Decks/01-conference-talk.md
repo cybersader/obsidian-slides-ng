@@ -1,8 +1,9 @@
 ---
 slides-ng-theme: black
 slides-ng-transition: slide
-title: "Building Resilient Systems"
+title: Building Resilient Systems
 ---
+
 
 # Building Resilient Systems
 
@@ -11,7 +12,6 @@ Lessons from running production for a decade
 <!-- slide: notes="Welcome the audience. Mention the 10-year journey. Don't read these notes verbatim." -->
 
 ---
-
 ## Who am I
 
 - 10 years building backend systems
