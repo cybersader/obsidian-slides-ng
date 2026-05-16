@@ -185,9 +185,17 @@ export const pandocFencedDivs: MarkedExtension = {
         let closeFenceLen = 0;
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
-          // Check for nested open: 3+ colons followed by non-empty (e.g. `:::name`)
-          const openMatch = /^(:{3,})[ \t]*\S/.exec(line);
-          // Check for close: 3+ colons followed by only whitespace
+          // Check for nested open: 3+ colons followed by a non-colon
+          // non-whitespace (e.g. `:::name`, `::::abc`, `::: { … }`).
+          //
+          // CRITICAL: the trailing class must be `[^\s:]` not `\S`.
+          // Otherwise regex backtracking lets a line like `::::` (just
+          // 4 colons, the close fence of a nested block) match as an
+          // open — greedy `:{3,}` shrinks to 3 and the 4th `:` is
+          // accepted as `\S`. Disastrous: balanced-depth tracking
+          // tilts and the outer fence never finds its close.
+          const openMatch = /^(:{3,})[ \t]*[^\s:]/.exec(line);
+          // Check for close: 3+ colons followed by only whitespace.
           const closeMatch = /^(:{3,})[ \t]*$/.exec(line);
           if (openMatch && openMatch[1].length >= fence.length) {
             depth++;
