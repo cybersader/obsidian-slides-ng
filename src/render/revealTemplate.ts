@@ -1934,15 +1934,20 @@ ${sectionsHtml}
                   '<meta charset="utf-8">',
                   '<title>Slides NG — Speaker view</title>',
                   '<style>',
-                  'html, body { margin: 0; height: 100%; background: #1a1a1a; color: #fff; font-family: sans-serif; overflow: hidden; }',
-                  /* v0.11.79: explicit 4-row grid + minmax(0, 1fr) so
-                   * panels never overflow their cells. Was auto/1fr/1fr,
-                   * and the slides panel (the 5th item) auto-flowed
-                   * into a phantom 4th row whose height wasn\\'t
-                   * capped — caused the slides grid to overlap the
-                   * notes / timer panels above. */
-                  'body { display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; box-sizing: border-box; overflow: hidden; }',
-                  '.scenes-bar { grid-column: 1 / -1; background: #0a0a0a; border: 1px solid #333; border-radius: 6px; padding: 0.4rem 0.6rem; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }',
+                  /* v0.11.90: body allows overflow-y so if the grid
+                   * exceeds viewport (huge scenes bar etc.) the user
+                   * can scroll instead of content getting silently
+                   * clipped — addresses audit issue 36. */
+                  'html, body { margin: 0; height: 100%; background: #1a1a1a; color: #fff; font-family: sans-serif; overflow-x: hidden; }',
+                  /* v0.11.90: minmax(0, 1fr) on COLUMNS too (audit
+                   * issue 28) so panels never grow beyond their
+                   * track. Body retains overflow-y so the grid can
+                   * scroll when content overflows. */
+                  'body { display: grid; grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 8px; box-sizing: border-box; overflow-x: hidden; overflow-y: auto; min-height: 100%; }',
+                  /* v0.11.90: cap scenes-bar height to keep the 1fr
+                   * rows below from being squeezed to zero (audit
+                   * issue 11). Wrap-overflow goes to internal scroll. */
+                  '.scenes-bar { grid-column: 1 / -1; grid-row: 1; background: #0a0a0a; border: 1px solid #333; border-radius: 6px; padding: 0.4rem 0.6rem; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; max-height: 20vh; overflow-y: auto; }',
                   '.scenes-bar .scene-label { font-size: 0.75em; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-right: 0.4rem; }',
                   '.scene-btn { background: #2a2a2a; color: #e0e0e0; border: 1px solid #444; border-radius: 4px; padding: 0.3rem 0.6rem; cursor: pointer; font-size: 0.85em; transition: background 80ms ease, border-color 80ms ease; }',
                   '.scene-btn:hover { background: #3a3a3a; border-color: #555; }',
@@ -1991,19 +1996,24 @@ ${sectionsHtml}
                   '  <!-- scene buttons injected at runtime from window.opener.__slidesNgScenes -->',
                   '  <button class="scene-btn clear" id="scene-clear">Clear</button>',
                   '</div>',
-                  '<div class="panel">',
+                  /* v0.11.90: pin every panel to an explicit grid
+                   * row/column (audit issue 1) so they never auto-
+                   * flow into the wrong cell when the scenes bar
+                   * wraps or any future panel is added. Deterministic
+                   * placement. */
+                  '<div class="panel" style="grid-row:2;grid-column:1;">',
                   '  <div class="label">Current slide</div>',
                   '  <div class="frame-wrap"><div class="frame-aspect"><iframe id="current-frame" src="' + deckUrl + '" sandbox="allow-scripts allow-same-origin"></iframe><div class="slide-counter" id="current-counter">—</div></div></div>',
                   '</div>',
-                  '<div class="panel">',
+                  '<div class="panel" style="grid-row:2;grid-column:2;">',
                   '  <div class="label">Next slide</div>',
                   '  <div class="frame-wrap"><div class="frame-aspect"><iframe id="next-frame" src="' + deckUrl + '" sandbox="allow-scripts allow-same-origin"></iframe><div class="slide-counter" id="next-counter">—</div></div></div>',
                   '</div>',
-                  '<div class="panel">',
+                  '<div class="panel" style="grid-row:3;grid-column:1;">',
                   '  <div class="label">Speaker notes</div>',
                   '  <div class="notes" id="notes"><span class="empty">(waiting for sync…)</span></div>',
                   '</div>',
-                  '<div class="panel">',
+                  '<div class="panel" style="grid-row:3;grid-column:2;">',
                   '  <div class="label">Timer</div>',
                   /* v0.11.42: default-paused timer + Start/Pause/Reset
                    * triplet. Was Reset+Pause where the timer auto-ran
@@ -2040,13 +2050,17 @@ ${sectionsHtml}
                    * see this panel eat the whole viewport and starve
                    * the slide-preview / notes / timer panels. */
                   '<div class="panel" style="grid-column: 1 / -1; grid-row: 4; min-height: 0; max-height: min(280px, 35vh);">',
-                  '  <div class="label" style="display:flex;justify-content:space-between;align-items:center;padding-right:0.6rem;gap:0.5rem;flex-wrap:nowrap;">',
-                  '    <span style="flex:0 0 auto;">Slides</span>',
-                  /* v0.11.78: runtime mode toggle. Choice persists
-                   * to localStorage so the popup remembers between
-                   * sessions. Default is "text"; "visual" renders
-                   * one sandboxed iframe per slide. */
-                  '    <span style="margin-left:auto;display:flex;gap:0.25rem;align-items:center;color:#999;text-transform:none;letter-spacing:normal;font-weight:normal;font-size:0.8em;flex:0 0 auto;">',
+                  /* v0.11.90: header uses gap-only flex layout
+                   * (no margin-left:auto, no flex:0 0 auto on every
+                   * child). Slides label absorbs free space with
+                   * flex:1 1 auto + min-width:0 so it shrinks
+                   * cleanly. Buttons and counter sit at their
+                   * natural size with normal gap. Auto-margin +
+                   * flex:0 0 auto siblings was the collision source
+                   * the audit identified. */
+                  '  <div class="label" style="display:flex;justify-content:space-between;align-items:center;padding-right:0.6rem;gap:0.5rem;flex-wrap:nowrap;min-width:0;">',
+                  '    <span style="flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;">Slides</span>',
+                  '    <span style="display:flex;gap:0.25rem;align-items:center;color:#999;text-transform:none;letter-spacing:normal;font-weight:normal;font-size:0.8em;flex:0 0 auto;">',
                   '      <button id="grid-mode-text" class="scene-btn" style="font-size:0.8em;padding:0.1rem 0.4rem;">Text</button>',
                   '      <button id="grid-mode-visual" class="scene-btn" style="font-size:0.8em;padding:0.1rem 0.4rem;">Visual</button>',
                   '    </span>',
@@ -2195,14 +2209,8 @@ ${sectionsHtml}
                    * decks; that is why this is opt-in. */
                   '    if (getGridMode() === "visual") {',
                   '      var deckUrlBase = "' + deckUrl + '";',
-                  /* v0.11.82: read the deck\\'s natural slide
-                   * dimensions from the opener\\'s Reveal config.
-                   * Used to render each iframe at full deck size
-                   * then transform: scale() it down to the tile\\'s
-                   * actual width — proportionally shrinking the
-                   * reveal chrome (menu, controls) along with the
-                   * slide content. Fallback to 1280x720 if opener
-                   * config unreadable. */
+                  /* v0.11.82: read the deck-natural slide dimensions
+                   * from the opener Reveal config. Fallback 1280x720. */
                   '      var deckW = 1280, deckH = 720;',
                   '      try {',
                   '        if (window.opener && window.opener.Reveal && typeof window.opener.Reveal.getConfig === "function") {',
@@ -2211,40 +2219,55 @@ ${sectionsHtml}
                   '          if (cfg && cfg.height) deckH = cfg.height;',
                   '        }',
                   '      } catch (_) {}',
-                  '      var tileAspect = deckW + "/" + deckH;',
-                  '      grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(180px, 1fr))";',
+                  /* v0.11.90: PIXEL-PIN tile width before render
+                   * (mirrors the v0.11.21 in-Obsidian picker fix that
+                   * the user remembered). Compute the column count
+                   * synchronously from the actual grid width and the
+                   * 180px minimum, then pin each tile to a concrete
+                   * pixel width. The transform: scale on the inner
+                   * div is computed from that pixel width — so the
+                   * first paint is already correct. Eliminates the
+                   * rAF/ResizeObserver race that was letting deck-
+                   * natural-size content escape overflow:hidden. */
+                  '      var gridRect = grid.getBoundingClientRect();',
+                  '      var gridContentW = Math.max(180, gridRect.width - 12);',
+                  '      var minTileW = 180;',
+                  '      var colCount = Math.max(1, Math.floor((gridContentW + 6) / (minTileW + 6)));',
+                  '      var tileW = Math.max(minTileW, Math.floor((gridContentW - (colCount - 1) * 6) / colCount));',
+                  '      var tileH = Math.round(tileW * deckH / deckW);',
+                  '      var scaleFactor = tileW / deckW;',
+                  '      grid.style.gridTemplateColumns = "repeat(" + colCount + ", " + tileW + "px)";',
                   '      for (var i = 0; i < sections.length; i++) {',
                   '        var tile = document.createElement("button");',
                   '        tile.setAttribute("data-idx", String(i));',
                   '        tile.className = "slide-tile";',
-                  '        tile.style.cssText = "background:#000;border:1px solid #333;border-radius:4px;padding:0;cursor:pointer;font-family:inherit;overflow:hidden;transition:border-color 80ms ease;aspect-ratio:" + tileAspect + ";position:relative;";',
-                  /* Inner div fixed at deck natural size + scaled
-                   * via transform. transform-origin: top left so the
-                   * scale anchors to the tile\\'s corner. */
+                  /* v0.11.90: pinned width + height, no aspect-ratio
+                   * CSS — aspect-ratio on a <button> with overflow
+                   * was the bug source that bled the iframe past the
+                   * tile boundary. */
+                  '        tile.style.cssText = "background:#000;border:1px solid #333;border-radius:4px;padding:0;cursor:pointer;font-family:inherit;transition:border-color 80ms ease;position:relative;width:" + tileW + "px;height:" + tileH + "px;overflow:hidden;";',
+                  /* Clip wrapper so the actual iframe-holding div
+                   * lives inside a plain <div> with overflow:hidden,
+                   * not the <button> tile (Chromium has known quirks
+                   * with overflow:hidden on form-element buttons). */
+                  '        var clip = document.createElement("div");',
+                  '        clip.style.cssText = "position:absolute;inset:0;overflow:hidden;pointer-events:none;";',
                   '        var inner = document.createElement("div");',
                   '        inner.className = "slide-tile-inner";',
-                  /* v0.11.83: bake in an initial scale BEFORE the
-                   * grid lays out. 180px is the minmax min for the
-                   * tile column, so this is the worst-case (smallest)
-                   * tile width. Actual updateTileScales runs later
-                   * via requestAnimationFrame and bumps to the true
-                   * width. Prevents the initial 1280x720 natural-size
-                   * render leaking past overflow:hidden on the tile. */
-                  '        var initialScale = 180 / deckW;',
-                  '        inner.style.cssText = "position:absolute;top:0;left:0;width:" + deckW + "px;height:" + deckH + "px;transform-origin:top left;transform:scale(" + initialScale + ");pointer-events:none;";',
+                  /* Initial scale is the DETERMINISTIC scale derived
+                   * from pinned tile width. No more 180px-floor guess. */
+                  '        inner.style.cssText = "position:absolute;top:0;left:0;width:" + deckW + "px;height:" + deckH + "px;transform-origin:top left;transform:scale(" + scaleFactor + ");pointer-events:none;";',
                   '        var fr = document.createElement("iframe");',
                   '        fr.src = deckUrlBase + "?slidesNgPinSlide=" + i;',
-                  /* v0.11.78: minimum sandbox — scripts for reveal
-                   * init, same-origin so reveal can fetch its
-                   * relative theme/script paths. */
                   '        fr.setAttribute("sandbox", "allow-scripts allow-same-origin");',
                   '        fr.setAttribute("loading", "lazy");',
                   '        fr.style.cssText = "border:0;width:100%;height:100%;background:#000;display:block;";',
                   '        inner.appendChild(fr);',
+                  '        clip.appendChild(inner);',
                   '        var badge = document.createElement("div");',
                   '        badge.textContent = String(i + 1);',
                   '        badge.style.cssText = "position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.65);color:#fff;font-size:0.7em;padding:1px 5px;border-radius:3px;font-weight:600;pointer-events:none;z-index:2;";',
-                  '        tile.appendChild(inner);',
+                  '        tile.appendChild(clip);',
                   '        tile.appendChild(badge);',
                   '        tile.addEventListener("click", (function (idx) {',
                   '          return function () { navCmd("goto", idx); };',
@@ -2253,36 +2276,33 @@ ${sectionsHtml}
                   '        tile.addEventListener("mouseleave", function () { var cur = this.classList.contains("current"); this.style.borderColor = cur ? "#42affa" : "#333"; });',
                   '        grid.appendChild(tile);',
                   '      }',
-                  /* v0.11.82: scale every tile inner so the deck-
-                   * sized iframe shrinks proportionally to the
-                   * tile\\'s current width. Run on initial layout
-                   * + on viewport resize so user-resizing the popup
-                   * re-scales correctly. */
-                  '      function updateTileScales() {',
-                  '        var tiles = grid.querySelectorAll(".slide-tile");',
-                  '        tiles.forEach(function (t) {',
-                  '          var inner = t.querySelector(".slide-tile-inner");',
-                  '          if (!inner) return;',
-                  '          var rect = t.getBoundingClientRect();',
-                  '          if (!rect.width) return;',
-                  '          var s = rect.width / deckW;',
-                  '          inner.style.transform = "scale(" + s + ")";',
+                  /* v0.11.90: ResizeObserver only for popup-resize
+                   * re-flow. Re-compute pinned widths + scales when
+                   * the grid changes size. No initial-paint rAF needed. */
+                  '      function relayoutTiles() {',
+                  '        var newGridRect = grid.getBoundingClientRect();',
+                  '        var newContentW = Math.max(180, newGridRect.width - 12);',
+                  '        var newColCount = Math.max(1, Math.floor((newContentW + 6) / (minTileW + 6)));',
+                  '        var newTileW = Math.max(minTileW, Math.floor((newContentW - (newColCount - 1) * 6) / newColCount));',
+                  '        var newTileH = Math.round(newTileW * deckH / deckW);',
+                  '        var newScale = newTileW / deckW;',
+                  '        grid.style.gridTemplateColumns = "repeat(" + newColCount + ", " + newTileW + "px)";',
+                  '        grid.querySelectorAll(".slide-tile").forEach(function (t) {',
+                  '          t.style.width = newTileW + "px";',
+                  '          t.style.height = newTileH + "px";',
+                  '          var innerEl = t.querySelector(".slide-tile-inner");',
+                  '          if (innerEl) innerEl.style.transform = "scale(" + newScale + ")";',
                   '        });',
                   '      }',
-                  /* v0.11.83: wait for layout via double rAF, then
-                   * compute the real scale. Also kick off a
-                   * ResizeObserver so the scale tracks the tile when
-                   * the user resizes the popup. */
-                  '      requestAnimationFrame(function () { requestAnimationFrame(updateTileScales); });',
                   '      try {',
                   '        if (typeof ResizeObserver === "function") {',
-                  '          var ro = new ResizeObserver(updateTileScales);',
-                  '          grid.querySelectorAll(".slide-tile").forEach(function (t) { ro.observe(t); });',
+                  '          var ro = new ResizeObserver(relayoutTiles);',
+                  '          ro.observe(grid);',
                   '        }',
                   '      } catch (_) {}',
                   '      window.removeEventListener("resize", window.__slidesNgUpdateTileScales || (function(){}));',
-                  '      window.__slidesNgUpdateTileScales = updateTileScales;',
-                  '      window.addEventListener("resize", updateTileScales);',
+                  '      window.__slidesNgUpdateTileScales = relayoutTiles;',
+                  '      window.addEventListener("resize", relayoutTiles);',
                   '      return;',
                   '    }',
                   /* Default text-only grid (cheap, no extra iframes). */
@@ -2313,10 +2333,16 @@ ${sectionsHtml}
                   '    setEmptyMsg("(unable to read opener slides: " + e.message + ")");',
                   '  }',
                   '}',
+                  /* v0.11.90: track the current tile via a class
+                   * (audit issue 20). Previously this set inline
+                   * borderColor which got clobbered on every mouse
+                   * leave because the leave-handler check for class
+                   * "current" was always false. */
                   'function highlightCurrentTile(idx) {',
                   '  var tiles = document.querySelectorAll(".slide-tile");',
                   '  for (var i = 0; i < tiles.length; i++) {',
                   '    var isCurrent = parseInt(tiles[i].getAttribute("data-idx") || "-1", 10) === idx;',
+                  '    tiles[i].classList.toggle("current", isCurrent);',
                   '    tiles[i].style.borderColor = isCurrent ? "#42affa" : "#333";',
                   '    tiles[i].style.boxShadow = isCurrent ? "0 0 0 2px rgba(66,175,250,0.25)" : "";',
                   '  }',
@@ -2450,151 +2476,6 @@ ${sectionsHtml}
                   '  if (typeof idx === "number") msg.idx = idx;',
                   '  try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, "*"); } catch (_) {}',
                   '}',
-                  /* v0.11.85: visible layout diagnostics. Adds a
-                   * collapsible debug pane to the popup itself
-                   * showing panel rects + overlap detection. User
-                   * can screenshot or copy the text. Toggled with
-                   * the ? key. */
-                  'function captureLayoutSnapshot() {',
-                  '  function rectOf(idOrSel, isSel) {',
-                  '    var el = isSel ? document.querySelector(idOrSel) : document.getElementById(idOrSel);',
-                  '    if (!el) return null;',
-                  '    var r = el.getBoundingClientRect();',
-                  '    return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };',
-                  '  }',
-                  '  function rectsOf(sel) {',
-                  '    return Array.from(document.querySelectorAll(sel)).map(function (el, i) {',
-                  '      var r = el.getBoundingClientRect();',
-                  '      var label = el.querySelector(".label");',
-                  /* v0.11.87: double-escape \\\\n because this string
-                   * passes through TWO JS parsers (deck script then
-                   * popup script). Single \\n becomes a real newline
-                   * after the deck parse, which leaves an unterminated
-                   * string literal in the popup source — breaking the
-                   * entire popup script. */
-                  '      return { sel: sel, idx: i, name: label ? (label.textContent || "").trim().split("\\\\n")[0].slice(0,20) : "", x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };',
-                  '    });',
-                  '  }',
-                  '  function rectsOverlap(a, b) {',
-                  '    if (!a || !b) return false;',
-                  '    return !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);',
-                  '  }',
-                  '  var panels = rectsOf(".panel");',
-                  '  var overlaps = [];',
-                  '  for (var i = 0; i < panels.length; i++) {',
-                  '    for (var j = i + 1; j < panels.length; j++) {',
-                  '      if (rectsOverlap(panels[i], panels[j])) {',
-                  '        overlaps.push("[" + (panels[i].name || ("#" + i)) + "] overlaps [" + (panels[j].name || ("#" + j)) + "]");',
-                  '      }',
-                  '    }',
-                  '  }',
-                  '  var snap = {',
-                  '    viewport: window.innerWidth + "x" + window.innerHeight,',
-                  '    gridMode: typeof getGridMode === "function" ? getGridMode() : "?",',
-                  '    overlaps: overlaps,',
-                  '    panels: panels,',
-                  '    timer: rectOf("timer"),',
-                  '    slideGrid: rectOf("slide-grid"),',
-                  '    firstTile: rectOf(".slide-tile", true),',
-                  '  };',
-                  '  /* Write to localStorage so it survives popup close. */',
-                  '  try { localStorage.setItem("slides-ng-popup-debug", JSON.stringify(snap, null, 2)); } catch (_) {}',
-                  '  /* Update the visible debug pane if it\\'s open. */',
-                  '  var pane = document.getElementById("slides-ng-debug-pane");',
-                  '  if (pane && pane.style.display !== "none") {',
-                  '    pane.querySelector("pre").textContent = JSON.stringify(snap, null, 2);',
-                  '  }',
-                  '  /* Forward to opener (works only when popup was launched from in-Obsidian deck). */',
-                  '  try { if (window.opener && !window.opener.closed) window.opener.postMessage({ type: "slides-ng-popup-layout", snap: snap, time: Date.now() }, "*"); } catch (_) {}',
-                  '}',
-                  /* Build the debug pane DOM. Hidden by default; toggle with ? key. */
-                  '(function () {',
-                  '  var pane = document.createElement("div");',
-                  '  pane.id = "slides-ng-debug-pane";',
-                  '  pane.style.cssText = "position:fixed;top:10px;right:10px;width:380px;max-height:80vh;overflow:auto;background:rgba(0,0,0,0.92);color:#0f0;border:1px solid #555;border-radius:6px;padding:0.5rem;font-family:monospace;font-size:11px;z-index:99999;display:none;";',
-                  /* Build via DOM API (avoids the escape hell of innerHTML
-                   * with quoted-attr strings inside a TS template literal). */
-                  '  var header = document.createElement("div");',
-                  '  header.style.cssText = "display:flex;justify-content:space-between;color:#aaa;border-bottom:1px solid #333;padding-bottom:4px;margin-bottom:4px;";',
-                  '  var hLabel = document.createElement("strong");',
-                  '  hLabel.textContent = "slides-ng popup layout";',
-                  '  var hHint = document.createElement("span");',
-                  '  hHint.textContent = "? to toggle";',
-                  '  hHint.style.cssText = "color:#888;font-weight:normal;";',
-                  '  header.appendChild(hLabel);',
-                  '  header.appendChild(hHint);',
-                  '  var pre = document.createElement("pre");',
-                  '  pre.style.cssText = "margin:0;white-space:pre-wrap;font-size:10px;line-height:1.3;";',
-                  '  pre.textContent = "(capturing…)";',
-                  /* v0.11.88: click-to-inspect button. Adds an
-                   * "Inspect" mode where clicking on any pixel shows
-                   * the elements stacked at that point — the actual
-                   * overlap source even when it\\'s inside iframes or
-                   * not a panel element. */
-                  '  var inspectBtn = document.createElement("button");',
-                  '  inspectBtn.textContent = "Click-to-inspect: OFF";',
-                  '  inspectBtn.style.cssText = "background:#222;color:#ccc;border:1px solid #555;padding:2px 6px;border-radius:3px;font-size:10px;margin:4px 0;cursor:pointer;width:100%;";',
-                  '  var inspecting = false;',
-                  '  inspectBtn.addEventListener("click", function () {',
-                  '    inspecting = !inspecting;',
-                  '    inspectBtn.textContent = "Click-to-inspect: " + (inspecting ? "ON (click anywhere)" : "OFF");',
-                  '    inspectBtn.style.background = inspecting ? "#440" : "#222";',
-                  '    document.body.style.cursor = inspecting ? "crosshair" : "";',
-                  '  });',
-                  '  /* Capture clicks anywhere when inspecting. */',
-                  '  document.addEventListener("click", function (e) {',
-                  '    if (!inspecting) return;',
-                  '    if (e.target === inspectBtn) return;',
-                  '    e.preventDefault();',
-                  '    e.stopPropagation();',
-                  '    var els = document.elementsFromPoint(e.clientX, e.clientY);',
-                  '    var report = els.map(function (el) {',
-                  '      var r = el.getBoundingClientRect();',
-                  '      var iframeContent = null;',
-                  '      if (el.tagName === "IFRAME") {',
-                  '        try {',
-                  '          var inner = el.contentDocument;',
-                  '          if (inner) {',
-                  '            /* Translate click into the iframe coordinate space then probe inside. */',
-                  '            var fr = el.getBoundingClientRect();',
-                  '            var transform = getComputedStyle(el.parentElement || el).transform;',
-                  '            var scaleStr = transform.match(/matrix\\\\(([-0-9.]+)/);',
-                  '            var scale = scaleStr ? parseFloat(scaleStr[1]) : 1;',
-                  '            var innerX = (e.clientX - fr.left) / scale;',
-                  '            var innerY = (e.clientY - fr.top) / scale;',
-                  '            var innerEls = inner.elementsFromPoint(innerX, innerY);',
-                  '            iframeContent = innerEls.slice(0, 6).map(function (ie) {',
-                  '              return { tag: ie.tagName, cls: (ie.className || "").toString().slice(0, 60), id: ie.id || "" };',
-                  '            });',
-                  '          }',
-                  '        } catch (err) { iframeContent = "x-origin"; }',
-                  '      }',
-                  '      return {',
-                  '        tag: el.tagName,',
-                  '        cls: (el.className || "").toString().slice(0, 60),',
-                  '        id: el.id || "",',
-                  '        rect: { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) },',
-                  '        iframe: iframeContent,',
-                  '      };',
-                  '    });',
-                  '    var out = { clickedAt: { x: e.clientX, y: e.clientY }, elements: report };',
-                  '    pre.textContent = JSON.stringify(out, null, 2);',
-                  '    pane.style.display = "block";',
-                  '  }, true);',
-                  '  pane.appendChild(header);',
-                  '  pane.appendChild(inspectBtn);',
-                  '  pane.appendChild(pre);',
-                  '  document.body.appendChild(pane);',
-                  '  document.addEventListener("keydown", function (e) {',
-                  '    if (e.key === "?" || (e.key === "/" && e.shiftKey)) {',
-                  '      pane.style.display = pane.style.display === "none" ? "block" : "none";',
-                  '      if (pane.style.display !== "none") captureLayoutSnapshot();',
-                  '    }',
-                  '  });',
-                  '})();',
-                  'setTimeout(captureLayoutSnapshot, 1000);',
-                  'setTimeout(captureLayoutSnapshot, 3000);',
-                  'window.addEventListener("resize", function () { setTimeout(captureLayoutSnapshot, 200); });',
                   'document.getElementById("nav-prev").addEventListener("click", function () { navCmd("prev"); });',
                   'document.getElementById("nav-next").addEventListener("click", function () { navCmd("next"); });',
                   'document.getElementById("nav-first").addEventListener("click", function () { navCmd("first"); });',
@@ -2795,20 +2676,6 @@ ${sectionsHtml}
               window.addEventListener('message', function (e) {
                 if (e.data && e.data.type === 'slides-ng-speaker-poke') {
                   postStateToSpeaker();
-                }
-                /* v0.11.84: forward popup layout snapshots to the
-                 * parent (Obsidian view), which logs to debug.log so
-                 * I can diagnose layout issues remotely. */
-                if (e.data && e.data.type === 'slides-ng-popup-layout') {
-                  try {
-                    if (window.parent && window.parent !== window) {
-                      window.parent.postMessage({
-                        type: 'slides-ng-popup-layout',
-                        snap: e.data.snap,
-                        time: e.data.time,
-                      }, '*');
-                    }
-                  } catch (_) {}
                 }
               });
               function openSpeakerPopup() {

@@ -159,15 +159,6 @@ export class SlidesNGView extends ItemView {
             firstSectionDisplay: data.firstSectionDisplay,
           });
           break;
-        case "slides-ng-popup-layout":
-          // v0.11.84: relays from the browser speaker popup, forwarded
-          // via the deck iframe. Lets me see the actual popup layout
-          // state in the debug log so I can diagnose overlap remotely.
-          this.debug?.log("popup/layout", {
-            time: (data as { time?: number }).time,
-            snap: (data as { snap?: unknown }).snap,
-          });
-          break;
       }
     };
     window.addEventListener("message", this.iframeErrorHandler);
