@@ -108,8 +108,32 @@
   flex-direction: column;
   gap: 2px;
 }
+/* v0.12.4: title row holds the [chip] + the name on one line. */
+.slides-ng-suggest .slides-ng-suggest-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 .slides-ng-suggest .slides-ng-suggest-title {
   font-weight: 600;
+  font-family: var(--font-monospace);
+}
+.slides-ng-suggest .slides-ng-suggest-chip {
+  font-size: 0.65em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+.slides-ng-suggest .slides-ng-suggest-chip-slot {
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+.slides-ng-suggest .slides-ng-suggest-chip-template {
+  background: color-mix(in srgb, var(--text-accent) 22%, transparent);
+  color: var(--text-accent);
 }
 .slides-ng-suggest .slides-ng-suggest-note {
   font-size: 0.8em;
