@@ -1518,6 +1518,25 @@
 .slides-ng-snippet-copy:hover {
   background: var(--interactive-hover);
 }
+/* v0.13.2: copy-all row sits above the snippet list as a primary action. */
+.slides-ng-snippet-copyall-row {
+  margin: 0.5rem 0 0.75rem;
+}
+.slides-ng-snippet-copyall {
+  width: 100%;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: 0;
+  border-radius: 6px;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.slides-ng-snippet-copyall:hover {
+  background: var(--interactive-accent-hover);
+}
 
 /* The line-step CSS below is injected INTO THE IFRAME (via revealTemplate.ts).
  * Keeping it in src/styles.css means it gets bundled, but it's only effective

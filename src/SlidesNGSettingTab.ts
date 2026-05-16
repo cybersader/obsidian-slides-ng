@@ -13,6 +13,7 @@ import type { SceneDefinition, SpeakerPanelId } from "./settings";
 import { availableThemes } from "./render/revealAssets";
 import { KNOWN_LAYOUTS } from "./render/layouts";
 import { TEMPLATES } from "./templates";
+import { formatAllSnippets } from "./snippetsDoc";
 
 export class SlidesNGSettingTab extends PluginSettingTab {
   private plugin: SlidesNGPlugin;
@@ -835,6 +836,28 @@ body markdown`,
    */
   private renderSnippetReference(containerEl: HTMLElement): void {
     const useShortcode = this.plugin.settings.experimentalShortcodeSnippets;
+
+    // v0.13.2: one-click "copy entire snippet library to clipboard"
+    // — drops a full markdown reference doc onto the clipboard so the
+    // user can paste it into an AI chat / agentic workflow context.
+    // Uses the same formatter as scripts/generate-snippets-doc.mjs so
+    // settings UI and SNIPPETS.md stay in lockstep.
+    const copyAllRow = containerEl.createDiv({ cls: "slides-ng-snippet-copyall-row" });
+    const copyAllBtn = copyAllRow.createEl("button", {
+      cls: "slides-ng-snippet-copyall",
+      text: `Copy entire snippet library (${TEMPLATES.length} snippets) to clipboard`,
+    });
+    copyAllBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(formatAllSnippets());
+        copyAllBtn.textContent = `Copied ${TEMPLATES.length} snippets ✓ — paste into your LLM chat`;
+        window.setTimeout(() => {
+          copyAllBtn.textContent = `Copy entire snippet library (${TEMPLATES.length} snippets) to clipboard`;
+        }, 2500);
+      } catch (err) {
+        new Notice("Copy failed — clipboard permission denied.");
+      }
+    });
 
     // Intro / conventions explainer.
     const intro = containerEl.createDiv({ cls: "slides-ng-snippet-intro" });

@@ -1,6 +1,6 @@
 {
   "name": "obsidian-slides-ng",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "description": "Markdown slide decks for Obsidian — zero localhost ports, no spawned dev server, reveal.js + Shiki bundled.",
   "main": "main.js",
   "private": true,
@@ -15,7 +15,8 @@
     "test": "bun test",
     "test:watch": "bun test --watch",
     "e2e": "wdio run wdio.conf.mts",
-    "smoke:render": "bun run gen:reveal-assets && bun run scripts/render-example.mjs"
+    "smoke:render": "bun run gen:reveal-assets && bun run scripts/render-example.mjs",
+    "gen:snippets-doc": "bun run scripts/generate-snippets-doc.mjs"
   },
   "keywords": [
     "obsidian",
