@@ -14,6 +14,7 @@ import { checkPdfExportContrast } from "./export/contrastCheck";
 import { SlidesNGSettingTab } from "./SlidesNGSettingTab";
 import { DEFAULT_SETTINGS, type SlidesNGSettings } from "./settings";
 import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
+import { openSnippetInsertModal } from "./SnippetInsertModal";
 import { DebugLog } from "./utils/debug";
 import {
   LayoutNameSuggest,
@@ -142,6 +143,20 @@ export default class SlidesNGPlugin extends Plugin {
       name: "Open speaker view",
       callback: () => {
         void this.activateSpeakerLeaf();
+      },
+    });
+
+    this.addCommand({
+      id: "insert-html-snippet",
+      name: "Insert HTML snippet",
+      // v0.12.1: command-palette flow alongside the ::name autocomplete.
+      // Selection-aware — if the user has text selected when they invoke,
+      // the selection gets wrapped/encased in the snippet body. With no
+      // selection it just drops the snippet at the caret like the
+      // autocomplete does. See src/SnippetInsertModal.ts for the modal
+      // class.
+      editorCallback: () => {
+        openSnippetInsertModal(this.app);
       },
     });
 
