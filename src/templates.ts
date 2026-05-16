@@ -63,17 +63,24 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
     description: "Center-layout slide (vertically + horizontally centered)",
     expand: () => withCursor("---\nlayout: center\n---\n\n## █\n"),
   },
+  // v0.13.0: renamed `two-cols` → `slidev-two-cols` to disambiguate
+  // from the new HTML-emitting `::twocol` snippet. Slidev names use
+  // the SLIDE-WIDE layout system (parse-time `layout:` frontmatter
+  // + `::left::` / `::right::` slot markers). The inline HTML
+  // `::twocol` snippet is usually what users actually want — it
+  // drops a two-column block INSIDE a slide without taking over the
+  // whole slide layout.
   {
-    name: "two-cols",
-    description: "Two-column layout with ::left:: / ::right:: slots",
+    name: "slidev-two-cols",
+    description: "Slide-WIDE two-column layout (Slidev style, uses `layout:` frontmatter)",
     expand: () =>
       withCursor(
         "---\nlayout: two-cols\n---\n\n::left::\n\n█\n\n::right::\n\n\n"
       ),
   },
   {
-    name: "two-cols-header",
-    description: "Two columns under a header (default slot is the header)",
+    name: "slidev-two-cols-header",
+    description: "Slide-WIDE two-cols with header above (Slidev style, uses `layout:` frontmatter)",
     expand: () =>
       withCursor(
         "---\nlayout: two-cols-header\n---\n\n# █\n\n::left::\n\n\n\n::right::\n\n\n"

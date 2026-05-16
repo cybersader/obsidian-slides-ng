@@ -41,8 +41,12 @@ describe("template registry shape", () => {
     expect(text).toContain("# ");
   });
 
-  test("two-cols template includes both slot markers", () => {
-    const t = findTemplate("two-cols")!;
+  test("slidev-two-cols template includes both slot markers", () => {
+    // v0.13.0: renamed from "two-cols" → "slidev-two-cols" to
+    // disambiguate from the new HTML `::twocol` snippet. The Slidev
+    // layout system itself (frontmatter `layout: two-cols`) is
+    // unchanged — only the snippet name moved.
+    const t = findTemplate("slidev-two-cols")!;
     const { text } = t.expand();
     expect(text).toContain("layout: two-cols");
     expect(text).toContain("::left::");
