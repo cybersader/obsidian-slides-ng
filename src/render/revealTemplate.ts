@@ -2555,7 +2555,7 @@ ${sectionsHtml}
                   '        try {',
                   '          var inner = el.contentDocument;',
                   '          if (inner) {',
-                  '            /* Translate click into the iframe\\\\'s coordinate space then probe inside. */',
+                  '            /* Translate click into the iframe coordinate space then probe inside. */',
                   '            var fr = el.getBoundingClientRect();',
                   '            var transform = getComputedStyle(el.parentElement || el).transform;',
                   '            var scaleStr = transform.match(/matrix\\\\(([-0-9.]+)/);',
