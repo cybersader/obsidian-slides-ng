@@ -12,6 +12,7 @@ import { parseLineStep } from "../parser/lineStep";
 import { renderLineStep } from "./lineStepRenderer";
 import { parseMagicMoveKey } from "../parser/magicMoveKey";
 import { renderMagicMoveBlock } from "./magicMoveRenderer";
+import { pandocFencedDivs } from "../parser/pandocFencedDivs";
 import { splitSlots, hasSlots } from "./slots";
 import { applyLayout } from "./layouts";
 import {
@@ -27,6 +28,10 @@ import {
 // just a different render config).
 function buildMarked(codeTheme: string | undefined): Marked {
   const inst = new Marked();
+  // v0.12.0: Pandoc fenced divs extension. Enables `::: classname ... :::`
+  // structural blocks that compose with reveal.js without needing custom
+  // parse-time logic per-snippet. See src/parser/pandocFencedDivs.ts.
+  inst.use(pandocFencedDivs);
   inst.use({
     renderer: {
       code(token: Tokens.Code): string {

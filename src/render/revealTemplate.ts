@@ -348,6 +348,187 @@ export function buildIframeHtml(
     }
 
     /* ----------------------------------------------------------------
+     * v0.12.0: slide snippet styles. The Pandoc-fenced-div extension
+     * (\`::: classname\`) emits \`<div class="classname">…</div>\`. These
+     * rules style the well-known class names so snippets render
+     * consistently. All sizing uses em/fr units so it scales with the
+     * deck (reveal auto-scales each <section>); colours pull from
+     * reveal\\'s CSS vars (--r-link-color, --r-main-color, etc.) so
+     * they match whatever theme the deck is using.
+     * --------------------------------------------------------------- */
+
+    /* Generic two-column grid. \`::: twocol\` */
+    .reveal .slides section .twocol {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2em;
+      align-items: start;
+      text-align: left;
+    }
+    /* Ratio variants — 60/40 and 40/60 splits. */
+    .reveal .slides section .twocol-60 { grid-template-columns: 3fr 2fr; }
+    .reveal .slides section .twocol-40 { grid-template-columns: 2fr 3fr; }
+    /* Single-column 1-3 layout in case user wants asymmetric. */
+    .reveal .slides section .twocol > * { min-width: 0; }
+
+    /* Three-column. \`::: threecol\` */
+    .reveal .slides section .threecol {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.2em;
+      align-items: start;
+      text-align: left;
+    }
+    .reveal .slides section .threecol > * { min-width: 0; }
+
+    /* Hero — big centred title block with optional subtitle. The
+     * .hero div centres its content vertically + horizontally. */
+    .reveal .slides section .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 0.4em;
+      padding: 0.5em 0;
+      min-height: 60vh;
+    }
+    .reveal .slides section .hero > h1,
+    .reveal .slides section .hero > h2 {
+      margin: 0;
+    }
+
+    /* Callout — coloured side-bar block for tips/warnings/notes.
+     * Default accent uses --r-link-color from the active theme. */
+    .reveal .slides section .callout {
+      border-left: 0.3em solid var(--r-link-color, #42affa);
+      background: color-mix(in srgb, var(--r-link-color, #42affa) 12%, transparent);
+      padding: 0.8em 1em;
+      border-radius: 0.2em;
+      text-align: left;
+      margin: 0.6em 0;
+    }
+    .reveal .slides section .callout > *:first-child { margin-top: 0; }
+    .reveal .slides section .callout > *:last-child { margin-bottom: 0; }
+    /* Semantic variants — stack on top of .callout: \`::: { .callout .warn }\` */
+    .reveal .slides section .callout.warn {
+      border-color: #f59e0b;
+      background: color-mix(in srgb, #f59e0b 12%, transparent);
+    }
+    .reveal .slides section .callout.danger {
+      border-color: #ef4444;
+      background: color-mix(in srgb, #ef4444 12%, transparent);
+    }
+    .reveal .slides section .callout.success {
+      border-color: #10b981;
+      background: color-mix(in srgb, #10b981 12%, transparent);
+    }
+
+    /* Big-number stat. \`::: bignum\` — paragraph 1 is the number,
+     * paragraph 2 is the label. */
+    .reveal .slides section .bignum {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.1em;
+      text-align: center;
+    }
+    .reveal .slides section .bignum > p:first-child {
+      font-size: 4em;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--r-link-color, currentColor);
+      margin: 0;
+    }
+    .reveal .slides section .bignum > p:nth-child(2) {
+      font-size: 1em;
+      opacity: 0.75;
+      margin: 0;
+    }
+
+    /* Stat grid: a wrapper grid that auto-fills stat-card children. */
+    .reveal .slides section .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(8em, 100%), 1fr));
+      gap: 1em;
+      text-align: center;
+    }
+    .reveal .slides section .stat-card {
+      border: 0.05em solid var(--r-link-color, currentColor);
+      border-radius: 0.3em;
+      padding: 0.8em 0.4em;
+      opacity: 0.9;
+    }
+    .reveal .slides section .stat-card > p:first-child {
+      font-size: 2.2em;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--r-link-color, currentColor);
+      margin: 0 0 0.2em 0;
+    }
+
+    /* Side-by-side compare. \`::: compare\` — two halves with a divider
+     * down the middle. Pair with sub-blocks for headings. */
+    .reveal .slides section .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5em;
+      text-align: left;
+      position: relative;
+    }
+    .reveal .slides section .compare::before {
+      content: "";
+      position: absolute;
+      top: 0.4em;
+      bottom: 0.4em;
+      left: 50%;
+      width: 0;
+      border-left: 0.05em dashed currentColor;
+      opacity: 0.25;
+    }
+    /* Optional themed halves for before/after, pro/con. */
+    .reveal .slides section .compare-good {
+      border-top: 0.2em solid #10b981;
+      padding-top: 0.5em;
+    }
+    .reveal .slides section .compare-bad {
+      border-top: 0.2em solid #ef4444;
+      padding-top: 0.5em;
+    }
+
+    /* Accent box — solid background block for emphasis. */
+    .reveal .slides section .accent-box {
+      background: var(--r-link-color, #42affa);
+      color: #fff;
+      padding: 1em 1.2em;
+      border-radius: 0.3em;
+      text-align: center;
+      font-weight: 600;
+    }
+    .reveal .slides section .accent-box > *:first-child { margin-top: 0; }
+    .reveal .slides section .accent-box > *:last-child { margin-bottom: 0; }
+
+    /* Image-side. \`::: image-left\` / \`::: image-right\`. First child
+     * is image, second is text. CSS \`order\` swaps layout without
+     * needing two near-identical classes. */
+    .reveal .slides section .image-left,
+    .reveal .slides section .image-right {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5em;
+      align-items: center;
+      text-align: left;
+    }
+    .reveal .slides section .image-right > *:first-child { order: 2; }
+    .reveal .slides section .image-left > img,
+    .reveal .slides section .image-right > img {
+      max-width: 100%;
+      max-height: 80vh;
+      object-fit: contain;
+      border-radius: 0.2em;
+    }
+
+    /* ----------------------------------------------------------------
      * Slidev-flavoured layouts (v0.2).
      * Each <section> wraps its content in
      *   <div class="slides-ng-layout" data-layout="<name>">

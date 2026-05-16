@@ -123,6 +123,287 @@ export const TEMPLATES: readonly SnippetTemplate[] = [
         '```ts [1|2-3|all]\nconst passphrase = "█"\nconst length = passphrase.split(" ").length\nconsole.log(`length is ${length}`)\n```\n'
       ),
   },
+
+  // ===========================================================================
+  // v0.12.0 — HTML structural snippets using Pandoc fenced divs (`::: name`).
+  //
+  // These compose with reveal.js without requiring any custom parse-time
+  // logic: marked treats `::: classname` as a `<div class="classname">`
+  // wrapper, the body is parsed as normal markdown. CSS for each class
+  // lives in src/render/revealTemplate.ts (so it ships inside the iframe)
+  // and uses --r-link-color etc. so it picks up the active reveal theme.
+  //
+  // Convention rules:
+  //  1. Always blank line after the opening `:::name` and before the
+  //     closing `:::`. (Standard Pandoc behaviour.)
+  //  2. Body content is regular markdown — paragraphs, headings, lists,
+  //     code blocks all parse normally.
+  //  3. em/fr/% units only inside the body — no fixed px. Reveal scales
+  //     the whole slide; relative units keep proportions intact.
+  //  4. For coloured accents prefer the .callout warn/danger/success
+  //     variants over inline styles — they survive theme switches.
+  // ===========================================================================
+
+  {
+    name: "hero",
+    description: "Centred hero / cover title with subtitle",
+    expand: () =>
+      withCursor("::: hero\n\n# █\n\nSubtitle goes here\n\n:::\n"),
+  },
+  {
+    name: "twocol",
+    description: "Two equal columns (50/50)",
+    expand: () =>
+      withCursor(
+        [
+          "::: twocol",
+          "",
+          ":::: { }",
+          "",
+          "## Left heading",
+          "",
+          "█",
+          "",
+          "::::",
+          "",
+          ":::: { }",
+          "",
+          "## Right heading",
+          "",
+          "",
+          "",
+          "::::",
+          "",
+          ":::",
+          "",
+        ].join("\n")
+      ),
+  },
+  {
+    name: "twocol-60",
+    description: "Two columns 60/40 (wider left)",
+    expand: () =>
+      withCursor(
+        [
+          "::: twocol-60",
+          "",
+          ":::: { }",
+          "",
+          "## Main",
+          "",
+          "█",
+          "",
+          "::::",
+          "",
+          ":::: { }",
+          "",
+          "## Aside",
+          "",
+          "",
+          "",
+          "::::",
+          "",
+          ":::",
+          "",
+        ].join("\n")
+      ),
+  },
+  {
+    name: "threecol",
+    description: "Three equal columns",
+    expand: () =>
+      withCursor(
+        [
+          "::: threecol",
+          "",
+          ":::: { }",
+          "",
+          "### One",
+          "",
+          "█",
+          "",
+          "::::",
+          "",
+          ":::: { }",
+          "",
+          "### Two",
+          "",
+          "",
+          "",
+          "::::",
+          "",
+          ":::: { }",
+          "",
+          "### Three",
+          "",
+          "",
+          "",
+          "::::",
+          "",
+          ":::",
+          "",
+        ].join("\n")
+      ),
+  },
+  {
+    name: "image-left",
+    description: "Image on the left, text on the right",
+    expand: () =>
+      withCursor(
+        [
+          "::: image-left",
+          "",
+          "![](█)",
+          "",
+          ":::: { }",
+          "",
+          "## Heading",
+          "",
+          "Text body alongside the image.",
+          "",
+          "::::",
+          "",
+          ":::",
+          "",
+        ].join("\n")
+      ),
+  },
+  {
+    name: "image-right",
+    description: "Image on the right, text on the left",
+    expand: () =>
+      withCursor(
+        [
+          "::: image-right",
+          "",
+          "![](█)",
+          "",
+          ":::: { }",
+          "",
+          "## Heading",
+          "",
+          "Text body alongside the image.",
+          "",
+          "::::",
+          "",
+          ":::",
+          "",
+        ].join("\n")
+      ),
+  },
+  {
+    name: "callout",
+    description: "Coloured side-bar callout (theme link colour)",
+    expand: () =>
+      withCursor("::: callout\n\n**Note:** █\n\n:::\n"),
+  },
+  {
+    name: "callout-warn",
+    description: "Amber warning callout",
+    expand: () =>
+      withCursor("::: { .callout .warn }\n\n**Warning:** █\n\n:::\n"),
+  },
+  {
+    name: "callout-danger",
+    description: "Red danger callout",
+    expand: () =>
+      withCursor("::: { .callout .danger }\n\n**Danger:** █\n\n:::\n"),
+  },
+  {
+    name: "callout-success",
+    description: "Green success callout",
+    expand: () =>
+      withCursor("::: { .callout .success }\n\n**Tip:** █\n\n:::\n"),
+  },
+  {
+    name: "bignum",
+    description: "Big number with a label below",
+    expand: () =>
+      withCursor(
+        [
+          "::: bignum",
+          "",
+          "█",
+          "",
+          "label / unit",
+          "",
+          ":::",
+          "",
+        ].join("\n")
+      ),
+  },
+  {
+    name: "stat-grid",
+    description: "Auto-fitting grid of stat cards (number + label each)",
+    expand: () =>
+      withCursor(
+        [
+          "::: stat-grid",
+          "",
+          ":::: stat-card",
+          "",
+          "█",
+          "",
+          "users",
+          "",
+          "::::",
+          "",
+          ":::: stat-card",
+          "",
+          "",
+          "",
+          "uptime",
+          "",
+          "::::",
+          "",
+          ":::: stat-card",
+          "",
+          "",
+          "",
+          "p99",
+          "",
+          "::::",
+          "",
+          ":::",
+          "",
+        ].join("\n")
+      ),
+  },
+  {
+    name: "compare",
+    description: "Side-by-side comparison with divider",
+    expand: () =>
+      withCursor(
+        [
+          "::: compare",
+          "",
+          ":::: compare-good",
+          "",
+          "### Good",
+          "",
+          "█",
+          "",
+          "::::",
+          "",
+          ":::: compare-bad",
+          "",
+          "### Avoid",
+          "",
+          "",
+          "",
+          "::::",
+          "",
+          ":::",
+          "",
+        ].join("\n")
+      ),
+  },
+  {
+    name: "accent-box",
+    description: "Solid accent-coloured emphasis block",
+    expand: () =>
+      withCursor("::: accent-box\n\n# █\n\n:::\n"),
+  },
 ];
 
 /** Look up a template by exact name. */

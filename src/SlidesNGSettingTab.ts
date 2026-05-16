@@ -12,6 +12,7 @@ import {
 import type { SceneDefinition, SpeakerPanelId } from "./settings";
 import { availableThemes } from "./render/revealAssets";
 import { KNOWN_LAYOUTS } from "./render/layouts";
+import { TEMPLATES } from "./templates";
 
 export class SlidesNGSettingTab extends PluginSettingTab {
   private plugin: SlidesNGPlugin;
@@ -209,6 +210,10 @@ export class SlidesNGSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
       });
+
+    // ---------- Slide snippets reference ----------
+    new Setting(containerEl).setName("Slide snippets").setHeading();
+    this.renderSnippetReference(containerEl);
 
     // ---------- Editor ----------
     new Setting(containerEl).setName("Editor").setHeading();
@@ -786,5 +791,60 @@ body markdown`,
       });
     };
     refresh();
+  }
+
+  /**
+   * v0.12.0: in-plugin snippet reference. Lists every snippet in
+   * src/templates.ts with its name, description, source-markdown
+   * preview, and a Copy button. Avoids forcing users to find external
+   * docs to learn the `::: name` convention.
+   *
+   * Renders a plain-language overview first, then a collapsible
+   * <details> per snippet with its source visible on expand.
+   */
+  private renderSnippetReference(containerEl: HTMLElement): void {
+    // Intro / conventions explainer.
+    const intro = containerEl.createDiv({ cls: "slides-ng-snippet-intro" });
+    intro.createEl("p", {
+      text:
+        "Type `::` at the start of a line in a deck and pick a snippet from the autocomplete to insert. Snippets are plain markdown — no special parser pass — so they read fine in any markdown tool. They use the Pandoc fenced-div convention (`::: classname ... :::`) to wrap regular markdown in a styled block.",
+    });
+    intro.createEl("p", {
+      text:
+        "Rules: keep a blank line after the opening `:::name` and before the closing `:::` so the inner content parses as markdown. Sizing uses em/fr units so layouts scale with the slide. Accent colours pull from the active reveal theme via CSS variables — switch theme and snippets follow.",
+    });
+
+    // Per-snippet details/summary collapsibles.
+    const list = containerEl.createDiv({ cls: "slides-ng-snippet-list" });
+    for (const tpl of TEMPLATES) {
+      const item = list.createEl("details", { cls: "slides-ng-snippet-item" });
+      const summary = item.createEl("summary", { cls: "slides-ng-snippet-summary" });
+      summary.createEl("code", { text: "::" + tpl.name, cls: "slides-ng-snippet-name" });
+      summary.createEl("span", { text: tpl.description, cls: "slides-ng-snippet-desc" });
+
+      const body = item.createDiv({ cls: "slides-ng-snippet-body" });
+      const { text } = tpl.expand();
+      // Strip the cursor marker character for the preview (we replaced it).
+      const display = text.replace(/█/g, "");
+      const pre = body.createEl("pre", { cls: "slides-ng-snippet-source" });
+      pre.createEl("code", { text: display });
+
+      const actions = body.createDiv({ cls: "slides-ng-snippet-actions" });
+      const copyBtn = actions.createEl("button", {
+        cls: "slides-ng-snippet-copy",
+        text: "Copy to clipboard",
+      });
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(display);
+          copyBtn.textContent = "Copied ✓";
+          window.setTimeout(() => {
+            copyBtn.textContent = "Copy to clipboard";
+          }, 1500);
+        } catch (err) {
+          new Notice("Copy failed — clipboard permission denied.");
+        }
+      });
+    }
   }
 }
