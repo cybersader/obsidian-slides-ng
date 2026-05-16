@@ -2320,31 +2320,44 @@ ${sectionsHtml}
                   '    }',
                   /* v0.11.91: Text mode — disconnect any lingering
                    * visual-mode ResizeObserver before building, and
-                   * reset gridTemplateColumns to the tighter text
-                   * default so the inline visual override (e.g.
-                   * repeat(4, 220px)) doesn\\'t persist. */
+                   * reset gridTemplateColumns so the inline visual
+                   * override (e.g. repeat(4, 220px)) doesn\\'t persist. */
                   '    try { if (window.__slidesNgTileRO) { window.__slidesNgTileRO.disconnect(); window.__slidesNgTileRO = null; } } catch (_) {}',
-                  /* Text mode: compact single-row tiles with bold
-                   * slide number on the left, ellipsised title on
-                   * the right. Smaller min column (85px) packs more
-                   * slides per row than visual mode. */
-                  '    grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(85px, 1fr))";',
+                  /* v0.11.92: text-mode tiles auto-fit their content.
+                   * NO line clamp — the full title shows, even if
+                   * that makes a tile tall. 160px min column so
+                   * most titles fit on 1-2 lines; very long titles
+                   * extend the tile downward. Grid rows
+                   * align-items:stretch so neighbours match the
+                   * tallest tile in the row — visually tidy. */
+                  '    grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(160px, 1fr))";',
+                  '    grid.style.alignItems = "stretch";',
+                  '    grid.style.gridAutoRows = "auto";',
                   '    for (var i = 0; i < sections.length; i++) {',
                   '      var sec = sections[i];',
                   '      var heading = sec.querySelector("h1, h2, h3");',
-                  '      var title = heading ? (heading.textContent || "").trim().slice(0, 40) : "";',
+                  '      var title = heading ? (heading.textContent || "").trim() : "";',
                   '      var tile = document.createElement("button");',
                   '      tile.setAttribute("data-idx", String(i));',
                   '      tile.className = "slide-tile";',
-                  '      tile.style.cssText = "background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:4px 6px;cursor:pointer;text-align:left;font-family:inherit;font-size:0.75em;line-height:1.2;display:flex;align-items:center;gap:5px;min-height:26px;transition:background 80ms ease, border-color 80ms ease;overflow:hidden;";',
+                  /* Layout: number on left + title (wraps up to 3
+                   * lines) on right. align-items:start so the
+                   * number stays at the top of multi-line titles. */
+                  '      tile.style.cssText = "background:#1a1a1a;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:6px 8px;cursor:pointer;text-align:left;font-family:inherit;font-size:0.78em;line-height:1.3;display:flex;align-items:flex-start;gap:6px;min-height:32px;transition:background 80ms ease, border-color 80ms ease;overflow:hidden;";',
                   '      var num = document.createElement("span");',
                   '      num.textContent = String(i + 1);',
-                  '      num.style.cssText = "color:#fff;font-weight:700;font-size:0.95em;flex:0 0 auto;font-variant-numeric:tabular-nums;min-width:1.2em;text-align:right;";',
+                  '      num.style.cssText = "color:#fff;font-weight:700;font-size:1em;flex:0 0 auto;font-variant-numeric:tabular-nums;min-width:1.2em;text-align:right;line-height:1.3;";',
                   '      tile.appendChild(num);',
                   '      if (title) {',
                   '        var ttl = document.createElement("span");',
                   '        ttl.textContent = title;',
-                  '        ttl.style.cssText = "color:#bbb;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";',
+                  /* v0.11.92: NO line-clamp — show the full title.
+                   * Tiles grow taller for longer titles; the grid
+                   * row stretches to match the tallest tile in
+                   * the row. Slightly less compact but reads
+                   * properly. word-break:break-word handles long
+                   * unspaced strings. */
+                  '        ttl.style.cssText = "color:#ddd;flex:1 1 auto;min-width:0;word-break:break-word;overflow-wrap:anywhere;";',
                   '        tile.appendChild(ttl);',
                   '      }',
                   '      tile.addEventListener("click", (function (idx) {',
