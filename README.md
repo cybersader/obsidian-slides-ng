@@ -40,7 +40,8 @@ Slides NG aims for the lightest possible authoring substrate:
 - **In-Obsidian Speaker Console** — opens alongside the preview as a horizontal split (drag-out to a new window for a true second monitor). Shows slide N / M, elapsed timer (start/pause/reset), navigation controls, blackout toggle, current slide's speaker notes, next-slide preview, and a slide picker (compact or full-list, user-toggleable). Drives the preview iframe via postMessage; no cross-origin shenanigans.
 - **Cursor-follow** (default on; togglable in settings) — when the markdown cursor is inside a deck file, the preview jumps to that slide. Counts `---` separators while skipping YAML frontmatter and fenced code blocks.
 - **Open in browser** — writes `.slides-ng-export-<timestamp>.html` to the vault, opens via `electron.shell.openExternal` (no port, no spawned server)
-- **Export for PDF** — same export workflow, opens with `?print-pdf` so reveal.js flattens the deck for browser-side Print → Save as PDF
+- **Browser speaker popup** — once the deck is open in a browser, pressing `S` opens a feature-complete second-window speaker view: current + next slide iframes, speaker notes, timer (elapsed / countdown / lap modes), scenes panel, slide picker with **Text** mode (compact tiles with full titles, auto-fit row height) or **Visual** mode (iframe-rendered slide thumbnails scaled to fit), and full keyboard nav. Toggle persists via localStorage.
+- **Export for PDF** — dedicated modal with three layouts (Slides / Slides + notes emphasis / Document), theme override, page size (Letter/A4/Legal), page margins, grayscale, hide-backgrounds, slide-number stamp, custom header/footer text, max-pages-per-slide, auto-shrink. Static mockup preview reflects the chosen options. **Deterministic WCAG contrast pre-check** flags text-on-bg combinations that would be invisible (e.g. dark theme + hide-backgrounds = white-on-white).
 
 ## Hard architectural constraints
 
@@ -142,7 +143,7 @@ reveal.js + reveal CSS + all 15 themes are inlined at build time by `scripts/gen
 
 ## Status
 
-v0.5.2 — In-window reveal.js controls + reveal.js-menu plugin + "Grid" overview mode + 6 new settings (default layout, code theme, image-split, line-step dim, speaker timer cadence, speaker picker default). v0.1.0 covered the brief's §7 acceptance list; v0.2.0 added 9 named layouts + `::name::` slots; v0.2.1 added the layout metadata registry + validation + in-editor autocomplete; v0.3.0 added Slides-Extended-flavoured `<!-- slide attr -->` / `<!-- element attr -->` annotations; v0.4.0 added template-expansion snippets, three image layouts with Obsidian-attachment path resolution, and Magic-Move via bundled `shiki-magic-move`; v0.5.0 added the speaker console; v0.5.1 added the "Use current" toolbar button. See `CHANGELOG.md` for the full delta and `ROADMAP.md` for what's coming next.
+v0.11.92 — Popup speaker view fully polished: pixel-pinned Visual-mode iframe thumbnails (matches the in-Obsidian picker), auto-fit Text-mode tiles with full title display, runtime Text/Visual toggle persisted in localStorage, deterministic CSS Grid layout for all aspect ratios, and an exhaustive 40-issue CSS audit informed the layout. See `CHANGELOG.md` for the full delta and `ROADMAP.md` for what's coming next.
 
 | Phase | Description | State |
 |---|---|---|
@@ -162,6 +163,13 @@ v0.5.2 — In-window reveal.js controls + reveal.js-menu plugin + "Grid" overvie
 | v0.4.0 | Snippet expansion + image layouts + Magic-Move | ✅ |
 | v0.5.0 | Speaker console + cursor-follow + toolbar polish | ✅ |
 | v0.5.2 | In-window controls + reveal.js-menu + Grid overview + 6 new settings | ✅ |
+| v0.6–v0.10 | Speaker view panel docking, scenes, picker strip with pixel-pin (v0.11.21), drag-resize iframe heights, multi-column speaker layout, hamburger menu fix, blackout/notes-toggle | ✅ |
+| v0.11.40s | PDF export modal with 3 layouts (Slides / Slides + notes emphasis / Document) + theme override, page size, page margin, grayscale, hide-backgrounds, slide-number stamp, header/footer text, max-pages-per-slide, auto-shrink | ✅ |
+| v0.11.6x | Browser speaker popup (`S` key in standalone export) — feature parity with in-Obsidian speaker view: current/next iframes, speaker notes, timer (elapsed/countdown/lap), scenes, slide picker, keyboard nav | ✅ |
+| v0.11.7x | Static-mockup PDF export preview, dim-when-irrelevant export options, plain-slides aspect-ratio visualisation, slide aspect ratio re-enabled in notes-emphasis | ✅ |
+| v0.11.73 | Lightweight WCAG contrast pre-check at PDF export — flags text-on-bg combinations that would be invisible (e.g. theme + hideBackgrounds = white-on-white) | ✅ |
+| v0.11.78 | Popup slide-grid Text/Visual runtime toggle (was opt-in setting) — persisted via localStorage, no re-export required to switch | ✅ |
+| v0.11.90–92 | Deep CSS audit + popup overlap fixes: pixel-pinned Visual tile widths (mirrors v0.11.21 picker fix), every panel explicitly grid-row pinned, flexbox-collision-free slides-panel header, auto-fit Text tiles showing full titles | ✅ |
 
 ## Features explicitly NOT in v0.1
 
