@@ -696,6 +696,22 @@ export function buildIframeHtml(
       object-fit: contain;
       display: block;
     }
+    /* v0.13.3: inline body image embeds — both Obsidian \`![[img]]\`
+     * and standard \`![](img)\` produce an img.slides-ng-embed element.
+     * reveal's default \`.reveal section img\` adds a white background
+     * + gray border + no size cap (large images overflow the slide).
+     * Reset that and constrain to the slide box. Explicit width/height
+     * from \`![[img|300x200]]\` are honoured (no height:auto override);
+     * the max-* caps just prevent overflow. */
+    .reveal .slides section img.slides-ng-embed {
+      max-width: 100%;
+      max-height: 75%;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      margin: 0.3em auto;
+      object-fit: contain;
+    }
     .slides-ng-image-content {
       min-width: 0;
       display: flex;

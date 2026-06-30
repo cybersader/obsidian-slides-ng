@@ -13,6 +13,10 @@ import { renderLineStep } from "./lineStepRenderer";
 import { parseMagicMoveKey } from "../parser/magicMoveKey";
 import { renderMagicMoveBlock } from "./magicMoveRenderer";
 import { pandocFencedDivs } from "../parser/pandocFencedDivs";
+import {
+  preprocessObsidianImageEmbeds,
+  buildImgTag,
+} from "../parser/obsidianEmbeds";
 import { splitSlots, hasSlots } from "./slots";
 import { applyLayout } from "./layouts";
 import {
@@ -26,7 +30,10 @@ import {
 // rebuild per-render so the theme can change at runtime without needing
 // to invalidate Shiki itself (Shiki caches grammars; switching theme is
 // just a different render config).
-function buildMarked(codeTheme: string | undefined): Marked {
+function buildMarked(
+  codeTheme: string | undefined,
+  resolveImage?: (path: string) => string | null
+): Marked {
   const inst = new Marked();
   // v0.12.0: Pandoc fenced divs extension. Enables `::: classname ... :::`
   // structural blocks that compose with reveal.js without needing custom
@@ -49,6 +56,17 @@ function buildMarked(codeTheme: string | undefined): Marked {
         // Plain Shiki highlight; strip non-lang info-string suffix.
         const langOnly = info.split(/\s+/)[0];
         return highlight(token.text, langOnly, codeTheme);
+      },
+      // v0.13.3: resolve standard-markdown image src (`![](path)`)
+      // through the same callback Obsidian embeds use, so relative
+      // attachment paths become loadable `app://` / `data:` URLs.
+      // http(s)/data/file URLs and unresolved paths pass through
+      // unchanged. The token title (if any) is ignored — sizing is
+      // an Obsidian-embed-only feature.
+      image(token: Tokens.Image): string {
+        const href = token.href ?? "";
+        const resolved = resolveImage ? resolveImage(href) : null;
+        return buildImgTag({ src: resolved ?? href, alt: token.text ?? "" });
       },
     },
   });
@@ -219,7 +237,7 @@ export function renderDeckFromAst(
   overrides: Partial<DeckRenderOptions> = {},
   defaults: RenderDefaults = {}
 ): string {
-  const md = buildMarked(defaults.codeTheme);
+  const md = buildMarked(defaults.codeTheme, defaults.resolveImage);
   const notesMd = buildNotesMarked();
   const slides = deck.slides.map((s) => slideToHtml(s, md, notesMd, defaults));
   const defaultLayer: Partial<DeckRenderOptions> = {};
@@ -348,8 +366,18 @@ function slideToHtml(
   // 1. Extract Slides-Extended-style slide annotations from the raw
   //    markdown before anything else touches it. The cleaned content
   //    is what flows into the slot splitter / markdown→HTML pass.
-  const { content: cleanedContent, attrs: rawSlideAttrs } = extractSlideAttrs(
+  const { content: rawCleanedContent, attrs: rawSlideAttrs } = extractSlideAttrs(
     slide.content
+  );
+  // 1a. v0.13.3: rewrite Obsidian image embeds (`![[image.png]]`,
+  // optionally with `|size` / `|alt`) into resolved `<img>` HTML
+  // BEFORE slot splitting / markdown parsing, so they work anywhere
+  // in the slide body — inside `::left::` slots, fenced divs, etc.
+  // marked doesn't understand wikilink embeds, so without this they
+  // render as the literal `![[…]]` string.
+  const cleanedContent = preprocessObsidianImageEmbeds(
+    rawCleanedContent,
+    defaults.resolveImage
   );
   // 1b. Resolve any vault-relative `data-background-image` /
   // `data-background-video` paths via the same callback the `image:`

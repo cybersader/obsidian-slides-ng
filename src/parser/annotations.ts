@@ -124,9 +124,23 @@ export function applyElementAnnotations(html: string): string {
 }
 
 function collapseElementSentinels(html: string): string {
-  // For each sentinel, find the matching open tag of the immediately-
+  // v0.13.3: VOID elements first (`<img>`, `<br>`, `<hr>`, `<input>`).
+  // These have no closing tag, so the paired-tag pass below can never
+  // match them — without this branch the sentinel after a bare
+  // `<img>` (e.g. from an `![[image.png]]` embed followed by an
+  // `<!-- element class="…" -->`) would be left as raw garbage text
+  // on the slide and the attributes dropped. Merge straight into the
+  // void tag.
+  let out = html.replace(
+    /(<(?:img|br|hr|input)\b[^>]*>)\s*__SLIDES_NG_ELEMENT_ANNOTATION__(\{[\s\S]*?\})__END__/g,
+    (_match, voidTag: string, attrsJson: string) => {
+      const attrs = JSON.parse(attrsJson) as AttrMap;
+      return mergeOpenTag(voidTag, attrs);
+    }
+  );
+  // Paired elements: find the matching open tag of the immediately-
   // preceding closed element and merge attributes into it.
-  return html.replace(
+  out = out.replace(
     /(<([a-zA-Z][\w-]*)([^>]*)>(?:[\s\S]*?)<\/\2>)\s*__SLIDES_NG_ELEMENT_ANNOTATION__(\{[\s\S]*?\})__END__/g,
     (_match, elementHtml: string, tag: string, existingAttrs: string, attrsJson: string) => {
       const attrs = JSON.parse(attrsJson) as AttrMap;
@@ -139,6 +153,7 @@ function collapseElementSentinels(html: string): string {
       return updatedElement;
     }
   );
+  return out;
 }
 
 /**

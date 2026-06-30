@@ -11,6 +11,7 @@ import {
   type PdfExportOptions,
 } from "./export/exportStandalone";
 import { checkPdfExportContrast } from "./export/contrastCheck";
+import { buildImageDataUriResolver } from "./export/imageDataUris";
 import { SlidesNGSettingTab } from "./SlidesNGSettingTab";
 import { DEFAULT_SETTINGS, type SlidesNGSettings } from "./settings";
 import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
@@ -184,10 +185,14 @@ export default class SlidesNGPlugin extends Plugin {
       return;
     }
     try {
+      // v0.13.3: inline referenced images as data URIs so the exported
+      // HTML is portable — `app://` URLs only load inside Obsidian.
+      const resolveImage = await buildImageDataUriResolver(this.app, file);
       const result = await exportAndOpen(this.app, file, undefined, {
         defaultTheme: this.settings.defaultTheme,
         defaultTransition: this.settings.defaultTransition,
         scenes: this.settings.scenes,
+        resolveImage,
       });
       if (result.opened) {
         new Notice(`Opened ${result.vaultRelativePath} in your default browser.`);
@@ -244,6 +249,8 @@ export default class SlidesNGPlugin extends Plugin {
       });
     }
     try {
+      // v0.13.3: inline referenced images as data URIs (portable PDF/HTML).
+      const resolveImage = await buildImageDataUriResolver(this.app, file);
       const result = await exportAndOpenForPdf(
         this.app,
         file,
@@ -252,6 +259,7 @@ export default class SlidesNGPlugin extends Plugin {
           defaultTheme: this.settings.defaultTheme,
           defaultTransition: this.settings.defaultTransition,
           scenes: this.settings.scenes,
+          resolveImage,
         },
         pdfOptions
       );
