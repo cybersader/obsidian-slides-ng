@@ -357,17 +357,77 @@ function resolveBackgroundAttrs(
   return out;
 }
 
+/**
+ * v0.13.5: split a horizontal slide's content into vertical sub-slides
+ * on lines that are exactly `--` (reveal.js / Slides-Extended vertical
+ * separator). Fenced code blocks are skipped so a `--` inside a code
+ * sample doesn't split. Returns `[content]` (one part) when there are
+ * no vertical separators — the overwhelmingly common case.
+ */
+function splitVerticalSlides(content: string): string[] {
+  const lines = content.split("\n");
+  const parts: string[][] = [[]];
+  let inFenced = false;
+  for (const line of lines) {
+    if (/^\s*(```|~~~)/.test(line)) inFenced = !inFenced;
+    if (!inFenced && /^\s*--\s*$/.test(line)) {
+      parts.push([]);
+    } else {
+      parts[parts.length - 1].push(line);
+    }
+  }
+  const joined = parts.map((p) => p.join("\n"));
+  // Drop empty leading/trailing parts (e.g. a stray `--` at the end),
+  // but always keep at least one part.
+  const nonEmpty = joined.filter((p) => p.trim().length > 0);
+  return nonEmpty.length > 0 ? nonEmpty : [joined[0] ?? ""];
+}
+
 function slideToHtml(
   slide: Slide,
   md: Marked,
   notesMd: Marked,
   defaults: RenderDefaults = {}
 ): SlideHtml {
+  const parts = splitVerticalSlides(slide.content);
+  if (parts.length === 1) {
+    // Common case: no vertical separators → a single section.
+    return renderSlidePart(parts[0], slide, md, notesMd, defaults, {
+      includeImage: true,
+      note: slide.note,
+    });
+  }
+  // Vertical stack: each `--`-delimited part becomes an inner section.
+  // Frontmatter (layout) applies to every part. The `image:` slot
+  // attaches to the FIRST sub-slide (it describes the slide's entry).
+  // The slide-level speaker note (a TRAILING `<!-- … -->` comment,
+  // which Slidev strips into `slide.note`) was authored after the
+  // last `--`, so it attaches to the LAST sub-slide. Per-part
+  // `<!-- slide notes="…" -->` annotations still attach to their own
+  // sub-slide independently.
+  const last = parts.length - 1;
+  const verticals = parts.map((part, i) =>
+    renderSlidePart(part, slide, md, notesMd, defaults, {
+      includeImage: i === 0,
+      note: i === last ? slide.note : undefined,
+    })
+  );
+  return { body: "", verticals };
+}
+
+function renderSlidePart(
+  rawContent: string,
+  slide: Slide,
+  md: Marked,
+  notesMd: Marked,
+  defaults: RenderDefaults,
+  opts: { includeImage: boolean; note?: string }
+): SlideHtml {
   // 1. Extract Slides-Extended-style slide annotations from the raw
   //    markdown before anything else touches it. The cleaned content
   //    is what flows into the slot splitter / markdown→HTML pass.
   const { content: rawCleanedContent, attrs: rawSlideAttrs } = extractSlideAttrs(
-    slide.content
+    rawContent
   );
   // 1a. v0.13.3: rewrite Obsidian image embeds (`![[image.png]]`,
   // optionally with `|size` / `|alt`) into resolved `<img>` HTML
@@ -425,7 +485,7 @@ function slideToHtml(
     "slides-ng-image",
     "image"
   );
-  if (fmImage && fmImage.length > 0) {
+  if (opts.includeImage && fmImage && fmImage.length > 0) {
     const resolved = defaults.resolveImage ? defaults.resolveImage(fmImage) : null;
     const src = resolved ?? fmImage;
     slotHtml.image = `<img class="slides-ng-image" src="${escapeAttrValue(src)}" alt="">`;
@@ -443,7 +503,7 @@ function slideToHtml(
   // canonical @slidev `note` field wins (last-one-wins is consistent
   // with how multi-annotation attrs merge).
   const slideAttrNotes = slideAttrs.notes;
-  const noteSource = slide.note ?? slideAttrNotes;
+  const noteSource = opts.note ?? slideAttrNotes;
   // Don't leak the notes attribute onto the rendered <section> tag.
   if (slideAttrNotes !== undefined) {
     delete slideAttrs.notes;

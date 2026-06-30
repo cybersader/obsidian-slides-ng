@@ -19,6 +19,14 @@ export interface SlideHtml {
    * here by interpolating into the opening tag.
    */
   sectionAttrs?: string;
+  /**
+   * v0.13.5: reveal.js vertical sub-slides. When present, this slide is
+   * a vertical STACK — the outer `<section>` wraps these inner
+   * `<section>`s (each a vertical sub-slide). Authored with `--` lines
+   * between the `---` horizontal separators. `body`/`noteHtml` are
+   * unused on the parent when `verticals` is set.
+   */
+  verticals?: SlideHtml[];
 }
 
 export interface DeckRenderOptions {
@@ -208,13 +216,24 @@ export function buildIframeHtml(
   // via UMD; init invokes it from the iframe-side inline script.
   const showMenu = !embedded || showMenuEmbedded;
 
+  const oneSection = (s: SlideHtml, indent: string): string => {
+    const attrs = s.sectionAttrs ? " " + s.sectionAttrs : "";
+    const note = s.noteHtml
+      ? `\n${indent}  <aside class="notes">${s.noteHtml}</aside>`
+      : "";
+    return `${indent}<section${attrs}>\n${indent}  ${s.body}${note}\n${indent}</section>`;
+  };
   const sectionsHtml = slides
     .map((s) => {
-      const attrs = s.sectionAttrs ? " " + s.sectionAttrs : "";
-      const note = s.noteHtml
-        ? `\n      <aside class="notes">${s.noteHtml}</aside>`
-        : "";
-      return `    <section${attrs}>\n      ${s.body}${note}\n    </section>`;
+      // v0.13.5: a slide with `verticals` becomes a nested-section
+      // stack — reveal renders these as vertically-navigable sub-slides.
+      if (s.verticals && s.verticals.length > 0) {
+        const inner = s.verticals
+          .map((v) => oneSection(v, "      "))
+          .join("\n");
+        return `    <section>\n${inner}\n    </section>`;
+      }
+      return oneSection(s, "    ");
     })
     .join("\n");
 
