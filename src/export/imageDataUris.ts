@@ -142,17 +142,19 @@ export function arrayBufferToBase64(buf: ArrayBuffer): string {
   return btoa(binary);
 }
 
+/** A resolved vault file — `stat.mtime` lets the resolver cache by version. */
+export interface FileLike {
+  path: string;
+  stat?: { mtime?: number };
+}
 /** Minimal Obsidian surface this helper needs — keeps it test-mockable. */
 export interface VaultLike {
   read(file: { path: string }): Promise<string>;
   adapter: { readBinary(path: string): Promise<ArrayBuffer> };
-  getAbstractFileByPath(path: string): { path: string } | null;
+  getAbstractFileByPath(path: string): FileLike | null;
 }
 export interface MetadataCacheLike {
-  getFirstLinkpathDest(
-    linkpath: string,
-    sourcePath: string
-  ): { path: string } | null;
+  getFirstLinkpathDest(linkpath: string, sourcePath: string): FileLike | null;
 }
 export interface AppLike {
   vault: VaultLike;
@@ -165,15 +167,24 @@ export interface AppLike {
  * the returned function is sync so it slots straight into the
  * render pass.
  *
+ * Data URIs (not `app://`) are used because the preview iframe is
+ * sandboxed with a null origin (`sandbox="allow-scripts"`), which
+ * Chromium blocks from loading `app://` privileged resources. `data:`
+ * URIs load in any origin, so the same approach works for both the
+ * in-Obsidian preview and the portable standalone export.
+ *
+ * `cache` (optional) memoises encoded files by `path|mtime` so repeated
+ * preview refreshes don't re-read + re-encode unchanged attachments.
+ *
  * Resolution per target:
  *   - absolute/remote URL → returned as-is (passthrough)
- *   - resolvable to a vault TFile → inlined as data URI
- *   - otherwise → null (renderer keeps the raw path; broken, but no
- *     worse than before)
+ *   - resolvable to a vault file → inlined as data URI
+ *   - otherwise → null (renderer keeps the raw path)
  */
 export async function buildImageDataUriResolver(
   app: AppLike,
-  deckFile: { path: string }
+  deckFile: { path: string },
+  cache?: Map<string, string>
 ): Promise<(path: string) => string | null> {
   const markdown = await app.vault.read(deckFile);
   const targets = collectImageTargets(markdown);
@@ -193,8 +204,14 @@ export async function buildImageDataUriResolver(
         app.metadataCache.getFirstLinkpathDest(target, deckFile.path) ??
         app.vault.getAbstractFileByPath(target);
       if (!dest) continue;
-      const buf = await app.vault.adapter.readBinary(dest.path);
-      const dataUri = `data:${mimeForExtension(dest.path)};base64,${arrayBufferToBase64(buf)}`;
+
+      const cacheKey = `${dest.path}|${dest.stat?.mtime ?? 0}`;
+      let dataUri = cache?.get(cacheKey);
+      if (!dataUri) {
+        const buf = await app.vault.adapter.readBinary(dest.path);
+        dataUri = `data:${mimeForExtension(dest.path)};base64,${arrayBufferToBase64(buf)}`;
+        cache?.set(cacheKey, dataUri);
+      }
       map.set(target, dataUri);
       if (decoded !== target) map.set(decoded, dataUri);
     } catch {

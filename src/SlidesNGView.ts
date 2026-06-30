@@ -19,6 +19,7 @@ import {
 import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
 import { warmHighlighter } from "./render/shiki";
 import { slideIndexFromCursor } from "./parser/slideIndexFromCursor";
+import { buildImageDataUriResolver } from "./export/imageDataUris";
 import type { SlidesNGSettings } from "./settings";
 import type { DebugLog } from "./utils/debug";
 
@@ -47,6 +48,12 @@ export class SlidesNGView extends ItemView {
   private refreshTimer: number | null = null;
   private cursorFollowTimer: number | null = null;
   private lastSentSlideIdx: number | null = null;
+  /**
+   * v0.13.4: data-URI cache for image attachments, keyed by
+   * `path|mtime`. Reused across refreshes so unchanged images aren't
+   * re-read + re-base64'd on every keystroke.
+   */
+  private imageDataUriCache = new Map<string, string>();
   private getSettings: SettingsAccessor;
   private resolveDeckFile: DeckFileAccessor;
   private debug?: DebugLog;
@@ -148,6 +155,14 @@ export class SlidesNGView extends ItemView {
           break;
         case "slides-ng-iframe-reveal-ready":
           this.debug?.log("iframe/reveal-ready", { time: data.time });
+          // v0.13.4: once reveal is up, jump to the slide the editor
+          // caret is on — so opening the preview lands on the slide
+          // you were editing instead of always slide 1. Reset the
+          // de-dupe guard so the goto definitely fires.
+          if (this.getSettings().followCursorInEditor) {
+            this.lastSentSlideIdx = null;
+            this.applyCursorFollow();
+          }
           break;
         case "slides-ng-iframe-watchdog":
           this.debug?.log("iframe/watchdog", {
@@ -462,10 +477,29 @@ export class SlidesNGView extends ItemView {
     }, 150);
   }
 
+  /**
+   * Find the Markdown editor showing this deck file — among ALL open
+   * markdown panes, not just the active one. v0.13.4: the previous
+   * `getActiveViewOfType` lookup failed whenever the preview pane (or
+   * anything else) was the active view, which is exactly the case
+   * right after opening the preview — so the initial cursor-follow
+   * jump never happened.
+   */
+  private findDeckMarkdownView(): MarkdownView | null {
+    if (!this.filePath) return null;
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const v = leaf.view;
+      if (v instanceof MarkdownView && v.file?.path === this.filePath) {
+        return v;
+      }
+    }
+    return null;
+  }
+
   private applyCursorFollow(): void {
     if (!this.iframeEl?.contentWindow || !this.filePath) return;
-    const mdView = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!mdView?.file || mdView.file.path !== this.filePath) return;
+    const mdView = this.findDeckMarkdownView();
+    if (!mdView) return;
     const cursor = mdView.editor.getCursor();
     const md = mdView.editor.getValue();
     const idx = slideIndexFromCursor(md, cursor.line, {
@@ -515,6 +549,15 @@ export class SlidesNGView extends ItemView {
     try {
       const markdown = await this.app.vault.read(file);
       const settings = this.getSettings();
+      // v0.13.4: resolve image attachments to data: URIs. The preview
+      // iframe is sandboxed with a null origin, which blocks `app://`
+      // resource loads — so an `app://` <img> src silently fails to
+      // load. data: URIs work in any origin. Cached by path|mtime.
+      const resolveImage = await buildImageDataUriResolver(
+        this.app,
+        file,
+        this.imageDataUriCache
+      );
       const html = renderDeck(markdown, file.path, {
         defaultTheme: settings.defaultTheme,
         defaultTransition: settings.defaultTransition,
@@ -531,7 +574,7 @@ export class SlidesNGView extends ItemView {
         magicMoveDurationMs: settings.magicMoveDurationMs,
         autoH1Breaks: settings.autoH1Breaks,
         sceneInheritThemeBg: settings.sceneInheritThemeBg,
-        resolveImage: (raw) => this.resolveImageAttachment(raw, file.path),
+        resolveImage,
       });
       // v0.10.8: queue the HTML as pending instead of setting srcdoc
       // immediately. `applyPendingIfReady()` consumes the pending
@@ -834,31 +877,6 @@ export class SlidesNGView extends ItemView {
     };
   }
 
-  /**
-   * Resolve a `image:` frontmatter value (relative path or absolute URL)
-   * to a URL the iframe-sandboxed reveal.js can load. Strategy:
-   *   - http(s):// → use as-is
-   *   - data: → use as-is
-   *   - vault-relative path → look up via Obsidian's metadata cache + adapter
-   *     and return getResourcePath() (which returns an `app://` URL the
-   *     iframe can load)
-   *   - not found → return null (renderer will fall back to the raw path)
-   */
-  private resolveImageAttachment(raw: string, deckPath: string): string | null {
-    if (/^(https?:|data:|file:)/.test(raw)) return raw;
-    const trimmed = raw.trim();
-    const linktext = trimmed.replace(/^!?\[\[|\]\]$/g, "");
-    const target = this.app.metadataCache.getFirstLinkpathDest(linktext, deckPath);
-    if (target) {
-      return this.app.vault.adapter.getResourcePath(target.path);
-    }
-    // Plain path (no wikilink syntax) — try direct adapter resolution.
-    const file = this.app.vault.getAbstractFileByPath(trimmed);
-    if (file && "path" in file) {
-      return this.app.vault.adapter.getResourcePath(file.path);
-    }
-    return null;
-  }
 }
 
 function escapeHtml(s: string): string {

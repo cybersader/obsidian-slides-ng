@@ -205,6 +205,63 @@ describe("buildImageDataUriResolver", () => {
     expect(resolve("missing.png")).toBeNull();
   });
 
+  test("cache by path|mtime avoids re-reading unchanged files", async () => {
+    let reads = 0;
+    const app: AppLike = {
+      vault: {
+        async read() {
+          return "![[a.png]]";
+        },
+        adapter: {
+          async readBinary() {
+            reads++;
+            return new Uint8Array([1, 2, 3]).buffer;
+          },
+        },
+        getAbstractFileByPath() {
+          return null;
+        },
+      },
+      metadataCache: {
+        getFirstLinkpathDest() {
+          return { path: "a.png", stat: { mtime: 100 } };
+        },
+      },
+    };
+    const cache = new Map<string, string>();
+    await buildImageDataUriResolver(app, { path: "deck.md" }, cache);
+    await buildImageDataUriResolver(app, { path: "deck.md" }, cache);
+    expect(reads).toBe(1); // second refresh hit the cache
+    expect(cache.has("a.png|100")).toBe(true);
+  });
+
+  test("cache miss when mtime changes (file edited)", async () => {
+    let reads = 0;
+    let mtime = 100;
+    const app: AppLike = {
+      vault: {
+        async read() {
+          return "![[a.png]]";
+        },
+        adapter: {
+          async readBinary() {
+            reads++;
+            return new Uint8Array([1]).buffer;
+          },
+        },
+        getAbstractFileByPath: () => null,
+      },
+      metadataCache: {
+        getFirstLinkpathDest: () => ({ path: "a.png", stat: { mtime } }),
+      },
+    };
+    const cache = new Map<string, string>();
+    await buildImageDataUriResolver(app, { path: "deck.md" }, cache);
+    mtime = 200; // the image was replaced
+    await buildImageDataUriResolver(app, { path: "deck.md" }, cache);
+    expect(reads).toBe(2);
+  });
+
   test("unreadable attachment is skipped, not fatal", async () => {
     // metadataCache resolves but readBinary throws → skip gracefully.
     const app: AppLike = {
