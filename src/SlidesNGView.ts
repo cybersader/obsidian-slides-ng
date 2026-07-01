@@ -232,6 +232,10 @@ export class SlidesNGView extends ItemView {
             this.lastSentSlideIdx = null;
             this.applyCursorFollow();
           }
+          // v0.13.17: the bridge is now confirmed up. Nudge a relayout in
+          // case reveal initialised into a wrong/zero-size viewport (the
+          // black-preview race) — reveal recomputes at the current size.
+          this.nudgeLayout("reveal-ready");
           break;
         case "slides-ng-iframe-watchdog":
           this.debug?.log("iframe/watchdog", {
@@ -355,41 +359,12 @@ export class SlidesNGView extends ItemView {
     // bug. Watching the outer element from the parent context is
     // authoritative.
     if (typeof ResizeObserver === "function") {
-      const postRelayoutBurst = (): void => {
-        // Single-shot postMessage may land before the iframe's bridge
-        // listener is up (srcdoc just set, scripts still parsing).
-        // Burst: fire now + at a few short delays to cover the race.
-        this.postIframeCommand("relayout");
-        for (const delay of [60, 180, 400, 900]) {
-          window.setTimeout(() => this.postIframeCommand("relayout"), delay);
-        }
-      };
-      const ro = new ResizeObserver(() => {
-        if (!this.iframeEl) return;
-        if (this.iframeEl.clientWidth === 0 || this.iframeEl.clientHeight === 0) return;
-        // v0.10.8: two cases —
-        //   (1) pendingHtml is queued: apply now that the iframe is
-        //       real-sized. Reveal initialises ONCE into a proper
-        //       viewport. Old v0.10.7's "re-render at real size"
-        //       race issue (srcdoc set 3-4 times in quick succession,
-        //       browser mid-cancelling each load) is gone — there's
-        //       only ever one srcdoc assignment per refresh now.
-        //   (2) pendingHtml empty: just post the relayout burst so
-        //       the in-iframe reveal recomputes for the new size.
-        if (this.pendingHtml !== null) {
-          this.applyPendingIfReady();
-          this.debug?.log("view/resize/apply-pending", {
-            clientW: this.iframeEl.clientWidth,
-            clientH: this.iframeEl.clientHeight,
-          });
-          return;
-        }
-        postRelayoutBurst();
-        this.debug?.log("view/resize/post-relayout", {
-          clientW: this.iframeEl.clientWidth,
-          clientH: this.iframeEl.clientHeight,
-        });
-      });
+      // v0.13.17: size changes route through nudgeLayout() — apply pending
+      // HTML once the iframe is real-sized, else nudge reveal to relayout.
+      // The same path is driven by onResize() (pane re-activated) + the
+      // reveal-ready message, so a preview that opened black on a slow SMB
+      // share recovers on its own instead of needing a manual tab switch.
+      const ro = new ResizeObserver(() => this.nudgeLayout("resize"));
       ro.observe(this.iframeEl);
       this.iframeResizeObserver = ro;
     }
@@ -743,6 +718,51 @@ export class SlidesNGView extends ItemView {
       this.showPlaceholder(`Render error: ${msg}`);
       new Notice(`slides-ng render error: ${msg}`);
     }
+  }
+
+  /**
+   * Post a `relayout` to the iframe now + at a few short delays. A
+   * single-shot post can land before the iframe's bridge listener is up
+   * (srcdoc just set, scripts still parsing — worse over a slow SMB
+   * share); the burst covers that race so reveal recomputes its layout.
+   */
+  private postRelayoutBurst(): void {
+    this.postIframeCommand("relayout");
+    for (const delay of [60, 180, 400, 900]) {
+      window.setTimeout(() => this.postIframeCommand("relayout"), delay);
+    }
+  }
+
+  /**
+   * The iframe was (re)sized OR the pane became visible/active. If HTML is
+   * pending, apply it now that the iframe is real-sized; otherwise nudge
+   * the in-iframe reveal to recompute its layout. No-op while the iframe
+   * is zero-size (hidden tab) — the next resize / onResize retries.
+   */
+  private nudgeLayout(source: string): void {
+    if (!this.iframeEl) return;
+    if (this.iframeEl.clientWidth === 0 || this.iframeEl.clientHeight === 0) return;
+    if (this.pendingHtml !== null) {
+      this.applyPendingIfReady();
+      this.debug?.log("view/nudge/apply-pending", { source });
+      return;
+    }
+    this.postRelayoutBurst();
+    this.debug?.log("view/nudge/relayout", { source });
+  }
+
+  /**
+   * v0.13.17: Obsidian calls this when the view's container resizes —
+   * including when this pane becomes the active tab again. This is the fix
+   * for the "preview opens black, switch tabs and back to render" race:
+   * over a slow SMB share reveal can initialise into a hidden/zero-size
+   * iframe (black) and the relayout burst can fire before the bridge is
+   * listening. onResize is an authoritative "we're visible now" signal to
+   * reapply / relayout. (ResizeObserver alone misses a display:none→block
+   * flip that doesn't change the iframe box size.)
+   */
+  onResize(): void {
+    this.nudgeLayout("onResize");
   }
 
   /**
