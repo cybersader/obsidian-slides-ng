@@ -117,7 +117,7 @@ export class ExportPdfOptionsModal extends Modal {
     new Setting(contentEl)
       .setName("Layout")
       .setDesc(
-        "Slides: each page IS the slide (full-bleed theme background). Slides + notes emphasis: a small slide card on top, notes fill the rest — for lecture handouts. Document: page IS the slide with notes inline as a panel — flowing handout."
+        "Slides: each page IS the slide (full-bleed theme background). Slides + notes emphasis: a fixed-size slide card at the same spot on every page, notes flow below — long notes continue onto extra pages (lecture handouts). Document: page IS the slide with notes inline as a panel — flowing handout."
       )
       .addDropdown((d) => {
         d.addOption("slides", "Slides (page is the slide)");
@@ -530,6 +530,15 @@ export class ExportPdfOptionsModal extends Modal {
           const line = document.createElement("div");
           line.className = "mockup-line mockup-line-notes";
           notes.appendChild(line);
+        }
+        // v0.13.19: be honest about the layout contract — the slide card
+        // is a FIXED size at the same spot on every page; long notes keep
+        // flowing onto continuation pages (which may be mostly notes).
+        if (isNotesEmphasis) {
+          const overflow = document.createElement("div");
+          overflow.className = "mockup-notes-overflow";
+          overflow.textContent = "⋯ long notes continue onto the next page";
+          notes.appendChild(overflow);
         }
         inner.appendChild(notes);
       }

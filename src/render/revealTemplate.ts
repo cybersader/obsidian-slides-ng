@@ -1687,6 +1687,45 @@ ${sectionsHtml}
              * at that slide width, and makes 16:9 vs 4:3 real again. */
             var slideW = (typeof initOpts === 'object' && initOpts && typeof initOpts.width === 'number')
               ? initOpts.width : 960;
+            var slideH = (typeof initOpts === 'object' && initOpts && typeof initOpts.height === 'number')
+              ? initOpts.height : 700;
+            /* v0.13.19: reveal's print view wraps each slide in a
+             * .pdf-page with a FIXED inline height + overflow:hidden —
+             * with pdfMaxPagesPerSlide forced to 1, anything taller than
+             * one page (long presenter notes) was CLIPPED. Measure the
+             * single-page height first (for the card's height budget),
+             * then neutralise the wrappers so card + notes flow naturally
+             * across as many printed pages as they need. */
+            /* Page geometry, computed the same way reveal's print view
+             * writes its @page rule (slide size * (1 + margin), @page
+             * margin 0) — deterministic, NOT measured from the screen
+             * viewport, so the handout looks identical on any machine. */
+            var rMargin = (typeof initOpts === 'object' && initOpts && typeof initOpts.margin === 'number')
+              ? initOpts.margin : 0.04;
+            var pageW = Math.ceil(slideW * (1 + rMargin));
+            var pageH = Math.ceil(slideH * (1 + rMargin));
+            var pdfPages = document.querySelectorAll('.pdf-page');
+            for (var pi1 = 0; pi1 < pdfPages.length; pi1++) {
+              var pp = pdfPages[pi1];
+              pp.style.setProperty('height', 'auto', 'important');
+              pp.style.setProperty('min-height', '0', 'important');
+              pp.style.setProperty('max-height', 'none', 'important');
+              pp.style.setProperty('overflow', 'visible', 'important');
+              pp.style.setProperty('page-break-after', 'always', 'important');
+              pp.style.setProperty('break-after', 'page', 'important');
+              pp.style.setProperty('page-break-inside', 'auto', 'important');
+              pp.style.setProperty('break-inside', 'auto', 'important');
+            }
+            /* v0.13.19: ONE uniform zoom for every card — fit the page
+             * width AND cap the card at ~52% of one page's height, so
+             * every page shows the SAME slide-shaped card (static size,
+             * like PowerPoint Notes Pages) with room for notes beneath.
+             * Content-driven per-card heights looked inconsistent. */
+            var zUniform = Math.max(0.2, Math.min(
+              1,
+              (pageW * 0.94) / slideW,
+              (pageH * 0.52) / slideH
+            ));
             var layouts = document.querySelectorAll('.slides-ng-layout');
             for (var li = 0; li < layouts.length; li++) {
               var el = layouts[li];
@@ -1699,20 +1738,19 @@ ${sectionsHtml}
                 var dbc = secEl0.getAttribute('data-background-color');
                 if (dbc) cardBg = dbc;
               }
-              /* Faithful scaled thumbnail: fixed slide-width layout, then
-               * zoom shrinks layout AND content together to fit the page;
-               * the deck's own CSS/theme styles it, notes reflow below. */
-              var avail = (secEl0 && secEl0.clientWidth) ||
-                document.documentElement.clientWidth || slideW;
-              var z = Math.max(0.2, Math.min(1, avail / slideW));
-              el.style.setProperty('zoom', String(z), 'important');
+              /* Faithful scaled slide: fixed slide-sized layout (width AND
+               * height, so every card is identical), one uniform zoom; the
+               * deck's own CSS/theme styles it, notes reflow below. */
+              el.style.setProperty('zoom', String(zUniform), 'important');
               el.style.setProperty('display', 'block', 'important');
               el.style.setProperty('text-align', 'initial', 'important');
               el.style.setProperty('width', slideW + 'px', 'important');
               el.style.setProperty('max-width', 'none', 'important');
-              el.style.setProperty('height', 'auto', 'important');
-              el.style.setProperty('min-height', '0', 'important');
-              el.style.setProperty('max-height', 'none', 'important');
+              el.style.setProperty('height', slideH + 'px', 'important');
+              el.style.setProperty('min-height', slideH + 'px', 'important');
+              el.style.setProperty('max-height', slideH + 'px', 'important');
+              el.style.setProperty('page-break-inside', 'avoid', 'important');
+              el.style.setProperty('break-inside', 'avoid', 'important');
               el.style.setProperty('background', cardBg, 'important');
               el.style.setProperty('padding', '0.28in 0.36in', 'important');
               el.style.setProperty('box-sizing', 'border-box', 'important');

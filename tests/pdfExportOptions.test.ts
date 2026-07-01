@@ -197,15 +197,20 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain("page-break-after: always");
     // Faithful thumbnail: the layout is scaled with zoom.
     expect(html).toMatch(/notes-emphasis[\s\S]{0,2000}\.slides-ng-layout\s*\{[\s\S]{0,800}zoom:/);
-    // v0.13.18: the runtime JS lays the card out at the CONFIGURED slide
-    // width (initOpts.width — the aspect-ratio pick) and computes the zoom
-    // to fit the page, so responsive grids resolve exactly like the live
-    // preview and 16:9 vs 4:3 genuinely changes the layout. It uses the
-    // deck's OWN theme background (revealBg) — no hardcoded dark card.
+    // v0.13.18/19: the runtime JS lays every card out at the CONFIGURED
+    // slide size (initOpts.width x height — the aspect-ratio pick) with
+    // ONE uniform zoom, so grids resolve exactly like the live preview,
+    // 16:9 vs 4:3 genuinely changes the layout, and every page shows the
+    // SAME fixed slide card. It uses the deck's OWN theme background
+    // (revealBg) — no hardcoded dark card.
     expect(html).toContain("var slideW");
     expect(html).toMatch(/initOpts\.width/);
-    expect(html).toContain("avail / slideW");
+    expect(html).toContain("var zUniform");
     expect(html).toContain("var revealBg");
+    // v0.13.19: reveal's fixed-height .pdf-page wrappers are neutralised
+    // so long notes flow onto continuation pages instead of being CLIPPED.
+    expect(html).toContain(".pdf-page");
+    expect(html).toMatch(/overflow',\s*'visible'/);
     expect(html).not.toMatch(/\.slides-ng-layout h1\b[\s\S]{0,300}color:\s*#ffffff\s*!important/);
     // reveal's per-slide .slide-background is hidden so a dark
     // data-background-color doesn't bleed across the whole handout page.

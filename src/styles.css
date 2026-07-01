@@ -1253,6 +1253,14 @@
 .mockup-line:nth-child(6) { width: 92%; }
 .mockup-line:nth-child(7) { width: 84%; }
 .mockup-line-notes { height: 2px; background: #aaa; }
+/* v0.13.19: notes-emphasis contract hint — fixed slide card per page,
+ * long notes flow onto continuation pages. */
+.mockup-notes-overflow {
+  margin-top: 4px;
+  font-size: 8px;
+  font-style: italic;
+  color: #888;
+}
 .mockup-doc-heading {
   font-size: 9px;
   font-weight: 700;
