@@ -944,6 +944,7 @@ export class SlidesNGView extends ItemView {
         if (previewOptions.headerText) merged.forceHeaderText = previewOptions.headerText;
         if (previewOptions.footerText) merged.forceFooterText = previewOptions.footerText;
         if (previewOptions.notesAlign) merged.forceNotesAlign = previewOptions.notesAlign;
+        if (previewOptions.pageOrientation) merged.forcePageOrientation = previewOptions.pageOrientation;
         const rendered = renderDeckStandalone(markdown, file.path, merged);
         // v0.11.58/v0.11.59: shrink the rendered HTML to fit the
         // preview iframe. CSS `zoom` shrinks the entire page

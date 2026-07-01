@@ -26,6 +26,7 @@ export class ExportPdfOptionsModal extends Modal {
     headerText: "",
     footerText: "",
     notesAlign: "left",
+    pageOrientation: "portrait",
   };
   private onSubmit: (options: PdfExportOptions | null) => void;
   /** Theme that the deck would render with by default — shown as the active option. */
@@ -49,6 +50,8 @@ export class ExportPdfOptionsModal extends Modal {
   /** v0.11.71: refs so we can disable settings that are silent no-ops under the current layout. */
   private aspectSetting?: Setting;
   private aspectDropdown?: DropdownComponent;
+  private orientationSetting?: Setting;
+  private orientationDropdown?: DropdownComponent;
   private showNotesSetting?: Setting;
   private showNotesToggleEl?: HTMLInputElement;
   private maxPagesSetting?: Setting;
@@ -139,6 +142,20 @@ export class ExportPdfOptionsModal extends Modal {
           this.options.showNotes = v;
         });
         this.showNotesToggleEl = t.toggleEl as unknown as HTMLInputElement;
+      });
+
+    this.orientationSetting = new Setting(contentEl)
+      .setName("Page orientation")
+      .setDesc(
+        "Slides + notes emphasis only. Portrait (default) is the classic notes-pages handout; Landscape keeps a slide-shaped page. Ignored when a specific page size is set below."
+      )
+      .addDropdown((d) => {
+        d.addOption("portrait", "Portrait (notes handout)");
+        d.addOption("landscape", "Landscape (slide-shaped page)");
+        d.setValue(this.options.pageOrientation ?? "portrait").onChange((v) => {
+          this.options.pageOrientation = v as PdfExportOptions["pageOrientation"];
+        });
+        this.orientationDropdown = d;
       });
 
     new Setting(contentEl)
@@ -357,6 +374,15 @@ export class ExportPdfOptionsModal extends Modal {
     }
     this.showNotesSetting?.settingEl.toggleClass("slides-ng-setting-disabled", isNotesEmphasis);
 
+    // Page orientation: only meaningful for the notes-pages handout.
+    if (this.orientationDropdown && this.orientationDropdown.selectEl) {
+      this.orientationDropdown.selectEl.disabled = !isNotesEmphasis;
+    }
+    this.orientationSetting?.settingEl.toggleClass(
+      "slides-ng-setting-disabled",
+      !isNotesEmphasis
+    );
+
     // Max pages per slide: forced to 1 in notes-emphasis.
     if (this.maxPagesInputEl) {
       this.maxPagesInputEl.disabled = isNotesEmphasis;
@@ -416,7 +442,21 @@ export class ExportPdfOptionsModal extends Modal {
       current: 260,       // default = Letter
     };
     const pageHeight = pageSizeMap[opts.pageSize ?? "current"] ?? 260;
-    page.style.height = `${pageHeight}px`;
+    // v0.13.21: honest orientation. Slides-notes exports PORTRAIT pages by
+    // default (Notes Pages convention) with an explicit orientation option;
+    // when the user picks landscape (or in plain "slides" mode, where the
+    // page IS the slide-shaped card), draw the mockup page WIDE so the
+    // preview matches what actually comes out of the printer.
+    const isNotesPagesStyle = opts.pdfStyle === "slides-notes";
+    const wantsLandscape =
+      (isNotesPagesStyle && opts.pageOrientation === "landscape") ||
+      (!isNotesPagesStyle && opts.pdfStyle !== "document");
+    if (wantsLandscape) {
+      page.style.width = `${pageHeight}px`;
+      page.style.height = `200px`;
+    } else {
+      page.style.height = `${pageHeight}px`;
+    }
 
     // Page-margin visualization — adjust inner padding.
     const margin = opts.pageMargin ?? "normal";

@@ -106,6 +106,13 @@ export interface PdfExportOptions {
    * Default "left" (readable); "center"/"right" available.
    */
   notesAlign?: "left" | "center" | "right";
+
+  /**
+   * v0.13.21: page orientation for the "Slides + notes emphasis" handout.
+   * Default "portrait" (Notes Pages convention); "landscape" keeps the
+   * slide-shaped page. Ignored when pageSize sets explicit paper.
+   */
+  pageOrientation?: "portrait" | "landscape";
 }
 
 /**
@@ -340,6 +347,7 @@ export async function exportAndOpenForPdf(
   if (pdfOptions.headerText) merged.forceHeaderText = pdfOptions.headerText;
   if (pdfOptions.footerText) merged.forceFooterText = pdfOptions.footerText;
   if (pdfOptions.notesAlign) merged.forceNotesAlign = pdfOptions.notesAlign;
+  if (pdfOptions.pageOrientation) merged.forcePageOrientation = pdfOptions.pageOrientation;
   const result = await exportDeckToFile(app, file, timestamp, merged);
   const suffix = buildPdfUrlSuffix(pdfOptions);
   const opened = await openExternalInBrowser(result.absolutePath, suffix);

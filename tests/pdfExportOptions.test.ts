@@ -245,6 +245,28 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     }
   });
 
+  test("notes-emphasis defaults to PORTRAIT pages; landscape is opt-in (v0.13.21)", () => {
+    const base = {
+      forcePrintMode: true,
+      forceShowNotes: true,
+      forceNotesEmphasis: true,
+    };
+    const portrait = renderDeckStandalone(SAMPLE, "deck.md", base);
+    expect(portrait).toContain("var NE_PORTRAIT = true");
+    expect(portrait).toContain("slides-ng-ne-page"); // late @page override
+    const landscape = renderDeckStandalone(SAMPLE, "deck.md", {
+      ...base,
+      forcePageOrientation: "landscape",
+    });
+    expect(landscape).toContain("var NE_PORTRAIT = false");
+    // Explicit paper size wins — the @page override is skipped.
+    const paper = renderDeckStandalone(SAMPLE, "deck.md", {
+      ...base,
+      forcePageSize: "letter",
+    });
+    expect(paper).toContain("var NE_HAS_PAPER_SIZE = true");
+  });
+
   test("forceMaxPagesPerSlide bakes pdfMaxPagesPerSlide into initOpts (v0.11.44)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {
       forcePrintMode: true,

@@ -159,6 +159,7 @@ export interface RenderDefaults {
   forceHeaderText?: string;
   forceFooterText?: string;
   forceNotesAlign?: "left" | "center" | "right";
+  forcePageOrientation?: "portrait" | "landscape";
   /** Max-height for code blocks before they scroll. CSS length. */
   codeBlockMaxHeight?: string;
   /** Whether code blocks scroll overflow when capped. */
@@ -302,6 +303,7 @@ export function renderDeckFromAst(
   if (defaults.forceHeaderText) defaultLayer.forceHeaderText = defaults.forceHeaderText;
   if (defaults.forceFooterText) defaultLayer.forceFooterText = defaults.forceFooterText;
   if (defaults.forceNotesAlign) defaultLayer.forceNotesAlign = defaults.forceNotesAlign;
+  if (defaults.forcePageOrientation) defaultLayer.forcePageOrientation = defaults.forcePageOrientation;
   if (defaults.codeBlockMaxHeight) {
     defaultLayer.codeBlockMaxHeight = defaults.codeBlockMaxHeight;
   }

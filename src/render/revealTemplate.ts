@@ -98,6 +98,12 @@ export interface DeckRenderOptions {
   forceAutoShrink?: boolean;
   /** v0.11.46: override @page paper size. */
   forcePageSize?: "a4" | "letter" | "legal";
+  /**
+   * v0.13.21: page orientation for the notes-emphasis handout. Default
+   * "portrait" (PowerPoint Notes Pages convention); "landscape" keeps the
+   * slide-shaped page. Ignored when forcePageSize sets explicit paper.
+   */
+  forcePageOrientation?: "portrait" | "landscape";
   /** v0.11.46: override @page margin. */
   forcePageMargin?: "normal" | "narrow" | "wide" | "none";
   /** v0.11.46: grayscale via CSS filter. */
@@ -185,6 +191,8 @@ export function buildIframeHtml(
   const forcePageMargin = options.forcePageMargin ?? "";
   // Notes alignment (left/center/right); default left for readability.
   const notesAlign = options.forceNotesAlign ?? "left";
+  // Notes-emphasis page orientation; portrait is the handout convention.
+  const nePortrait = (options.forcePageOrientation ?? "portrait") !== "landscape";
   const forceGrayscale = options.forceGrayscale ?? false;
   const forceHideBackgrounds = options.forceHideBackgrounds ?? false;
   const forceSlideNumberStamp = options.forceSlideNumberStamp ?? false;
@@ -1699,11 +1707,33 @@ ${sectionsHtml}
             /* Page geometry, computed the same way reveal's print view
              * writes its @page rule (slide size * (1 + margin), @page
              * margin 0) — deterministic, NOT measured from the screen
-             * viewport, so the handout looks identical on any machine. */
+             * viewport, so the handout looks identical on any machine.
+             * v0.13.21: notes-pages default to PORTRAIT paper (the
+             * PowerPoint Notes Pages convention, and what the export
+             * modal's mockup shows) — the slide-shaped page silently
+             * came out landscape, which surprised users. An explicit
+             * "Page orientation" export option controls it; when the
+             * user picked an explicit paper size (a4/letter/legal),
+             * that @page rule wins and this override is skipped. */
             var rMargin = (typeof initOpts === 'object' && initOpts && typeof initOpts.margin === 'number')
               ? initOpts.margin : 0.04;
             var pageW = Math.ceil(slideW * (1 + rMargin));
             var pageH = Math.ceil(slideH * (1 + rMargin));
+            var NE_PORTRAIT = ${nePortrait ? "true" : "false"};
+            var NE_HAS_PAPER_SIZE = ${forcePageSize ? "true" : "false"};
+            if (NE_PORTRAIT && pageW > pageH) {
+              var tmpDim = pageW; pageW = pageH; pageH = tmpDim;
+            }
+            if (!NE_HAS_PAPER_SIZE) {
+              var pgStyle = document.getElementById('slides-ng-ne-page');
+              if (!pgStyle) {
+                pgStyle = document.createElement('style');
+                pgStyle.id = 'slides-ng-ne-page';
+              }
+              pgStyle.textContent = '@page{size:' + pageW + 'px ' + pageH + 'px; margin: 0px;}';
+              /* (re-)append LAST so it wins over reveal's own @page. */
+              document.head.appendChild(pgStyle);
+            }
             var pdfPages = document.querySelectorAll('.pdf-page');
             for (var pi1 = 0; pi1 < pdfPages.length; pi1++) {
               var pp = pdfPages[pi1];
