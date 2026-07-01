@@ -16,6 +16,7 @@ import { pandocFencedDivs } from "../parser/pandocFencedDivs";
 import {
   preprocessObsidianImageEmbeds,
   buildImgTag,
+  rewriteCssUrlTokens,
 } from "../parser/obsidianEmbeds";
 import { splitSlots, hasSlots } from "./slots";
 import { applyLayout } from "./layouts";
@@ -24,6 +25,21 @@ import {
   applyElementAnnotations,
   renderAttrs,
 } from "../parser/annotations";
+
+/**
+ * Reverse the 5 HTML entities marked emits when it escapes inline text,
+ * so a value can be handed to a helper that escapes again (buildImgTag)
+ * without double-escaping. `&amp;` is decoded LAST so a literal `&lt;`
+ * authored in the source isn't over-decoded.
+ */
+function decodeMarkedText(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
 
 // Build a marked instance whose code renderer threads the user's
 // `codeTheme` setting into Shiki + Slidev line-step + Magic-Move. We
@@ -66,7 +82,11 @@ function buildMarked(
       image(token: Tokens.Image): string {
         const href = token.href ?? "";
         const resolved = resolveImage ? resolveImage(href) : null;
-        return buildImgTag({ src: resolved ?? href, alt: token.text ?? "" });
+        // marked has ALREADY HTML-escaped token.text; buildImgTag escapes
+        // again, so decode marked's entities first to avoid double-escaping
+        // the alt (`Tom & Jerry` → `Tom &amp; Jerry`, not `&amp;amp;`).
+        // Matches the single-escape of the `![[…|caption]]` embed path.
+        return buildImgTag({ src: resolved ?? href, alt: decodeMarkedText(token.text ?? "") });
       },
     },
   });
@@ -353,6 +373,12 @@ function resolveBackgroundAttrs(
     if (/^(https?:|data:|file:|\/)/.test(val)) continue;
     const resolved = resolveImage(val);
     if (resolved) out[key] = resolved;
+  }
+  // A slide annotation's own `style="…"` (e.g.
+  // `<!-- slide style="background:url('tile.png')" -->`) is extracted
+  // before the body-level CSS url() pass runs, so inline its url()s here.
+  if (typeof out.style === "string" && /url\(/i.test(out.style)) {
+    out.style = rewriteCssUrlTokens(out.style, resolveImage);
   }
   return out;
 }

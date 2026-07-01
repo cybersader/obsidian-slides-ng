@@ -8,6 +8,19 @@ import {
   revealMenuCss,
 } from "./revealAssets";
 
+/**
+ * JSON.stringify a value for safe interpolation INSIDE an inline
+ * `<script>` element. JSON.stringify escapes quotes (so the JS-string
+ * literal is safe) but NOT `<`, so a value containing `</script>`,
+ * `<!--`, or `<script>` would break out of the script element and inject
+ * markup — a real XSS in the unsandboxed standalone/PDF export. Escaping
+ * every `<` to its `<` JS/JSON escape closes that hole while
+ * preserving the value's meaning (JS parses `<` back to `<`).
+ */
+function jsonForScript(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
 export interface SlideHtml {
   /** Pre-rendered HTML for the slide body (markdown already converted). */
   body: string;
@@ -203,7 +216,7 @@ export function buildIframeHtml(
   // default).
   const sceneInheritThemeBg = options.sceneInheritThemeBg ?? true;
   const scenesJson = Array.isArray(options.scenes)
-    ? JSON.stringify(options.scenes)
+    ? jsonForScript(options.scenes)
     : "[]";
   // Reveal's controls + progress bar visibility. Standalone mode always
   // shows them (helps presenters drive in a browser); embedded mode hides
@@ -237,10 +250,11 @@ export function buildIframeHtml(
     })
     .join("\n");
 
-  // Reveal.initialize() config. We stringify safely so user-supplied
-  // overrides can't break out of the JSON literal. menu options live
-  // here too — the plugin reads its config from Reveal.initialize().
-  const initConfig = JSON.stringify({
+  // Reveal.initialize() config. jsonForScript escapes `<` so user-supplied
+  // `...userOptions` overrides can't break out of the JSON literal OR the
+  // enclosing <script> element. menu options live here too — the plugin
+  // reads its config from Reveal.initialize().
+  const initConfig = jsonForScript({
     hash: false,
     history: false,
     keyboard: true,
@@ -1852,11 +1866,11 @@ ${sectionsHtml}
             ${forceHeaderText || forceFooterText ? `for (var hi = 0; hi < sections.length; hi++) {
               ${forceHeaderText ? `var h = document.createElement('div');
               h.className = 'slides-ng-page-header';
-              h.textContent = ${JSON.stringify(forceHeaderText)};
+              h.textContent = ${jsonForScript(forceHeaderText)};
               sections[hi].insertBefore(h, sections[hi].firstChild);` : ""}
               ${forceFooterText ? `var f = document.createElement('div');
               f.className = 'slides-ng-page-footer';
-              f.textContent = ${JSON.stringify(forceFooterText)};
+              f.textContent = ${jsonForScript(forceFooterText)};
               sections[hi].appendChild(f);` : ""}
             }` : ""}
             ${forceAutoShrink ? `/* Auto-shrink: measure each section\\'s

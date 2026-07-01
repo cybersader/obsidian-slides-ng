@@ -212,19 +212,34 @@ export function rewriteCssImageUrls(
 ): string {
   if (!resolve) return text;
   return text.replace(CSS_CONTEXT_RE, (region: string): string =>
-    region.replace(
-      CSS_URL_RE,
-      (whole, dq?: string, sq?: string, uq?: string): string => {
-        const raw = (dq ?? sq ?? uq ?? "").trim();
-        if (!raw || IMG_PASSTHROUGH.test(raw)) return whole;
-        const resolved = resolve(raw);
-        if (!resolved || resolved === raw) return whole;
-        // Keep an SVG sprite/view #fragment (data URIs contain no #), so
-        // `url(icons.svg#home)` still selects the `home` symbol.
-        const frag = /#[^#?]*$/.exec(raw)?.[0] ?? "";
-        return cssUrlToken(resolved + frag);
-      }
-    )
+    rewriteCssUrlTokens(region, resolve)
+  );
+}
+
+/**
+ * Rewrite every `url(…)` token in a bare CSS string (a style-attribute
+ * VALUE or the inside of a `<style>` region) — no CSS-context scoping.
+ * Use this only on text already known to be CSS (e.g. a slide
+ * annotation's `style="…"` value); use {@link rewriteCssImageUrls} for
+ * arbitrary markdown/HTML where url() must be confined to CSS contexts.
+ */
+export function rewriteCssUrlTokens(
+  css: string,
+  resolve?: (path: string) => string | null
+): string {
+  if (!resolve) return css;
+  return css.replace(
+    CSS_URL_RE,
+    (whole, dq?: string, sq?: string, uq?: string): string => {
+      const raw = (dq ?? sq ?? uq ?? "").trim();
+      if (!raw || IMG_PASSTHROUGH.test(raw)) return whole;
+      const resolved = resolve(raw);
+      if (!resolved || resolved === raw) return whole;
+      // Keep an SVG sprite/view #fragment (data URIs contain no #), so
+      // `url(icons.svg#home)` still selects the `home` symbol.
+      const frag = /#[^#?]*$/.exec(raw)?.[0] ?? "";
+      return cssUrlToken(resolved + frag);
+    }
   );
 }
 
