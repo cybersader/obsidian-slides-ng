@@ -207,10 +207,17 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toMatch(/initOpts\.width/);
     expect(html).toContain("var zUniform");
     expect(html).toContain("var revealBg");
-    // v0.13.19: reveal's fixed-height .pdf-page wrappers are neutralised
-    // so long notes flow onto continuation pages instead of being CLIPPED.
+    // v0.13.23: reveal's fixed-height .pdf-page wrappers are UNWRAPPED —
+    // they clipped long notes AND broke user-CSS ".slides > section"
+    // child-combinator rules (preview matched them, export didn't).
     expect(html).toContain(".pdf-page");
-    expect(html).toMatch(/overflow',\s*'visible'/);
+    expect(html).toContain("ppParent.insertBefore(pp.firstChild, pp)");
+    // v0.13.23: deterministic white-on-dark base colour from the card's
+    // actual background luminance (has-dark-background timing was flaky).
+    expect(html).toMatch(/lum < 140 \? '#f5f5f5' : '#1a1a1a', 'important'/);
+    // v0.13.23: the card INHERITS the section's text-align (title-slide
+    // centering etc.), instead of forcing 'initial'.
+    expect(html).toMatch(/'text-align', 'inherit'/);
     expect(html).not.toMatch(/\.slides-ng-layout h1\b[\s\S]{0,300}color:\s*#ffffff\s*!important/);
     // reveal's per-slide .slide-background is hidden so a dark
     // data-background-color doesn't bleed across the whole handout page.

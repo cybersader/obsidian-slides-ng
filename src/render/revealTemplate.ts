@@ -1080,7 +1080,7 @@ export function buildIframeHtml(
     html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout {
       zoom: 0.6;
       display: block !important;
-      text-align: initial !important;
+      text-align: inherit !important;
       width: 100% !important;
       height: auto !important;
       min-height: 0 !important;
@@ -1744,17 +1744,21 @@ ${sectionsHtml}
               /* (re-)append LAST so it wins over reveal's own @page. */
               document.head.appendChild(pgStyle);
             }
+            /* v0.13.23: UNWRAP reveal's .pdf-page wrappers entirely
+             * (they used to be merely neutralised). The wrapper sits
+             * between .slides and each section, which silently broke
+             * every user-CSS child-combinator rule of the form
+             * .reveal .slides > section (e.g. text-align) — the
+             * live preview matched them, the export didn't. Notes-
+             * emphasis owns its own flow + page breaks, so the wrapper
+             * serves no purpose here. Idempotent (later runs find none). */
             var pdfPages = document.querySelectorAll('.pdf-page');
             for (var pi1 = 0; pi1 < pdfPages.length; pi1++) {
               var pp = pdfPages[pi1];
-              pp.style.setProperty('height', 'auto', 'important');
-              pp.style.setProperty('min-height', '0', 'important');
-              pp.style.setProperty('max-height', 'none', 'important');
-              pp.style.setProperty('overflow', 'visible', 'important');
-              pp.style.setProperty('page-break-after', 'always', 'important');
-              pp.style.setProperty('break-after', 'page', 'important');
-              pp.style.setProperty('page-break-inside', 'auto', 'important');
-              pp.style.setProperty('break-inside', 'auto', 'important');
+              var ppParent = pp.parentNode;
+              if (!ppParent) continue;
+              while (pp.firstChild) ppParent.insertBefore(pp.firstChild, pp);
+              ppParent.removeChild(pp);
             }
             /* v0.13.19: ONE uniform zoom for every card — fit the page
              * width AND cap the card at ~52% of one page's height, so
@@ -1795,7 +1799,10 @@ ${sectionsHtml}
               el.style.setProperty('display', 'flex', 'important');
               el.style.setProperty('flex-direction', 'column', 'important');
               el.style.setProperty('justify-content', vCenter ? 'safe center' : 'flex-start', 'important');
-              el.style.setProperty('text-align', 'initial', 'important');
+              /* inherit, NOT initial: the slide annotation's classes land
+               * on the SECTION (e.g. .title-slide { text-align:center }),
+               * and the card must inherit that like the live preview. */
+              el.style.setProperty('text-align', 'inherit', 'important');
               el.style.setProperty('width', slideW + 'px', 'important');
               el.style.setProperty('max-width', 'none', 'important');
               el.style.setProperty('height', slideH + 'px', 'important');
@@ -1813,6 +1820,25 @@ ${sectionsHtml}
               el.style.setProperty('margin', '0 auto', 'important');
               el.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
               el.style.setProperty('print-color-adjust', 'exact', 'important');
+              /* v0.13.23: deterministic base text colour from the card's
+               * ACTUAL background luminance. White-on-dark previously
+               * relied on reveal adding has-dark-background in print
+               * view — timing-fragile (user saw dark-on-navy). Inline
+               * colour on the card wins the inheritance base; explicit
+               * custom-CSS colours on elements still apply. */
+              try {
+                /* backslash-free parse (template-literal escaping ate a
+                 * regex here once — emitted /rgba?(...)/ and NaN'd). */
+                var bgRgb = getComputedStyle(el).backgroundColor;
+                var parenAt = bgRgb.indexOf('(');
+                var ch = parenAt >= 0 ? bgRgb.slice(parenAt + 1).split(',') : [];
+                if (ch.length >= 3) {
+                  var lum = 0.2126 * parseFloat(ch[0]) + 0.7152 * parseFloat(ch[1]) + 0.0722 * parseFloat(ch[2]);
+                  if (!isNaN(lum)) {
+                    el.style.setProperty('color', lum < 140 ? '#f5f5f5' : '#1a1a1a', 'important');
+                  }
+                }
+              } catch (_) {}
               /* v0.13.22: auto-shrink fits overflowing slide content
                * INSIDE the fixed card via a uniform zoom on a content
                * wrapper (slidesNgFitToBox hoists from the pdfPostInit
