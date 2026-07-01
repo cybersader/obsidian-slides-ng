@@ -1675,7 +1675,18 @@ ${sectionsHtml}
                 if (csBg && csBg !== 'rgba(0, 0, 0, 0)' && csBg !== 'transparent') revealBg = csBg;
               }
             } catch (_) {}
-            var NE_SCALE = 0.66; /* thumbnail scale — slide stays faithful, notes get room */
+            /* v0.13.18: lay the card out at EXACTLY the configured slide
+             * width (initOpts.width — the aspect-ratio pick), then zoom to
+             * fit the printable page width. The previous width:100% +
+             * fixed zoom made the card's CSS content width ~1.5x the PAGE
+             * width regardless of aspect ratio, so responsive grids
+             * (auto-fill minmax) packed MORE columns than the live preview
+             * (user report: 3 rows in preview, 2 in the export) and the
+             * aspect-ratio choice appeared to do nothing. Fixing the
+             * content width makes grids resolve identically to a preview
+             * at that slide width, and makes 16:9 vs 4:3 real again. */
+            var slideW = (typeof initOpts === 'object' && initOpts && typeof initOpts.width === 'number')
+              ? initOpts.width : 960;
             var layouts = document.querySelectorAll('.slides-ng-layout');
             for (var li = 0; li < layouts.length; li++) {
               var el = layouts[li];
@@ -1688,13 +1699,17 @@ ${sectionsHtml}
                 var dbc = secEl0.getAttribute('data-background-color');
                 if (dbc) cardBg = dbc;
               }
-              /* Faithful scaled thumbnail: zoom shrinks the layout AND its
-               * content together, the deck's own CSS/theme styles it, and
-               * notes reflow below. No forced dark/center/white/fixed-4in. */
-              el.style.setProperty('zoom', String(NE_SCALE), 'important');
+              /* Faithful scaled thumbnail: fixed slide-width layout, then
+               * zoom shrinks layout AND content together to fit the page;
+               * the deck's own CSS/theme styles it, notes reflow below. */
+              var avail = (secEl0 && secEl0.clientWidth) ||
+                document.documentElement.clientWidth || slideW;
+              var z = Math.max(0.2, Math.min(1, avail / slideW));
+              el.style.setProperty('zoom', String(z), 'important');
               el.style.setProperty('display', 'block', 'important');
               el.style.setProperty('text-align', 'initial', 'important');
-              el.style.setProperty('width', '100%', 'important');
+              el.style.setProperty('width', slideW + 'px', 'important');
+              el.style.setProperty('max-width', 'none', 'important');
               el.style.setProperty('height', 'auto', 'important');
               el.style.setProperty('min-height', '0', 'important');
               el.style.setProperty('max-height', 'none', 'important');
@@ -1704,7 +1719,8 @@ ${sectionsHtml}
               el.style.setProperty('overflow', 'hidden', 'important');
               el.style.setProperty('border', '1px solid #ccc', 'important');
               el.style.setProperty('border-radius', '4px', 'important');
-              el.style.setProperty('margin', '0', 'important');
+              /* 0 auto: center the fixed-width card on the page. */
+              el.style.setProperty('margin', '0 auto', 'important');
               el.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
               el.style.setProperty('print-color-adjust', 'exact', 'important');
               /* The parent <section> must let our card shape through.

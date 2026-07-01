@@ -48,7 +48,11 @@ slides-ng-debug.log
 Thumbs.db
 
 # --- Standalone export artifacts (generated on demand by the plugin) ---
+# Both forms: the builder emits a dot-prefixed name, but files can land
+# without the dot (Obsidian adapter / manual rename). These can contain
+# real deck content — must NEVER reach GitHub.
 .slides-ng-export-*.html
+slides-ng-export-*.html
 
 # --- Logs ---
 debug.log

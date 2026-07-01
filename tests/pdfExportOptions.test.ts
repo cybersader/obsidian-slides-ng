@@ -197,10 +197,14 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain("page-break-after: always");
     // Faithful thumbnail: the layout is scaled with zoom.
     expect(html).toMatch(/notes-emphasis[\s\S]{0,2000}\.slides-ng-layout\s*\{[\s\S]{0,800}zoom:/);
-    // The runtime JS scales via NE_SCALE and uses the deck's OWN theme
-    // background (revealBg) / per-slide data-background-color — no more
-    // hardcoded #191919 card or forced-white headings.
-    expect(html).toContain("var NE_SCALE");
+    // v0.13.18: the runtime JS lays the card out at the CONFIGURED slide
+    // width (initOpts.width — the aspect-ratio pick) and computes the zoom
+    // to fit the page, so responsive grids resolve exactly like the live
+    // preview and 16:9 vs 4:3 genuinely changes the layout. It uses the
+    // deck's OWN theme background (revealBg) — no hardcoded dark card.
+    expect(html).toContain("var slideW");
+    expect(html).toMatch(/initOpts\.width/);
+    expect(html).toContain("avail / slideW");
     expect(html).toContain("var revealBg");
     expect(html).not.toMatch(/\.slides-ng-layout h1\b[\s\S]{0,300}color:\s*#ffffff\s*!important/);
     // reveal's per-slide .slide-background is hidden so a dark
