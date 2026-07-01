@@ -20,6 +20,7 @@ import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
 import { warmHighlighter } from "./render/shiki";
 import { slideIndexFromCursor } from "./parser/slideIndexFromCursor";
 import { sourceLineForSlide } from "./parser/slideSourceLine";
+import { shouldReverseFollow } from "./parser/reverseFollowDecision";
 import {
   buildImageDataUriResolver,
   sharedImageDataUriCache,
@@ -30,6 +31,18 @@ import type { DebugLog } from "./utils/debug";
 export const VIEW_TYPE_SLIDES_NG = "slides-ng-preview";
 
 const REFRESH_DEBOUNCE_MS = 300;
+
+/**
+ * After the preview iframe is (re)loaded, its fresh Reveal instance
+ * boots at slide 0 and posts a `slides-ng-state` before the forward
+ * follow (reveal-ready → applyCursorFollow) restores it to the slide
+ * you were editing. Without a guard, that transient state(0) drives
+ * the reverse follow and yanks the editor caret to the top on every
+ * save. Suppress reverse-follow for this window after each reload so
+ * the re-init settles first. Genuine preview navigation (a postMessage
+ * goto, no reload) is unaffected — it never arms this window.
+ */
+const REVERSE_FOLLOW_SUPPRESS_MS = 1500;
 
 interface SlidesNGViewState extends Record<string, unknown> {
   filePath?: string;
@@ -67,6 +80,13 @@ export class SlidesNGView extends ItemView {
    */
   private currentPreviewH = 0;
   private currentPreviewV = 0;
+  /**
+   * v0.13.9: timestamp (ms) until which reverse-follow is suppressed
+   * because the iframe was just (re)loaded. Prevents a save/refresh
+   * from bouncing the editor caret to the top. See
+   * {@link REVERSE_FOLLOW_SUPPRESS_MS}.
+   */
+  private suppressReverseFollowUntil = 0;
   /**
    * v0.13.4: data-URI cache for image attachments, keyed by
    * `path|mtime`. Reused across refreshes so unchanged images aren't
@@ -184,15 +204,22 @@ export class SlidesNGView extends ItemView {
           if (typeof data.currentVIdx === "number") {
             this.currentPreviewV = data.currentVIdx;
           }
-          if (this.getSettings().followPreviewInEditor) {
-            const h = this.currentPreviewH;
-            const v = this.currentPreviewV;
-            // Ignore the echo of our OWN forward-follow (editor→preview
-            // already put us here). Only react to genuine preview
-            // navigation.
-            if (h !== this.lastSentSlideIdx || v !== this.lastSyncedV) {
-              this.scheduleReverseFollow();
-            }
+          // Reverse-follow only on genuine preview navigation — not on
+          // our own forward-follow echo, and not on the transient
+          // state(0) a fresh Reveal posts right after a save/refresh
+          // reload (which would bounce the caret to the top).
+          if (
+            shouldReverseFollow({
+              followPreviewInEditor: this.getSettings().followPreviewInEditor,
+              now: Date.now(),
+              suppressReverseFollowUntil: this.suppressReverseFollowUntil,
+              previewH: this.currentPreviewH,
+              previewV: this.currentPreviewV,
+              syncedH: this.lastSentSlideIdx,
+              syncedV: this.lastSyncedV,
+            })
+          ) {
+            this.scheduleReverseFollow();
           }
           break;
         case "slides-ng-iframe-reveal-ready":
@@ -734,6 +761,14 @@ export class SlidesNGView extends ItemView {
     const html = this.pendingHtml;
     this.pendingHtml = null;
     this.iframeEl.srcdoc = html;
+    // The reload boots a fresh Reveal at slide 0; suppress reverse-follow
+    // until it settles so a save doesn't yank the caret to the top. Also
+    // cancel any reverse-follow already queued from before the reload.
+    this.suppressReverseFollowUntil = Date.now() + REVERSE_FOLLOW_SUPPRESS_MS;
+    if (this.reverseFollowTimer !== null) {
+      window.clearTimeout(this.reverseFollowTimer);
+      this.reverseFollowTimer = null;
+    }
     this.debug?.log("view/apply-pending/applied", {
       htmlLength: html.length,
       clientW: this.iframeEl.clientWidth,
