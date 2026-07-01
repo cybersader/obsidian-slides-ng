@@ -47,6 +47,9 @@ slides-ng-debug.log
 .DS_Store
 Thumbs.db
 
+# --- Exported/printed PDFs (testing content — must NEVER reach GitHub) ---
+*.pdf
+
 # --- Standalone export artifacts (generated on demand by the plugin) ---
 # Both forms: the builder emits a dot-prefixed name, but files can land
 # without the dot (Obsidian adapter / manual rename). These can contain

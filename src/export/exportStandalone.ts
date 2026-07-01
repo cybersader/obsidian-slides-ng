@@ -131,8 +131,18 @@ export interface ExportResult {
  * Build the filename used by the export workflow. Externalised so tests
  * can pin the timestamp.
  */
-export function buildExportFilename(timestamp: number): string {
-  return `.slides-ng-export-${timestamp}.html`;
+export function buildExportFilename(timestamp: number, deckBasename?: string): string {
+  // v0.13.22: include the deck name so repeated exports of different
+  // decks are tellable apart at a glance. Timestamp keeps uniqueness;
+  // characters unsafe in filenames are dashed.
+  const slug = (deckBasename ?? "")
+    .replace(/\.md$/i, "")
+    .replace(/[\\/:*?"<>|#^[\]]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .trim();
+  return slug
+    ? `.slides-ng-export-${slug}-${timestamp}.html`
+    : `.slides-ng-export-${timestamp}.html`;
 }
 
 /**
@@ -160,7 +170,7 @@ export async function exportDeckToFile(
     ...defaults,
     resolveImage,
   });
-  const vaultRelativePath = buildExportFilename(timestamp);
+  const vaultRelativePath = buildExportFilename(timestamp, file.basename ?? file.name);
   await app.vault.adapter.write(vaultRelativePath, html);
 
   // Resolve to an absolute on-disk path. The Obsidian filesystem adapter

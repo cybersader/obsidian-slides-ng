@@ -43,6 +43,13 @@ export interface SlideHtml {
 }
 
 export interface DeckRenderOptions {
+  /**
+   * v0.13.22: document title for the exported HTML. The browser's
+   * Save-as-PDF dialog defaults its filename to document.title, so this
+   * is what makes exports auto-name after the deck instead of all
+   * suggesting "slides-ng preview".
+   */
+  docTitle?: string;
   theme?: string;
   transition?: string;
   slideNumber?: boolean;
@@ -193,6 +200,9 @@ export function buildIframeHtml(
   const notesAlign = options.forceNotesAlign ?? "left";
   // Notes-emphasis page orientation; portrait is the handout convention.
   const nePortrait = (options.forcePageOrientation ?? "portrait") !== "landscape";
+  // Exported-document title -> browser Save-as-PDF default filename.
+  const docTitle = (options.docTitle ?? "slides-ng preview")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const forceGrayscale = options.forceGrayscale ?? false;
   const forceHideBackgrounds = options.forceHideBackgrounds ?? false;
   const forceSlideNumberStamp = options.forceSlideNumberStamp ?? false;
@@ -346,7 +356,7 @@ export function buildIframeHtml(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>slides-ng preview</title>
+  <title>${docTitle}</title>
   <style>
     /* reveal.js core */
     ${revealCss}
@@ -1803,6 +1813,16 @@ ${sectionsHtml}
               el.style.setProperty('margin', '0 auto', 'important');
               el.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
               el.style.setProperty('print-color-adjust', 'exact', 'important');
+              /* v0.13.22: auto-shrink fits overflowing slide content
+               * INSIDE the fixed card via a uniform zoom on a content
+               * wrapper (slidesNgFitToBox hoists from the pdfPostInit
+               * chunk — emitted whenever autoShrink is on). */
+              if (${forceAutoShrink ? "true" : "false"} && typeof slidesNgFitToBox === 'function') {
+                var csEl = getComputedStyle(el);
+                var padV = (parseFloat(csEl.paddingTop) || 0) + (parseFloat(csEl.paddingBottom) || 0);
+                var padH = (parseFloat(csEl.paddingLeft) || 0) + (parseFloat(csEl.paddingRight) || 0);
+                slidesNgFitToBox(el, Math.max(50, slideH - padV), Math.max(100, slideW - padH), null);
+              }
               /* The parent <section> must let our card shape through.
                * v0.11.56: position:relative (not static) so a
                * pseudo-element like the slide-number-stamp ::before
@@ -1880,6 +1900,46 @@ ${sectionsHtml}
         setTimeout(applyNotesEmphasisInline, 800);
         ` : ""}
         ${!embedded && (forceAutoShrink || forceSlideNumberStamp || forceHeaderText || forceFooterText) ? `
+        ${forceAutoShrink ? `/* v0.13.22: TRUE uniform auto-shrink. The old
+         * implementation shrank font-size only, which does nothing for
+         * px-based layout (grids like minmax(88px,1fr), min-height card
+         * tiles, borders, px paddings) — px-heavy slides still
+         * overflowed. Instead: move the content into a wrapper and apply
+         * CSS zoom, which scales layout AND content uniformly. Only ever
+         * scales DOWN. Top-level function declaration — hoists across
+         * this script, so the notes-emphasis restyle (which runs earlier
+         * in time) can call it for the fixed slide card too. */
+        function slidesNgFitToBox(box, budgetH, innerW, excludeSel) {
+          try {
+            var wrap = box.querySelector(':scope > .slides-ng-fit-wrap');
+            if (!wrap) {
+              wrap = document.createElement('div');
+              wrap.className = 'slides-ng-fit-wrap';
+              var kids = Array.prototype.slice.call(box.childNodes);
+              for (var ki = 0; ki < kids.length; ki++) {
+                var k = kids[ki];
+                if (k.nodeType === 1 && excludeSel && k.matches && k.matches(excludeSel)) continue;
+                wrap.appendChild(k);
+              }
+              box.insertBefore(wrap, box.firstChild);
+            }
+            /* Reset before measuring so repeat invocations are
+             * idempotent (the notes-emphasis restyle runs 3x).
+             * ABSOLUTE px width, not '100%': percentages inside a zoomed
+             * element resolve in the zoomed coordinate space (wider), which
+             * re-flowed responsive grids to MORE columns than the live
+             * preview. A px width keeps the layout preview-faithful. */
+            wrap.style.zoom = '1';
+            wrap.style.width = innerW + 'px';
+            var natH = wrap.scrollHeight;
+            if (natH > budgetH && natH > 0) {
+              var s = Math.max(0.2, (budgetH / natH) * 0.97);
+              wrap.style.zoom = String(s);
+              /* Center the (now narrower-rendered) content in flex boxes. */
+              wrap.style.alignSelf = 'center';
+            }
+          } catch (_) {}
+        }` : ""}
         /* v0.11.46: post-init PDF tweaks. Hook into Reveal\\'s 'ready'
          * so slide DOM exists. Cheap — only runs in standalone-export
          * mode and only if the user picked one of these options. */
@@ -1940,22 +2000,16 @@ ${sectionsHtml}
               f.textContent = ${jsonForScript(forceFooterText)};
               sections[hi].appendChild(f);` : ""}
             }` : ""}
-            ${forceAutoShrink ? `/* Auto-shrink: measure each section\\'s
-             * natural content height (a wrapper-div inside the section
-             * holds the original content) and apply a CSS scale so
-             * everything fits within the slide-card height. Only
-             * scales DOWN; never up — content smaller than the slide
-             * stays at its natural size. */
-            for (var ai = 0; ai < sections.length; ai++) {
-              var sec = sections[ai];
-              var maxH = sec.clientHeight;
-              var natH = sec.scrollHeight;
-              if (natH > maxH && natH > 0) {
-                var factor = (maxH / natH) * 0.97;
-                sec.style.transformOrigin = 'top left';
-                /* Apply scale to a wrapper to avoid clipping by reveal\\'s
-                 * own transform on the section. */
-                sec.style.fontSize = (factor * 100) + '%';
+            ${forceAutoShrink ? `/* Auto-shrink each slide-page section
+             * uniformly (see slidesNgFitToBox). Skipped in notes-emphasis
+             * — there the fixed slide CARD is the box to fit, handled by
+             * the notes-emphasis restyle. Notes/header/footer/stamp stay
+             * OUTSIDE the wrapper so they keep their natural size. */
+            if (!document.documentElement.classList.contains('notes-emphasis')) {
+              for (var ai = 0; ai < sections.length; ai++) {
+                var sec = sections[ai];
+                slidesNgFitToBox(sec, sec.clientHeight, sec.clientWidth,
+                  'aside.notes, .speaker-notes, .slides-ng-page-header, .slides-ng-page-footer, .slides-ng-slide-number-badge');
               }
             }` : ""}
           } catch (err) { console.warn('[slides-ng] pdfPostInit error', err); }

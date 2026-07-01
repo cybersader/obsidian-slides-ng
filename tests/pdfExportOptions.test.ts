@@ -267,6 +267,33 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(paper).toContain("var NE_HAS_PAPER_SIZE = true");
   });
 
+  test("auto-shrink is a TRUE uniform scale, not the font-size hack (v0.13.22)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+      forceAutoShrink: true,
+    });
+    expect(html).toContain("function slidesNgFitToBox");
+    expect(html).toContain("slides-ng-fit-wrap");
+    // the old hack shrank only text — px grids kept overflowing
+    expect(html).not.toContain("style.fontSize = (factor");
+    // notes-emphasis path calls the same helper for the fixed card
+    const ne = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+      forceShowNotes: true,
+      forceNotesEmphasis: true,
+      forceAutoShrink: true,
+    });
+    expect(ne).toMatch(/typeof slidesNgFitToBox === 'function'/);
+  });
+
+  test("exported document is titled after the deck file (v0.13.22)", () => {
+    const html = renderDeckStandalone(SAMPLE, "Decks/Q2 Security Update.md");
+    expect(html).toContain("<title>Q2 Security Update</title>");
+    // escaping: & and < can never break the <title> element
+    const esc = renderDeckStandalone(SAMPLE, "a & b <weird>.md");
+    expect(esc).toContain("<title>a &amp; b &lt;weird></title>");
+  });
+
   test("forceMaxPagesPerSlide bakes pdfMaxPagesPerSlide into initOpts (v0.11.44)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {
       forcePrintMode: true,

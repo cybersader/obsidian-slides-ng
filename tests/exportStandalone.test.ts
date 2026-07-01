@@ -14,6 +14,13 @@ describe("buildExportFilename", () => {
   test("each call with a different timestamp produces a different name", () => {
     expect(buildExportFilename(1)).not.toBe(buildExportFilename(2));
   });
+
+  test("includes a sanitized deck name when provided (v0.13.22)", () => {
+    expect(buildExportFilename(9, "Q2 Report")).toBe(".slides-ng-export-Q2 Report-9.html");
+    expect(buildExportFilename(9, 'we/ird:na*me?"x"')).toBe(".slides-ng-export-we-ird-na-me-x-9.html");
+    // both gitignore patterns still match the slugged form
+    expect(buildExportFilename(9, "Deck")).toMatch(/^\.slides-ng-export-.*\.html$/);
+  });
 });
 
 describe("renderDeckStandalone vs renderDeck", () => {

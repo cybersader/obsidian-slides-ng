@@ -245,7 +245,11 @@ export function renderDeckStandalone(
   const deck = parseDeck(markdown, filepath, {
     autoH1Breaks: defaults.autoH1Breaks,
   });
-  return renderDeckFromAst(deck, { embedded: false }, defaults);
+  // v0.13.22: title the exported document after the deck file so the
+  // browser's Save-as-PDF dialog suggests "<deck name>.pdf" instead of
+  // the same generic name for every export.
+  const base = (filepath.split("/").pop() ?? filepath).replace(/\.md$/i, "");
+  return renderDeckFromAst(deck, { embedded: false, docTitle: base }, defaults);
 }
 
 /**
