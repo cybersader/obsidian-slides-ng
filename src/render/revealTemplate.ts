@@ -3167,6 +3167,7 @@ ${sectionsHtml}
         return {
           type: 'slides-ng-state',
           currentIdx: indices.h,
+          currentVIdx: indices.v != null ? indices.v : 0,
           fragmentIdx: indices.f != null ? indices.f : -1,
           totalSlides: totalSlides,
           // isBlackout retained for backwards compatibility with the

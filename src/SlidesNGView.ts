@@ -19,6 +19,7 @@ import {
 import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
 import { warmHighlighter } from "./render/shiki";
 import { slideIndexFromCursor } from "./parser/slideIndexFromCursor";
+import { sourceLineForSlide } from "./parser/slideSourceLine";
 import { buildImageDataUriResolver } from "./export/imageDataUris";
 import type { SlidesNGSettings } from "./settings";
 import type { DebugLog } from "./utils/debug";
@@ -48,6 +49,13 @@ export class SlidesNGView extends ItemView {
   private refreshTimer: number | null = null;
   private cursorFollowTimer: number | null = null;
   private lastSentSlideIdx: number | null = null;
+  /**
+   * v0.13.6: current slide position shown in the preview, tracked from
+   * the iframe's `slides-ng-state` messages. Used by the "reveal in
+   * editor" button to jump the editor caret to this slide's source.
+   */
+  private currentPreviewH = 0;
+  private currentPreviewV = 0;
   /**
    * v0.13.4: data-URI cache for image attachments, keyed by
    * `path|mtime`. Reused across refreshes so unchanged images aren't
@@ -153,6 +161,16 @@ export class SlidesNGView extends ItemView {
             hasReveal: data.hasReveal,
           });
           break;
+        case "slides-ng-state":
+          // v0.13.6: track the slide the preview is currently showing
+          // so "reveal in editor" can jump to its source.
+          if (typeof data.currentIdx === "number") {
+            this.currentPreviewH = data.currentIdx;
+          }
+          if (typeof data.currentVIdx === "number") {
+            this.currentPreviewV = data.currentVIdx;
+          }
+          break;
         case "slides-ng-iframe-reveal-ready":
           this.debug?.log("iframe/reveal-ready", { time: data.time });
           // v0.13.4: once reveal is up, jump to the slide the editor
@@ -237,6 +255,15 @@ export class SlidesNGView extends ItemView {
       label: "Grid",
       tooltip: "Toggle the slide-grid overview",
       onClick: () => this.postIframeCommand("toggleOverview"),
+    });
+
+    // v0.13.6: reverse cursor-follow. Jump the editor caret to the
+    // source of the slide currently shown in the preview.
+    this.addToolbarButton(leftGroup, {
+      icon: "crosshair",
+      label: "Find in note",
+      tooltip: "Move the editor cursor to this slide's source",
+      onClick: () => this.revealCurrentSlideInEditor(),
     });
 
     this.addToolbarButton(rightGroup, {
@@ -511,6 +538,47 @@ export class SlidesNGView extends ItemView {
       { type: "slides-ng-cmd", cmd: "goto", idx },
       "*"
     );
+  }
+
+  /**
+   * v0.13.6: reverse cursor-follow — move the editor caret to the
+   * source line of the slide the preview is currently showing, reveal
+   * that editor pane, and focus it. The inverse of the editor→preview
+   * follow.
+   */
+  private revealCurrentSlideInEditor(): void {
+    if (!this.filePath) return;
+    let targetLeaf: WorkspaceLeaf | null = null;
+    let mdView: MarkdownView | null = null;
+    for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+      const v = leaf.view;
+      if (v instanceof MarkdownView && v.file?.path === this.filePath) {
+        targetLeaf = leaf;
+        mdView = v;
+        break;
+      }
+    }
+    if (!mdView || !targetLeaf) {
+      new Notice(
+        "Open this deck's markdown file in a pane, then use \"Find in note\"."
+      );
+      return;
+    }
+    const md = mdView.editor.getValue();
+    const line = sourceLineForSlide(
+      md,
+      this.currentPreviewH,
+      this.currentPreviewV,
+      { autoH1Breaks: this.getSettings().autoH1Breaks }
+    );
+    const pos = { line, ch: 0 };
+    // Pre-set the forward-follow guard to this slide so the caret move
+    // below doesn't immediately bounce the preview somewhere else.
+    this.lastSentSlideIdx = this.currentPreviewH;
+    this.app.workspace.revealLeaf(targetLeaf);
+    mdView.editor.setCursor(pos);
+    mdView.editor.scrollIntoView({ from: pos, to: pos }, true);
+    mdView.editor.focus();
   }
 
   private scheduleRefresh(): void {
