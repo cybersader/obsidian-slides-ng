@@ -1,5 +1,9 @@
 import { App, TFile } from "obsidian";
 import { renderDeckStandalone, type RenderDefaults } from "../render/renderDeck";
+import {
+  buildImageDataUriResolver,
+  sharedImageDataUriCache,
+} from "./imageDataUris";
 
 /**
  * Options the user picks before exporting to PDF. v0.9.0+. Each
@@ -130,7 +134,19 @@ export async function exportDeckToFile(
   defaults: RenderDefaults = {}
 ): Promise<ExportResult> {
   const markdown = await app.vault.read(file);
-  const html = renderDeckStandalone(markdown, file.path, defaults);
+  // Inline every referenced image as a data: URI so the exported .html is
+  // self-contained and images render the SAME as the in-Obsidian preview.
+  // Without this, the preview (which builds a resolver) showed images but
+  // the export wrote raw app://local / relative / <img src> paths that a
+  // file:// browser tab (and the PDF print) can't load. Reuses the shared
+  // path|mtime cache so preview + export don't re-read the same bytes.
+  const resolveImage =
+    defaults.resolveImage ??
+    (await buildImageDataUriResolver(app, file, sharedImageDataUriCache));
+  const html = renderDeckStandalone(markdown, file.path, {
+    ...defaults,
+    resolveImage,
+  });
   const vaultRelativePath = buildExportFilename(timestamp);
   await app.vault.adapter.write(vaultRelativePath, html);
 

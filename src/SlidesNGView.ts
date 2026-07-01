@@ -885,6 +885,13 @@ export class SlidesNGView extends ItemView {
         const { renderDeckStandalone } = await import("./render/renderDeck");
         const merged: import("./render/renderDeck").RenderDefaults = {
           ...this.renderDefaults(),
+          // Inline images (data: URIs) so the PDF-options preview matches
+          // both the live preview and the actual export. Same shared cache.
+          resolveImage: await buildImageDataUriResolver(
+            this.app,
+            file,
+            this.imageDataUriCache
+          ),
         };
         // Mirror exportAndOpenForPdf's merging so the preview
         // matches what the export will produce.

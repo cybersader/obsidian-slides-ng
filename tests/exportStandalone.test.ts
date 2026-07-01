@@ -156,3 +156,71 @@ describe("exportDeckToFile", () => {
     expect(written.size).toBe(2);
   });
 });
+
+// v0.13.12: the export must inline images as data: URIs (same as the
+// preview), else the exported .html / PDF shows broken images because a
+// file:// browser tab can't load app://local / relative / <img src> paths.
+describe("exportDeckToFile inlines images (parity with preview)", () => {
+  function imageApp(): Parameters<typeof exportDeckToFile>[0] {
+    const png = new Uint8Array([137, 80, 78, 71]).buffer;
+    return {
+      vault: {
+        adapter: {
+          written: new Map<string, string>(),
+          async write(p: string, c: string) {
+            (this.written as Map<string, string>).set(p, c);
+          },
+          getFullPath(p: string) {
+            return "/vault/" + p;
+          },
+          async readBinary(p: string) {
+            if (
+              p === "Decks/assets/export-logo.png" ||
+              p === "assets/export-hero.png"
+            ) {
+              return png;
+            }
+            throw new Error("not found: " + p);
+          },
+        },
+        async read() {
+          return '# S\n\n<img src="assets/export-logo.png" style="height:40px">\n\n![[export-hero.png]]\n';
+        },
+        getAbstractFileByPath(p: string) {
+          return p === "Decks/assets/export-logo.png" ? { path: p } : null;
+        },
+      },
+      metadataCache: {
+        getFirstLinkpathDest(lp: string) {
+          return lp === "export-hero.png"
+            ? { path: "assets/export-hero.png" }
+            : null;
+        },
+      },
+    } as unknown as Parameters<typeof exportDeckToFile>[0];
+  }
+
+  test("raw <img> + wikilink embed both become data: URIs in the export", async () => {
+    const app = imageApp();
+    const file = { path: "Decks/deck.md" } as unknown as Parameters<
+      typeof exportDeckToFile
+    >[1];
+    const result = await exportDeckToFile(app, file, 77);
+    const dataUris = (result.html.match(/data:image\/png;base64,/g) ?? []).length;
+    expect(dataUris).toBeGreaterThanOrEqual(2); // both images inlined
+    // The raw, unloadable forms must be gone.
+    expect(result.html).not.toContain('src="assets/export-logo.png"');
+    expect(result.html).not.toContain("![[export-hero.png]]");
+  });
+
+  test("a caller-supplied resolveImage is respected (not overwritten)", async () => {
+    const app = imageApp();
+    const file = { path: "Decks/deck.md" } as unknown as Parameters<
+      typeof exportDeckToFile
+    >[1];
+    const result = await exportDeckToFile(app, file, 78, {
+      resolveImage: () => "data:image/png;base64,CALLER",
+    });
+    expect(result.html).toContain("data:image/png;base64,CALLER");
+  });
+});
