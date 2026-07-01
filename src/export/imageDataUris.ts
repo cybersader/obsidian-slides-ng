@@ -46,6 +46,20 @@ const IMG_SRC_RE =
   /<img\b(?:"[^"]*"|'[^']*'|[^>"'])*?(?<![-\w])src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
 
 /**
+ * A CSS `url(…)` reference (quoted or unquoted). Mirrors obsidianEmbeds
+ * CSS_URL_RE so collection + rewriting agree on the same refs.
+ */
+const CSS_URL_RE = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)"']*))\s*\)/gi;
+
+/**
+ * CSS-bearing regions (<style> blocks + inline style attributes). Mirrors
+ * obsidianEmbeds CSS_CONTEXT_RE so collection is scoped the same way the
+ * rewrite is — a stray url(file) in prose isn't collected/read.
+ */
+const CSS_CONTEXT_RE =
+  /<style\b[^>]*>[\s\S]*?<\/style>|style\s*=\s*"[^"]*"|style\s*=\s*'[^']*'/gi;
+
+/**
  * Session-scoped cache of encoded attachments, keyed by `path|mtime`.
  * Shared across the main preview, speaker up-next, and speaker picker
  * iframes so a given attachment is read from disk at most once per
@@ -116,6 +130,17 @@ export function collectImageTargets(markdown: string): string[] {
   for (const m of markdown.matchAll(IMG_SRC_RE)) {
     const val = (m[1] ?? m[2] ?? m[3] ?? "").trim();
     addIfLocal(val);
+  }
+
+  // CSS url(…) refs, ONLY within <style> blocks + inline style="…"
+  // attributes (e.g. background-image). Same reasoning: styled images
+  // must be inlined to load in the sandbox / portable export. Scoped to
+  // CSS contexts so a stray url(file) in prose isn't read.
+  for (const ctx of markdown.matchAll(CSS_CONTEXT_RE)) {
+    for (const m of ctx[0].matchAll(CSS_URL_RE)) {
+      const val = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+      addIfLocal(val);
+    }
   }
 
   return Array.from(out);

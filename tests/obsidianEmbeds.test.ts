@@ -4,6 +4,7 @@ import {
   buildImgTag,
   preprocessObsidianImageEmbeds,
   rewriteHtmlImageSrcs,
+  rewriteCssImageUrls,
 } from "../src/parser/obsidianEmbeds";
 
 describe("parseEmbedInner", () => {
@@ -241,5 +242,109 @@ describe("rewriteHtmlImageSrcs", () => {
     const out = preprocessObsidianImageEmbeds(md, () => "data:image/png;base64,AAA");
     expect(out).toContain('<img src="logo.png">');
     expect(out).not.toContain("data:image/png;base64,AAA");
+  });
+
+  test("CSS url() in a <style> block is rewritten to a data URI (unquoted)", () => {
+    const md = "<style>\n.hero { background-image: url(_attachments/bg.png); }\n</style>";
+    const out = preprocessObsidianImageEmbeds(md, (p) =>
+      p === "_attachments/bg.png" ? "data:image/png;base64,BG" : null
+    );
+    expect(out).toContain("url(data:image/png;base64,BG)");
+    expect(out).not.toContain("url(_attachments/bg.png)");
+  });
+
+  test("CSS url() in a double-quoted inline style attr doesn't corrupt the tag", () => {
+    const md = '<div style="background:url(hero.png)">Title</div>';
+    const out = preprocessObsidianImageEmbeds(md, (p) =>
+      p === "hero.png" ? "data:image/png;base64,H" : null
+    );
+    // unquoted → no stray " that would close the style attribute early
+    expect(out).toBe('<div style="background:url(data:image/png;base64,H)">Title</div>');
+    expect(out).not.toContain('url("data:');
+  });
+
+  test("CSS url() inside a code fence stays literal", () => {
+    const md = '```css\n.x { background: url(_attachments/bg.png); }\n```';
+    const out = preprocessObsidianImageEmbeds(md, () => "data:image/png;base64,BG");
+    expect(out).toContain("url(_attachments/bg.png)");
+    expect(out).not.toContain("data:image/png;base64,BG");
+  });
+});
+
+describe("rewriteCssImageUrls", () => {
+  // Models the real resolver: strips #fragment / ?query before resolving,
+  // returns null for remote/data/fragment-only refs.
+  const R = (p: string): string | null => {
+    if (p.startsWith("http") || p.startsWith("data:") || p.startsWith("#")) {
+      return null;
+    }
+    return "data:X," + p.replace(/[#?].*$/, "");
+  };
+  const style = (css: string): string => `<style>${css}</style>`;
+
+  test("rewrites double, single, and unquoted url() — always emits unquoted", () => {
+    expect(rewriteCssImageUrls(style("a{background:url(a.png)}"), R)).toBe(
+      style("a{background:url(data:X,a.png)}")
+    );
+    expect(rewriteCssImageUrls(style('a{background:url("b.png")}'), R)).toBe(
+      style("a{background:url(data:X,b.png)}")
+    );
+    expect(rewriteCssImageUrls(style("a{background:url('c.png')}"), R)).toBe(
+      style("a{background:url(data:X,c.png)}")
+    );
+  });
+
+  test("double-quoted inline style attr is not corrupted (no injected quote)", () => {
+    const out = rewriteCssImageUrls('<div style="background:url(hero.png)">x</div>', R);
+    expect(out).toBe('<div style="background:url(data:X,hero.png)">x</div>');
+    expect(out).not.toContain('url("data:');
+  });
+
+  test("preserves an SVG sprite #fragment", () => {
+    expect(rewriteCssImageUrls(style("i{background:url(icons.svg#home)}"), R)).toBe(
+      style("i{background:url(data:X,icons.svg#home)}")
+    );
+  });
+
+  test("tolerates inner whitespace", () => {
+    expect(rewriteCssImageUrls(style("a{background:url(  a.png  )}"), R)).toBe(
+      style("a{background:url(data:X,a.png)}")
+    );
+  });
+
+  test("leaves remote/data urls and SVG fragment refs untouched", () => {
+    expect(rewriteCssImageUrls(style("a{background:url(https://e.com/x.png)}"), R)).toBe(
+      style("a{background:url(https://e.com/x.png)}")
+    );
+    expect(rewriteCssImageUrls(style("a{background:url(data:image/png;base64,ZZ)}"), R)).toBe(
+      style("a{background:url(data:image/png;base64,ZZ)}")
+    );
+    expect(rewriteCssImageUrls(style("a{fill:url(#grad)}"), R)).toBe(
+      style("a{fill:url(#grad)}")
+    );
+  });
+
+  test("url() OUTSIDE a CSS context (prose) is NOT rewritten", () => {
+    // A stray url(...) in body text must be left alone.
+    expect(rewriteCssImageUrls("see url(a.png) for details", R)).toBe(
+      "see url(a.png) for details"
+    );
+  });
+
+  test("leaves url() untouched when the resolver returns null", () => {
+    expect(rewriteCssImageUrls(style("a{background:url(missing.png)}"), () => null)).toBe(
+      style("a{background:url(missing.png)}")
+    );
+  });
+
+  test("no resolver → unchanged", () => {
+    expect(rewriteCssImageUrls(style("a{background:url(a.png)}"), undefined)).toBe(
+      style("a{background:url(a.png)}")
+    );
+  });
+
+  test("rewrites multiple url()s (e.g. two backgrounds) in one block", () => {
+    const out = rewriteCssImageUrls(style("a{background:url(a.png),url(b.png)}"), R);
+    expect(out).toBe(style("a{background:url(data:X,a.png),url(data:X,b.png)}"));
   });
 });

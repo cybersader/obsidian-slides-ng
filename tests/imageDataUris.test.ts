@@ -107,6 +107,28 @@ describe("collectImageTargets", () => {
     expect(t).toContain("hero.png");
     expect(t).not.toContain("thumb.png");
   });
+  test("collects CSS url() refs from <style> blocks and inline styles", () => {
+    const md = [
+      "<style>",
+      ".hero { background-image: url(_attachments/bg.png); }",
+      '.logo { background: url("_attachments/logo.png") no-repeat; }',
+      "</style>",
+      '<div style="background:url(_attachments/inline.png)">x</div>',
+    ].join("\n");
+    const t = collectImageTargets(md).sort();
+    expect(t).toEqual([
+      "_attachments/bg.png",
+      "_attachments/inline.png",
+      "_attachments/logo.png",
+    ]);
+  });
+  test("url() skips remote/data (SVG fragment url(#id) doesn't resolve anyway)", () => {
+    const md =
+      "<style>.a{background:url(https://e.com/x.png)}.b{background:url(data:image/png;base64,ZZ)}.c{fill:url(#grad)}</style>";
+    const t = collectImageTargets(md);
+    expect(t).not.toContain("https://e.com/x.png");
+    expect(t.some((x) => x.startsWith("data:"))).toBe(false);
+  });
   test("raw <img> skips http/data but keeps file:// and app://local", () => {
     const md = [
       '<img src="https://e.com/x.png">',

@@ -160,6 +160,75 @@ export function rewriteHtmlImageSrcs(
 }
 
 /**
+ * A CSS `url(…)` reference: double-quoted (group 1), single-quoted
+ * (group 2), or unquoted (group 3), with optional inner whitespace.
+ * Matches inside `<style>` blocks AND inline `style="…"` attributes —
+ * both pass through marked verbatim, so rewriting here reaches both.
+ */
+const CSS_URL_RE = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)"']*))\s*\)/gi;
+
+/**
+ * CSS-bearing regions of the deck: `<style>…</style>` blocks and inline
+ * `style="…"` / `style='…'` attributes. The url() rewrite is confined to
+ * these so a stray `url(file)` in prose or a non-style attribute isn't
+ * touched.
+ */
+const CSS_CONTEXT_RE =
+  /<style\b[^>]*>[\s\S]*?<\/style>|style\s*=\s*"[^"]*"|style\s*=\s*'[^']*'/gi;
+
+/**
+ * Emit a CSS `url()` token, quoting ONLY when the value contains a char
+ * that would break an unquoted token. A base64 data URI (what the
+ * resolver always produces) contains none, so it stays UNQUOTED — which
+ * is valid inside a `<style>` block AND, crucially, injects no quote that
+ * would prematurely terminate a double- or single-quoted inline
+ * `style="…"` attribute. The quoted branches are a defensive fallback for
+ * a non-base64 resolver.
+ */
+function cssUrlToken(value: string): string {
+  if (!/[\s()"']/.test(value)) return `url(${value})`;
+  if (!value.includes('"')) return `url("${value}")`;
+  if (!value.includes("'")) return `url('${value}')`;
+  return `url("${value.replace(/"/g, "%22")}")`;
+}
+
+/**
+ * Rewrite CSS `url(…)` image references (a `background-image` in a
+ * `<style>` block, an inline `style="background:url(…)"`, etc.) to
+ * inlined `data:` URIs via `resolve`, so styled images load in the
+ * sandboxed null-origin preview iframe and the portable file:// export.
+ *
+ * Remote (`http(s):`) and already-inlined (`data:`) urls, SVG fragment
+ * refs (`url(#id)`), and any the resolver can't map are left untouched.
+ * An external SVG sprite/view `#fragment` (`url(icons.svg#home)`) is
+ * preserved. Output is unquoted for base64 data URIs (see cssUrlToken).
+ *
+ * Exported for unit testing; called by `preprocessObsidianImageEmbeds`
+ * inside its code-masked region so `url(…)` in code samples is untouched.
+ */
+export function rewriteCssImageUrls(
+  text: string,
+  resolve?: (path: string) => string | null
+): string {
+  if (!resolve) return text;
+  return text.replace(CSS_CONTEXT_RE, (region: string): string =>
+    region.replace(
+      CSS_URL_RE,
+      (whole, dq?: string, sq?: string, uq?: string): string => {
+        const raw = (dq ?? sq ?? uq ?? "").trim();
+        if (!raw || IMG_PASSTHROUGH.test(raw)) return whole;
+        const resolved = resolve(raw);
+        if (!resolved || resolved === raw) return whole;
+        // Keep an SVG sprite/view #fragment (data URIs contain no #), so
+        // `url(icons.svg#home)` still selects the `home` symbol.
+        const frag = /#[^#?]*$/.exec(raw)?.[0] ?? "";
+        return cssUrlToken(resolved + frag);
+      }
+    )
+  );
+}
+
+/**
  * Fenced code blocks (``` / ~~~) — captured whole so embeds inside them
  * are NOT expanded (Obsidian shows code samples literally).
  */
@@ -202,6 +271,10 @@ export function preprocessObsidianImageEmbeds(
   // Still inside the code mask, so <img> in a code fence stays a literal
   // sample.
   masked = rewriteHtmlImageSrcs(masked, resolve);
+
+  // 2c. Rewrite CSS url(…) image refs in <style> blocks + inline styles,
+  // still inside the code mask so url(…) in code samples stays literal.
+  masked = rewriteCssImageUrls(masked, resolve);
 
   // 3. Expand embeds in the remaining (non-code) text.
   masked = masked.replace(EMBED_RE, (whole, inner: string) => {
