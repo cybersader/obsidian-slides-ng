@@ -26,6 +26,10 @@ import {
 import { Marked } from "marked";
 import { VIEW_TYPE_SLIDES_NG, SlidesNGView } from "./SlidesNGView";
 import { renderDeck } from "./render/renderDeck";
+import {
+  buildImageDataUriResolver,
+  sharedImageDataUriCache,
+} from "./export/imageDataUris";
 import { readSlideNotes, replaceSlideNotes } from "./parser/editSlideNotes";
 import type {
   SlidesNGSettings,
@@ -1452,6 +1456,13 @@ export class SlidesNGSpeakerView extends ItemView {
     try {
       const markdown = await this.app.vault.read(file);
       const settings = this.getSettings?.();
+      // Data URIs (not app://): these iframes are sandboxed null-origin,
+      // which blocks app:// — shared cache so bytes are read once/session.
+      const resolveImage = await buildImageDataUriResolver(
+        this.app,
+        file,
+        sharedImageDataUriCache
+      );
       const html = renderDeck(markdown, file.path, {
         defaultTheme: settings?.defaultTheme,
         defaultTransition: settings?.defaultTransition,
@@ -1468,7 +1479,7 @@ export class SlidesNGSpeakerView extends ItemView {
         // The mini-iframe is a preview, not interactive — controls + menu off.
         showRevealControlsEmbedded: false,
         showRevealMenuEmbedded: false,
-        resolveImage: (raw) => this.resolveDeckImage(raw, file.path),
+        resolveImage,
       });
       this.nextSlideIframe.srcdoc = html;
       this.lastMiniRenderedPath = deckPath;
@@ -1544,6 +1555,13 @@ export class SlidesNGSpeakerView extends ItemView {
     try {
       const markdown = await this.app.vault.read(file);
       const settings = this.getSettings?.();
+      // Data URIs (not app://): sandboxed null-origin iframe blocks
+      // app://. Shared cache → each attachment read once per session.
+      const resolveImage = await buildImageDataUriResolver(
+        this.app,
+        file,
+        sharedImageDataUriCache
+      );
       const html = renderDeck(markdown, file.path, {
         defaultTheme: settings?.defaultTheme,
         defaultTransition: settings?.defaultTransition,
@@ -1559,7 +1577,7 @@ export class SlidesNGSpeakerView extends ItemView {
         sceneInheritThemeBg: settings?.sceneInheritThemeBg,
         showRevealControlsEmbedded: false,
         showRevealMenuEmbedded: false,
-        resolveImage: (raw) => this.resolveDeckImage(raw, file.path),
+        resolveImage,
       });
       this.pickerStripIframe.srcdoc = html;
       this.lastPickerRenderedPath = deckPath;
@@ -1762,18 +1780,6 @@ export class SlidesNGSpeakerView extends ItemView {
     const n = parseInt(raw, 10);
     if (Number.isFinite(n) && n >= 0) return n;
     return undefined;
-  }
-
-  /** Image-attachment resolver — mirrors SlidesNGView.resolveImageAttachment. */
-  private resolveDeckImage(raw: string, deckPath: string): string | null {
-    if (/^(https?:|data:|file:)/.test(raw)) return raw;
-    const trimmed = raw.trim();
-    const linktext = trimmed.replace(/^!?\[\[|\]\]$/g, "");
-    const target = this.app.metadataCache.getFirstLinkpathDest(linktext, deckPath);
-    if (target) return this.app.vault.adapter.getResourcePath(target.path);
-    const file = this.app.vault.getAbstractFileByPath(trimmed);
-    if (file && "path" in file) return this.app.vault.adapter.getResourcePath(file.path);
-    return null;
   }
 
   /** Lower-level postMessage helper for commands with payloads beyond {cmd, idx?}. */

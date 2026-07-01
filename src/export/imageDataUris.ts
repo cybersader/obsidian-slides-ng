@@ -26,6 +26,16 @@ const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp|avif|bmp)$/i;
 /** Already-loadable URLs that need no embedding. */
 const PASSTHROUGH = /^(https?:|data:|file:)/i;
 
+/**
+ * Session-scoped cache of encoded attachments, keyed by `path|mtime`.
+ * Shared across the main preview, speaker up-next, and speaker picker
+ * iframes so a given attachment is read from disk at most once per
+ * session (keys self-invalidate on save via the changed mtime). This
+ * matters most over slow shares (SMB/VPN) where re-reading image bytes
+ * per iframe would add real latency to opening the speaker view.
+ */
+export const sharedImageDataUriCache = new Map<string, string>();
+
 /** Strip Obsidian wikilink wrapping (`![[ ]]` / `[[ ]]`) + whitespace. */
 export function stripWikiBrackets(s: string): string {
   return s.replace(/^!?\[\[/, "").replace(/\]\]$/, "").trim();
@@ -175,6 +185,9 @@ export interface AppLike {
  *
  * `cache` (optional) memoises encoded files by `path|mtime` so repeated
  * preview refreshes don't re-read + re-encode unchanged attachments.
+ * Pass {@link sharedImageDataUriCache} to share encoded bytes across the
+ * main preview + speaker up-next + picker iframes, so each attachment is
+ * read from disk once per session — important over slow shares (SMB/VPN).
  *
  * Resolution per target:
  *   - absolute/remote URL → returned as-is (passthrough)

@@ -20,7 +20,10 @@ import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
 import { warmHighlighter } from "./render/shiki";
 import { slideIndexFromCursor } from "./parser/slideIndexFromCursor";
 import { sourceLineForSlide } from "./parser/slideSourceLine";
-import { buildImageDataUriResolver } from "./export/imageDataUris";
+import {
+  buildImageDataUriResolver,
+  sharedImageDataUriCache,
+} from "./export/imageDataUris";
 import type { SlidesNGSettings } from "./settings";
 import type { DebugLog } from "./utils/debug";
 
@@ -67,9 +70,11 @@ export class SlidesNGView extends ItemView {
   /**
    * v0.13.4: data-URI cache for image attachments, keyed by
    * `path|mtime`. Reused across refreshes so unchanged images aren't
-   * re-read + re-base64'd on every keystroke.
+   * re-read + re-base64'd on every keystroke. Points at the module-level
+   * shared cache so the speaker view's up-next + picker iframes reuse
+   * these encoded bytes instead of re-reading each attachment.
    */
-  private imageDataUriCache = new Map<string, string>();
+  private imageDataUriCache = sharedImageDataUriCache;
   private getSettings: SettingsAccessor;
   private resolveDeckFile: DeckFileAccessor;
   private debug?: DebugLog;
@@ -617,7 +622,12 @@ export class SlidesNGView extends ItemView {
     this.lastSyncedV = v;
     if (focus) this.app.workspace.revealLeaf(targetLeaf);
     mdView.editor.setCursor(pos);
-    mdView.editor.scrollIntoView({ from: pos, to: pos }, focus);
+    // Always CENTER the target line (2nd arg = center), not just for the
+    // focus/button case. Auto-follow previously passed `false`, giving a
+    // minimal scroll that pinned the slide's first line to the top edge —
+    // the user wanted it "scrolled down and then some". Centering delegates
+    // to CM6's scrollIntoView, so no manual line-height math is needed.
+    mdView.editor.scrollIntoView({ from: pos, to: pos }, true);
     if (focus) mdView.editor.focus();
   }
 
