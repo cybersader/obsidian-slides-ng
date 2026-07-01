@@ -15,6 +15,14 @@ export interface SlidesNGSettings {
   followCursorInEditor: boolean;
 
   /**
+   * v0.13.6: the reverse direction — when you navigate the preview
+   * (Prev/Next, arrow keys, clicking a slide in the grid), the editor
+   * caret jumps to that slide's source. Combined with
+   * `followCursorInEditor` this gives two-way sync. Default on.
+   */
+  followPreviewInEditor: boolean;
+
+  /**
    * Layout used for slides that don't specify `layout:` in their
    * frontmatter. Default `"default"` (single column). Must be one of the
    * known layouts.
@@ -425,6 +433,7 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   defaultTheme: "black",
   defaultTransition: "slide",
   followCursorInEditor: true,
+  followPreviewInEditor: true,
   defaultLayout: "default",
   codeTheme: "github-dark",
   imageLayoutSplit: "50/50",

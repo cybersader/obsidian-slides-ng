@@ -233,6 +233,20 @@ export class SlidesNGSettingTab extends PluginSettingTab {
         );
       });
 
+    new Setting(containerEl)
+      .setName("Follow preview in editor")
+      .setDesc(
+        "The reverse direction: when you navigate the preview (prev/next, arrow keys, grid), the editor cursor moves to that slide's source. With both toggles on you get two-way sync."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.followPreviewInEditor).onChange(
+          async (v) => {
+            this.plugin.settings.followPreviewInEditor = v;
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
     // ---------- Speaker ----------
     new Setting(containerEl).setName("Speaker").setHeading();
 

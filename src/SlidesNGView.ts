@@ -48,11 +48,19 @@ export class SlidesNGView extends ItemView {
   private iframeEl?: HTMLIFrameElement;
   private refreshTimer: number | null = null;
   private cursorFollowTimer: number | null = null;
+  private reverseFollowTimer: number | null = null;
+  /**
+   * The last (h, v) slide position synced BETWEEN editor and preview.
+   * Both follow directions consult + set this so neither echoes the
+   * other into an infinite loop: a state/cursor change that already
+   * matches the synced position is treated as our own echo and ignored.
+   */
   private lastSentSlideIdx: number | null = null;
+  private lastSyncedV = 0;
   /**
    * v0.13.6: current slide position shown in the preview, tracked from
-   * the iframe's `slides-ng-state` messages. Used by the "reveal in
-   * editor" button to jump the editor caret to this slide's source.
+   * the iframe's `slides-ng-state` messages. Used by the reverse
+   * (preview → editor) follow + the "Find in note" button.
    */
   private currentPreviewH = 0;
   private currentPreviewV = 0;
@@ -163,12 +171,23 @@ export class SlidesNGView extends ItemView {
           break;
         case "slides-ng-state":
           // v0.13.6: track the slide the preview is currently showing
-          // so "reveal in editor" can jump to its source.
+          // (for the "Find in note" button) and, when two-way follow
+          // is on, move the editor caret to match.
           if (typeof data.currentIdx === "number") {
             this.currentPreviewH = data.currentIdx;
           }
           if (typeof data.currentVIdx === "number") {
             this.currentPreviewV = data.currentVIdx;
+          }
+          if (this.getSettings().followPreviewInEditor) {
+            const h = this.currentPreviewH;
+            const v = this.currentPreviewV;
+            // Ignore the echo of our OWN forward-follow (editor→preview
+            // already put us here). Only react to genuine preview
+            // navigation.
+            if (h !== this.lastSentSlideIdx || v !== this.lastSyncedV) {
+              this.scheduleReverseFollow();
+            }
           }
           break;
         case "slides-ng-iframe-reveal-ready":
@@ -262,8 +281,9 @@ export class SlidesNGView extends ItemView {
     this.addToolbarButton(leftGroup, {
       icon: "crosshair",
       label: "Find in note",
-      tooltip: "Move the editor cursor to this slide's source",
-      onClick: () => this.revealCurrentSlideInEditor(),
+      tooltip: "Jump the editor cursor to this slide's source (+ focus)",
+      onClick: () =>
+        this.moveEditorToSlide(this.currentPreviewH, this.currentPreviewV, true),
     });
 
     this.addToolbarButton(rightGroup, {
@@ -402,6 +422,10 @@ export class SlidesNGView extends ItemView {
       window.clearTimeout(this.cursorFollowTimer);
       this.cursorFollowTimer = null;
     }
+    if (this.reverseFollowTimer !== null) {
+      window.clearTimeout(this.reverseFollowTimer);
+      this.reverseFollowTimer = null;
+    }
     if (this.iframeResizeObserver) {
       this.iframeResizeObserver.disconnect();
       this.iframeResizeObserver = undefined;
@@ -533,52 +557,68 @@ export class SlidesNGView extends ItemView {
       autoH1Breaks: this.getSettings().autoH1Breaks,
     });
     if (idx === this.lastSentSlideIdx) return;
+    // `goto idx` lands reveal at (idx, 0), so the synced vertical is 0.
+    // Recording it here means the resulting state echo is recognised
+    // and doesn't bounce the caret back via the reverse follow.
     this.lastSentSlideIdx = idx;
+    this.lastSyncedV = 0;
     this.iframeEl.contentWindow.postMessage(
       { type: "slides-ng-cmd", cmd: "goto", idx },
       "*"
     );
   }
 
+  private scheduleReverseFollow(): void {
+    if (this.reverseFollowTimer !== null) {
+      window.clearTimeout(this.reverseFollowTimer);
+    }
+    this.reverseFollowTimer = window.setTimeout(() => {
+      this.reverseFollowTimer = null;
+      // Auto-follow: move the caret but DON'T steal focus/reveal — the
+      // user is navigating the preview and shouldn't get yanked away.
+      this.moveEditorToSlide(this.currentPreviewH, this.currentPreviewV, false);
+    }, 120);
+  }
+
   /**
-   * v0.13.6: reverse cursor-follow — move the editor caret to the
-   * source line of the slide the preview is currently showing, reveal
-   * that editor pane, and focus it. The inverse of the editor→preview
-   * follow.
+   * v0.13.6: move the editor caret to the source line of slide (h, v).
+   * `focus` true → also reveal + focus the editor pane (manual "Find in
+   * note" button); false → just move the caret + scroll (auto two-way
+   * follow, no focus theft).
    */
-  private revealCurrentSlideInEditor(): void {
+  private moveEditorToSlide(h: number, v: number, focus: boolean): void {
     if (!this.filePath) return;
     let targetLeaf: WorkspaceLeaf | null = null;
     let mdView: MarkdownView | null = null;
     for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
-      const v = leaf.view;
-      if (v instanceof MarkdownView && v.file?.path === this.filePath) {
+      const view = leaf.view;
+      if (view instanceof MarkdownView && view.file?.path === this.filePath) {
         targetLeaf = leaf;
-        mdView = v;
+        mdView = view;
         break;
       }
     }
     if (!mdView || !targetLeaf) {
-      new Notice(
-        "Open this deck's markdown file in a pane, then use \"Find in note\"."
-      );
+      if (focus) {
+        new Notice(
+          "Open this deck's markdown file in a pane, then use \"Find in note\"."
+        );
+      }
       return;
     }
     const md = mdView.editor.getValue();
-    const line = sourceLineForSlide(
-      md,
-      this.currentPreviewH,
-      this.currentPreviewV,
-      { autoH1Breaks: this.getSettings().autoH1Breaks }
-    );
+    const line = sourceLineForSlide(md, h, v, {
+      autoH1Breaks: this.getSettings().autoH1Breaks,
+    });
     const pos = { line, ch: 0 };
-    // Pre-set the forward-follow guard to this slide so the caret move
-    // below doesn't immediately bounce the preview somewhere else.
-    this.lastSentSlideIdx = this.currentPreviewH;
-    this.app.workspace.revealLeaf(targetLeaf);
+    // Mark this (h, v) as the synced position so the caret move below
+    // doesn't bounce the preview back via the forward follow.
+    this.lastSentSlideIdx = h;
+    this.lastSyncedV = v;
+    if (focus) this.app.workspace.revealLeaf(targetLeaf);
     mdView.editor.setCursor(pos);
-    mdView.editor.scrollIntoView({ from: pos, to: pos }, true);
-    mdView.editor.focus();
+    mdView.editor.scrollIntoView({ from: pos, to: pos }, focus);
+    if (focus) mdView.editor.focus();
   }
 
   private scheduleRefresh(): void {
