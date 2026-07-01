@@ -1742,7 +1742,19 @@ ${sectionsHtml}
                * height, so every card is identical), one uniform zoom; the
                * deck's own CSS/theme styles it, notes reflow below. */
               el.style.setProperty('zoom', String(zUniform), 'important');
-              el.style.setProperty('display', 'block', 'important');
+              /* v0.13.20: match live-presentation vertical centering.
+               * reveal centers slide content vertically (center:true is
+               * its default), so the card does too — flex COLUMN with
+               * justify-content only (main axis = vertical). align-items
+               * stays default (stretch) so grids keep full width — this
+               * is NOT the old align-items/text-align force-centering
+               * that collapsed grid layouts. 'safe center' top-anchors
+               * when content overflows the card (Chromium honors it;
+               * unsupported engines fall back to flex-start = top). */
+              var vCenter = !(typeof initOpts === 'object' && initOpts && initOpts.center === false);
+              el.style.setProperty('display', 'flex', 'important');
+              el.style.setProperty('flex-direction', 'column', 'important');
+              el.style.setProperty('justify-content', vCenter ? 'safe center' : 'flex-start', 'important');
               el.style.setProperty('text-align', 'initial', 'important');
               el.style.setProperty('width', slideW + 'px', 'important');
               el.style.setProperty('max-width', 'none', 'important');
