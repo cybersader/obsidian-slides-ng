@@ -111,10 +111,60 @@ export function buildImgTag(opts: ImgTagOptions): string {
 }
 
 /**
+ * The `src` attribute of an HTML `<img>` tag: double-quoted (group 2),
+ * single-quoted (group 3), or unquoted (group 4). Group 1 is the run of
+ * attributes/whitespace between `<img` and `src`, preserved on rewrite.
+ *
+ * The skip `(?:"[^"]*"|'[^']*'|[^>"'])*?` consumes earlier attributes,
+ * treating quoted values as ATOMIC units so a `>` or a literal `src=`
+ * inside `alt="a > b"` / `title="use src=x"` can't derail the match.
+ * `(?<![-\w])src` anchors on a real `src` attribute, so `data-src` (and
+ * any `*-src`) is skipped rather than mistaken for the src to inline.
+ */
+const IMG_SRC_ATTR_RE =
+  /(<img\b(?:"[^"]*"|'[^']*'|[^>"'])*?(?<![-\w])src\s*=\s*)(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+
+/** URLs an `<img>` can already load in-sandbox — never rewritten. */
+const IMG_PASSTHROUGH = /^(https?:|data:)/i;
+
+/**
+ * Rewrite the `src` of every raw HTML `<img>` tag via `resolve`, so
+ * hand-written `<img src="_attachments/x.png">` (or `./`, `file://`,
+ * `app://local/…`) becomes an inlined `data:` URI — the sandboxed
+ * null-origin preview iframe can't load any of those raw forms, only
+ * `data:`. Remote (`http(s):`) and already-inlined (`data:`) srcs, and
+ * any the resolver can't map, are left exactly as authored. Only the
+ * `src` value is touched; every other attribute (style, alt, width…) is
+ * preserved verbatim.
+ *
+ * Exported for unit testing; called by `preprocessObsidianImageEmbeds`
+ * inside its code-masked region so `<img>` in code fences is untouched.
+ */
+export function rewriteHtmlImageSrcs(
+  text: string,
+  resolve?: (path: string) => string | null
+): string {
+  if (!resolve) return text;
+  return text.replace(
+    IMG_SRC_ATTR_RE,
+    (whole, lead: string, dq?: string, sq?: string, uq?: string): string => {
+      const src = dq ?? sq ?? uq ?? "";
+      if (!src || IMG_PASSTHROUGH.test(src)) return whole;
+      const resolved = resolve(src);
+      if (!resolved || resolved === src) return whole;
+      // `resolved` is a data: URI (base64 alphabet has no `"`), so a
+      // double-quoted attribute is always safe.
+      return `${lead}"${resolved}"`;
+    }
+  );
+}
+
+/**
  * Fenced code blocks (``` / ~~~) — captured whole so embeds inside them
  * are NOT expanded (Obsidian shows code samples literally).
  */
-const FENCED_CODE_RE = /(^|\n)([`~]{3,})[^\n]*\n[\s\S]*?\n\2[^\n]*(?=\n|$)/g;
+const FENCED_CODE_RE =
+  /(^|\n)[ ]{0,3}([`~]{3,})[^\n]*\n[\s\S]*?\n[ ]{0,3}\2[^\n]*(?=\n|$)/g;
 /** Inline code spans (`` `…` ``) on a single line. */
 const INLINE_CODE_RE = /(`+)[^\n]*?\1/g;
 /** Placeholder for masked code regions (collision-safe vs real content). */
@@ -146,7 +196,14 @@ export function preprocessObsidianImageEmbeds(
     .replace(FENCED_CODE_RE, (m) => mask(m))
     .replace(INLINE_CODE_RE, (m) => mask(m));
 
-  // 2. Expand embeds in the remaining (non-code) text.
+  // 2. Rewrite raw HTML <img src="…"> tags the user hand-authored. Done
+  // BEFORE embed expansion so it only touches authored <img> tags, never
+  // the ones step 3 generates (which would double-resolve their src).
+  // Still inside the code mask, so <img> in a code fence stays a literal
+  // sample.
+  masked = rewriteHtmlImageSrcs(masked, resolve);
+
+  // 3. Expand embeds in the remaining (non-code) text.
   masked = masked.replace(EMBED_RE, (whole, inner: string) => {
     const parsed = parseEmbedInner(inner);
     if (!parsed) return whole; // not an image embed — leave as-is
@@ -160,6 +217,6 @@ export function preprocessObsidianImageEmbeds(
     });
   });
 
-  // 3. Restore masked code regions verbatim.
+  // 4. Restore masked code regions verbatim.
   return masked.replace(MASK_RE, (_m, i: string) => masks[Number(i)]);
 }

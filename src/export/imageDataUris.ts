@@ -23,8 +23,27 @@
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp|avif|bmp)$/i;
 
-/** Already-loadable URLs that need no embedding. */
-const PASSTHROUGH = /^(https?:|data:|file:)/i;
+/**
+ * URLs that are already loadable inside the sandboxed iframe and need no
+ * embedding: remote `http(s):` and inline `data:`. NOTE `file:` is
+ * deliberately NOT here — a `file://` that points inside the vault is
+ * inlined as a data URI (Chromium blocks `file://` in a null-origin
+ * iframe), while a `file://` we can't resolve is left untouched.
+ * `app://local/…` is likewise resolved (not passed through), since that
+ * privileged scheme is also blocked in the sandbox.
+ */
+const PASSTHROUGH = /^(https?:|data:)/i;
+
+/**
+ * Capture the `src` value of an HTML `<img>` tag: double-quoted (group
+ * 1), single-quoted (group 2), or unquoted (group 3). The attribute skip
+ * treats quoted values as atomic (so a `>` or `src=` inside an earlier
+ * attribute is ignored) and `(?<![-\w])src` anchors on a real `src`, not
+ * `data-src`. Kept in lockstep with obsidianEmbeds.ts IMG_SRC_ATTR_RE so
+ * collection and rewriting agree on the same attribute.
+ */
+const IMG_SRC_RE =
+  /<img\b(?:"[^"]*"|'[^']*'|[^>"'])*?(?<![-\w])src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
 
 /**
  * Session-scoped cache of encoded attachments, keyed by `path|mtime`.
@@ -88,6 +107,15 @@ export function collectImageTargets(markdown: string): string[] {
     /data-background-(?:image|video)\s*[:=]\s*["']?([^"'\s>]+)/gi
   )) {
     addIfLocal(m[1]);
+  }
+
+  // Raw HTML <img src="…"> tags authored directly in the deck (users lay
+  // out slides with hand-written HTML). marked passes these through
+  // verbatim, so their src must be resolved to a data URI too — else the
+  // sandboxed null-origin iframe can't load them. Quoted + unquoted.
+  for (const m of markdown.matchAll(IMG_SRC_RE)) {
+    const val = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+    addIfLocal(val);
   }
 
   return Array.from(out);
@@ -160,7 +188,16 @@ export interface FileLike {
 /** Minimal Obsidian surface this helper needs — keeps it test-mockable. */
 export interface VaultLike {
   read(file: { path: string }): Promise<string>;
-  adapter: { readBinary(path: string): Promise<ArrayBuffer> };
+  adapter: {
+    readBinary(path: string): Promise<ArrayBuffer>;
+    /**
+     * Absolute on-disk path of the vault root (Obsidian's
+     * FileSystemAdapter.getBasePath). Optional so tests can omit it;
+     * used to map absolute `file://` / `app://local/` srcs back to a
+     * vault-relative path.
+     */
+    getBasePath?(): string;
+  };
   getAbstractFileByPath(path: string): FileLike | null;
 }
 export interface MetadataCacheLike {
@@ -169,6 +206,118 @@ export interface MetadataCacheLike {
 export interface AppLike {
   vault: VaultLike;
   metadataCache: MetadataCacheLike;
+}
+
+/** Folder of a vault path (`a/b/c.md` → `a/b`; root file → `""`). */
+function parentFolder(path: string): string {
+  const i = path.lastIndexOf("/");
+  return i >= 0 ? path.slice(0, i) : "";
+}
+
+/**
+ * Collapse `.` / `..` / empty segments in a forward-slash path.
+ * Leading `..` that would escape the root are dropped (best effort).
+ */
+function normalizeSlashPath(path: string): string {
+  const out: string[] = [];
+  for (const seg of path.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") out.pop();
+    else out.push(seg);
+  }
+  return out.join("/");
+}
+
+/**
+ * Strip a resource scheme + any `?query`/`#hash` from an image ref,
+ * returning a bare path. Handles `app://local/…`, `file://[/]…`, and a
+ * leading `./`. Backslashes are normalised to `/` so Windows paths
+ * compare cleanly. Percent-encoding is left intact for the caller to
+ * decode (so both encoded + decoded keys can be tried).
+ */
+function stripScheme(ref: string): string {
+  let s = ref.trim();
+  s = s.replace(/^app:\/\/local\//i, "");
+  s = s.replace(/^file:\/\/\/?/i, "");
+  s = s.replace(/[?#].*$/, "");
+  s = s.replace(/\\/g, "/");
+  s = s.replace(/^\.\//, "");
+  return s;
+}
+
+/**
+ * Map an absolute on-disk path to a vault-relative path by stripping the
+ * vault's base path. Comparison is slash-normalised + case-insensitive
+ * (Windows drives), but the RETURNED remainder keeps its original case
+ * (vault paths are case-sensitive lookups). Returns null when `abs`
+ * isn't under `base`.
+ */
+function stripBasePath(abs: string, base: string): string | null {
+  // Strip a leading slash from BOTH sides: `stripScheme` removes the
+  // leading `/` of a POSIX absolute path (`file:///Users/…` → `Users/…`)
+  // while getBasePath() keeps it (`/Users/…`). Windows drive-letter bases
+  // (`Y:/…`) have no leading slash, so this is a no-op there.
+  const a = abs.replace(/\\/g, "/").replace(/^\/+/, "");
+  const b = base.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!b) return null;
+  const prefix = b.toLowerCase() + "/";
+  if (a.toLowerCase().startsWith(prefix)) return a.slice(prefix.length);
+  return null;
+}
+
+/**
+ * Resolve an image reference (wikilink target, markdown href, or raw
+ * `<img>` src) to a vault file, trying, in order: the ref as authored,
+ * the scheme-stripped ref, the ref relative to the deck's folder, and
+ * (for absolute `file://`/`app://local/` paths) the ref with the vault
+ * base path removed. Returns null when nothing matches.
+ */
+function findDest(
+  app: AppLike,
+  ref: string,
+  deckPath: string,
+  basePath: string | undefined
+): FileLike | null {
+  const tryPath = (p: string): FileLike | null => {
+    if (!p) return null;
+    return (
+      app.metadataCache.getFirstLinkpathDest(p, deckPath) ??
+      app.vault.getAbstractFileByPath(p)
+    );
+  };
+  const tryBoth = (p: string): FileLike | null => {
+    const decoded = safeDecode(p);
+    return tryPath(decoded) ?? (decoded !== p ? tryPath(p) : null);
+  };
+
+  // 1. As authored (covers wikilinks + plain vault paths).
+  let dest = tryBoth(ref);
+  if (dest) return dest;
+
+  // 2. Scheme-stripped (app://local/, file://, ./, query/hash removed).
+  const bare = stripScheme(ref);
+  if (bare !== ref) {
+    dest = tryBoth(bare);
+    if (dest) return dest;
+  }
+
+  // 3. Relative to the deck's own folder (e.g. `_attachments/x.png`).
+  const dir = parentFolder(deckPath);
+  if (dir) {
+    dest = tryBoth(normalizeSlashPath(`${dir}/${safeDecode(bare)}`));
+    if (dest) return dest;
+  }
+
+  // 4. Absolute on-disk path → strip the vault base path.
+  if (basePath) {
+    const rel = stripBasePath(safeDecode(bare), basePath);
+    if (rel) {
+      dest = tryPath(rel);
+      if (dest) return dest;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -202,20 +351,19 @@ export async function buildImageDataUriResolver(
   const markdown = await app.vault.read(deckFile);
   const targets = collectImageTargets(markdown);
   const map = new Map<string, string>();
+  const basePath = app.vault.adapter.getBasePath?.();
 
   for (const target of targets) {
     try {
-      // Vault lookups need the DECODED path (a real filename), but the
-      // map is keyed by BOTH raw + decoded so it matches whatever form
-      // reaches the resolver: marked hands the renderer a possibly
-      // percent-encoded `token.href`, while the embed preprocessor
-      // hands it a literal (already-decoded) linkpath.
+      // findDest tries the ref as authored, scheme-stripped, relative to
+      // the deck folder, and (for absolute file://app://local paths) with
+      // the vault base path removed. The map is keyed by BOTH the raw
+      // target and its decoded form so it matches whatever string reaches
+      // the resolver — marked hands the renderer a possibly
+      // percent-encoded `token.href`, the embed preprocessor hands it a
+      // literal linkpath, and the <img> rewrite hands it the authored src.
       const decoded = safeDecode(target);
-      const dest =
-        app.metadataCache.getFirstLinkpathDest(decoded, deckFile.path) ??
-        app.vault.getAbstractFileByPath(decoded) ??
-        app.metadataCache.getFirstLinkpathDest(target, deckFile.path) ??
-        app.vault.getAbstractFileByPath(target);
+      const dest = findDest(app, target, deckFile.path, basePath);
       if (!dest) continue;
 
       const cacheKey = `${dest.path}|${dest.stat?.mtime ?? 0}`;

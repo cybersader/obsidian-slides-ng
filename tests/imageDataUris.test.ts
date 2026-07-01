@@ -19,9 +19,13 @@ describe("collectImageTargets", () => {
     const t = collectImageTargets(md).sort();
     expect(t).toEqual(["a.png", "b.jpg", "d.webp", "sub/c.gif"]);
   });
-  test("excludes remote + data + file URLs", () => {
+  test("excludes remote + data URLs (file:// is now inlined when local)", () => {
     const md = "![x](https://e.com/x.png)\n![[data:foo]]\n![y](file:///z.png)";
-    expect(collectImageTargets(md)).toEqual([]);
+    const t = collectImageTargets(md);
+    expect(t).not.toContain("https://e.com/x.png");
+    // `file://` is no longer passthrough — it's collected so a vault-local
+    // file:// path can be resolved + inlined (external ones just miss).
+    expect(t).toContain("file:///z.png");
   });
   test("strips size + subpath from embed targets", () => {
     expect(collectImageTargets("![[pic.png|300x200]]")).toEqual(["pic.png"]);
@@ -81,6 +85,40 @@ describe("collectImageTargets", () => {
   });
   test("angle-bracket markdown dest with spaces captured whole", () => {
     expect(collectImageTargets("![a](<my pic.png>)")).toEqual(["my pic.png"]);
+  });
+
+  // Raw HTML <img> tags — the durable "just write HTML" authoring path.
+  test("collects raw <img src> (double, single, unquoted)", () => {
+    const md = [
+      '<img src="_attachments/a.png">',
+      "<img alt='x' src='b.jpg' style='height:40px'>",
+      "<img src=c.gif width=10>",
+    ].join("\n");
+    const t = collectImageTargets(md).sort();
+    expect(t).toEqual(["_attachments/a.png", "b.jpg", "c.gif"]);
+  });
+  test("raw <img> with '>' in a pre-src attribute is still collected", () => {
+    expect(collectImageTargets('<img title="Q3 > Q2" src="chart.png">')).toEqual([
+      "chart.png",
+    ]);
+  });
+  test("raw <img> collects the real src, not a data-src", () => {
+    const t = collectImageTargets('<img data-src="thumb.png" src="hero.png">');
+    expect(t).toContain("hero.png");
+    expect(t).not.toContain("thumb.png");
+  });
+  test("raw <img> skips http/data but keeps file:// and app://local", () => {
+    const md = [
+      '<img src="https://e.com/x.png">',
+      '<img src="data:image/png;base64,AAAA">',
+      '<img src="file:///Y:/vault/a.png">',
+      '<img src="app://local/Y:/vault/b.png">',
+    ].join("\n");
+    const t = collectImageTargets(md);
+    expect(t).not.toContain("https://e.com/x.png");
+    expect(t.some((x) => x.startsWith("data:"))).toBe(false);
+    expect(t).toContain("file:///Y:/vault/a.png");
+    expect(t).toContain("app://local/Y:/vault/b.png");
   });
   test("resolver strips wikilink brackets so frontmatter [[x]] matches", async () => {
     const app: AppLike = {
@@ -286,5 +324,130 @@ describe("buildImageDataUriResolver", () => {
     };
     const resolve = await buildImageDataUriResolver(app, { path: "deck.md" });
     expect(resolve("a.png")).toBeNull();
+  });
+});
+
+describe("buildImageDataUriResolver — raw <img> src path forms", () => {
+  test("relative + ./ prefix resolve against the deck folder", async () => {
+    const app: AppLike = {
+      vault: {
+        async read() {
+          return '<img src="_attachments/logo.png">\n<img src="./_attachments/logo.png">';
+        },
+        adapter: {
+          async readBinary(p: string) {
+            if (p === "talks/_attachments/logo.png") {
+              return new Uint8Array([1, 2, 3]).buffer;
+            }
+            throw new Error("not found: " + p);
+          },
+        },
+        getAbstractFileByPath(p: string) {
+          return p === "talks/_attachments/logo.png" ? { path: p } : null;
+        },
+      },
+      metadataCache: { getFirstLinkpathDest: () => null },
+    };
+    const resolve = await buildImageDataUriResolver(app, { path: "talks/q2.md" });
+    expect(resolve("_attachments/logo.png")).toMatch(/^data:image\/png;base64,/);
+    expect(resolve("./_attachments/logo.png")).toMatch(/^data:image\/png;base64,/);
+  });
+
+  test("absolute file:// and app://local resolve via the vault base path", async () => {
+    const app: AppLike = {
+      vault: {
+        async read() {
+          return [
+            '<img src="file:///Y:/vault/2%20-%20Areas/_attachments/bw.png">',
+            '<img src="app://local/Y:/vault/2%20-%20Areas/_attachments/bw.png">',
+          ].join("\n");
+        },
+        adapter: {
+          async readBinary(p: string) {
+            if (p === "2 - Areas/_attachments/bw.png") {
+              return new Uint8Array([9, 9]).buffer;
+            }
+            throw new Error("not found: " + p);
+          },
+          getBasePath() {
+            return "Y:/vault";
+          },
+        },
+        getAbstractFileByPath(p: string) {
+          return p === "2 - Areas/_attachments/bw.png" ? { path: p } : null;
+        },
+      },
+      metadataCache: { getFirstLinkpathDest: () => null },
+    };
+    const resolve = await buildImageDataUriResolver(app, {
+      path: "2 - Areas/deck.md",
+    });
+    expect(
+      resolve("file:///Y:/vault/2%20-%20Areas/_attachments/bw.png")
+    ).toMatch(/^data:image\/png;base64,/);
+    expect(
+      resolve("app://local/Y:/vault/2%20-%20Areas/_attachments/bw.png")
+    ).toMatch(/^data:image\/png;base64,/);
+  });
+
+  test("POSIX absolute file:// and app://local resolve (leading-slash base path)", async () => {
+    // macOS/Linux: getBasePath() returns a POSIX absolute path with a
+    // leading slash, but stripScheme drops the leading slash of the ref.
+    const app: AppLike = {
+      vault: {
+        async read() {
+          return [
+            '<img src="file:///Users/foo/MyVault/2%20-%20Areas/_attachments/bw.png">',
+            '<img src="app://local/Users/foo/MyVault/2%20-%20Areas/_attachments/bw.png">',
+          ].join("\n");
+        },
+        adapter: {
+          async readBinary(p: string) {
+            if (p === "2 - Areas/_attachments/bw.png") {
+              return new Uint8Array([7]).buffer;
+            }
+            throw new Error("not found: " + p);
+          },
+          getBasePath() {
+            return "/Users/foo/MyVault";
+          },
+        },
+        getAbstractFileByPath(p: string) {
+          return p === "2 - Areas/_attachments/bw.png" ? { path: p } : null;
+        },
+      },
+      metadataCache: { getFirstLinkpathDest: () => null },
+    };
+    const resolve = await buildImageDataUriResolver(app, {
+      path: "2 - Areas/deck.md",
+    });
+    expect(
+      resolve("file:///Users/foo/MyVault/2%20-%20Areas/_attachments/bw.png")
+    ).toMatch(/^data:image\/png;base64,/);
+    expect(
+      resolve("app://local/Users/foo/MyVault/2%20-%20Areas/_attachments/bw.png")
+    ).toMatch(/^data:image\/png;base64,/);
+  });
+
+  test("absolute path outside the vault base is not resolved", async () => {
+    const app: AppLike = {
+      vault: {
+        async read() {
+          return '<img src="file:///Z:/elsewhere/x.png">';
+        },
+        adapter: {
+          async readBinary() {
+            return new Uint8Array([1]).buffer;
+          },
+          getBasePath() {
+            return "Y:/vault";
+          },
+        },
+        getAbstractFileByPath: () => null,
+      },
+      metadataCache: { getFirstLinkpathDest: () => null },
+    };
+    const resolve = await buildImageDataUriResolver(app, { path: "deck.md" });
+    expect(resolve("file:///Z:/elsewhere/x.png")).toBeNull();
   });
 });

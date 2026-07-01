@@ -3,6 +3,7 @@ import {
   parseEmbedInner,
   buildImgTag,
   preprocessObsidianImageEmbeds,
+  rewriteHtmlImageSrcs,
 } from "../src/parser/obsidianEmbeds";
 
 describe("parseEmbedInner", () => {
@@ -154,5 +155,91 @@ describe("preprocessObsidianImageEmbeds", () => {
     expect(out).toContain('src="R:real.png"');
     expect(out).toContain("![[fake.png]]"); // untouched inside fence
     expect(out).not.toContain("R:fake.png");
+  });
+
+  test("raw <img src> in the body is rewritten via the resolver", () => {
+    const src = '<img src="_attachments/a.png" style="height:40px" alt="A">';
+    const out = preprocessObsidianImageEmbeds(src, (p) =>
+      p === "_attachments/a.png" ? "data:image/png;base64,AAA" : null
+    );
+    expect(out).toContain('src="data:image/png;base64,AAA"');
+    // other attributes preserved verbatim
+    expect(out).toContain('style="height:40px"');
+    expect(out).toContain('alt="A"');
+  });
+
+  test("raw <img> inside a code fence is NOT rewritten (stays a literal sample)", () => {
+    const src = '```html\n<img src="_attachments/a.png">\n```';
+    const out = preprocessObsidianImageEmbeds(src, () => "data:image/png;base64,AAA");
+    expect(out).toContain('<img src="_attachments/a.png">');
+    expect(out).not.toContain("data:image/png;base64,AAA");
+  });
+});
+
+describe("rewriteHtmlImageSrcs", () => {
+  const R = (p: string): string | null =>
+    p.startsWith("http") || p.startsWith("data:") ? p : `data:X,${p}`;
+
+  test("rewrites double, single, and unquoted src", () => {
+    expect(rewriteHtmlImageSrcs('<img src="a.png">', R)).toBe('<img src="data:X,a.png">');
+    expect(rewriteHtmlImageSrcs("<img src='b.png'>", R)).toBe('<img src="data:X,b.png">');
+    expect(rewriteHtmlImageSrcs("<img src=c.png>", R)).toBe('<img src="data:X,c.png">');
+  });
+
+  test("preserves surrounding attributes on both sides of src", () => {
+    const out = rewriteHtmlImageSrcs(
+      '<img class="x" src="a.png" width="10" alt="hi">',
+      R
+    );
+    expect(out).toBe('<img class="x" src="data:X,a.png" width="10" alt="hi">');
+  });
+
+  test("leaves http/data srcs untouched (passthrough)", () => {
+    const http = '<img src="https://e.com/x.png">';
+    const data = '<img src="data:image/png;base64,ZZ">';
+    expect(rewriteHtmlImageSrcs(http, R)).toBe(http);
+    expect(rewriteHtmlImageSrcs(data, R)).toBe(data);
+  });
+
+  test("leaves an <img> untouched when the resolver returns null", () => {
+    const src = '<img src="missing.png">';
+    expect(rewriteHtmlImageSrcs(src, () => null)).toBe(src);
+  });
+
+  test("rewrites every <img> when several appear in one block", () => {
+    const src = '<div><img src="a.png"><img src="b.png"></div>';
+    const out = rewriteHtmlImageSrcs(src, R);
+    expect(out).toContain('src="data:X,a.png"');
+    expect(out).toContain('src="data:X,b.png"');
+  });
+
+  test("no resolver → unchanged", () => {
+    const src = '<img src="a.png">';
+    expect(rewriteHtmlImageSrcs(src, undefined)).toBe(src);
+  });
+
+  // Adversarial-workflow-confirmed regressions (v0.13.11):
+  test("'>' inside an attribute BEFORE src doesn't break the match", () => {
+    const src = '<img title="Q3 > Q2" src="chart.png">';
+    const out = rewriteHtmlImageSrcs(src, R);
+    expect(out).toBe('<img title="Q3 > Q2" src="data:X,chart.png">');
+  });
+  test("data-src is skipped; the real trailing src is what gets rewritten", () => {
+    const src = '<img data-src="thumb.png" src="hero.png">';
+    const out = rewriteHtmlImageSrcs(src, R);
+    expect(out).toContain('data-src="thumb.png"'); // untouched
+    expect(out).toContain('src="data:X,hero.png"'); // real src inlined
+    expect(out).not.toContain("data:X,thumb.png");
+  });
+  test("src= inside a quoted attribute value is not mistaken for the src attr", () => {
+    const src = '<img alt="use src=foo" src="a.png">';
+    const out = rewriteHtmlImageSrcs(src, R);
+    expect(out).toBe('<img alt="use src=foo" src="data:X,a.png">');
+  });
+  test("<img> in a 3-space-indented fence (numbered list) stays literal", () => {
+    const md = '1. Add:\n\n   ```html\n   <img src="logo.png">\n   ```';
+    const out = preprocessObsidianImageEmbeds(md, () => "data:image/png;base64,AAA");
+    expect(out).toContain('<img src="logo.png">');
+    expect(out).not.toContain("data:image/png;base64,AAA");
   });
 });
