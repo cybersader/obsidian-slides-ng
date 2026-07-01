@@ -211,6 +211,31 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toMatch(/notes-emphasis[^{}]*aside\.notes\s*\{[\s\S]{0,1500}?min-height:\s*0/);
   });
 
+  test("notes default to LEFT alignment (v0.13.16)", () => {
+    const html = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+      forceShowNotes: true,
+    });
+    // both the general + notes-emphasis aside.notes rules align left
+    expect(html).toMatch(/aside\.notes\s*\{[^}]*text-align:\s*left/);
+  });
+
+  test("forceNotesAlign controls the printed notes alignment (v0.13.16)", () => {
+    for (const align of ["center", "right"] as const) {
+      const html = renderDeckStandalone(SAMPLE, "deck.md", {
+        forcePrintMode: true,
+        forceShowNotes: true,
+        forceNotesEmphasis: true,
+        forceNotesAlign: align,
+      });
+      expect(html).toMatch(
+        new RegExp(`aside\\.notes\\s*\\{[^}]*text-align:\\s*${align}`)
+      );
+      // the notes-emphasis inline JS applies it too
+      expect(html).toContain(`'text-align', '${align}', 'important'`);
+    }
+  });
+
   test("forceMaxPagesPerSlide bakes pdfMaxPagesPerSlide into initOpts (v0.11.44)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {
       forcePrintMode: true,

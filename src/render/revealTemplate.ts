@@ -110,6 +110,12 @@ export interface DeckRenderOptions {
   forceHeaderText?: string;
   /** v0.11.46: page footer text. */
   forceFooterText?: string;
+  /**
+   * v0.13.16: horizontal alignment of the printed speaker notes block
+   * (both the notes-emphasis handout + the 70/30 slides+notes layout).
+   * Defaults to "left" — reading-friendly; reveal otherwise centers them.
+   */
+  forceNotesAlign?: "left" | "center" | "right";
   /** Column split ratio for image-left / image-right layouts. */
   imageLayoutSplit?: "50/50" | "60/40" | "40/60";
   /** Line-step dimming opacity (0–1). */
@@ -177,6 +183,8 @@ export function buildIframeHtml(
   const forceAutoShrink = options.forceAutoShrink ?? false;
   const forcePageSize = options.forcePageSize ?? "";
   const forcePageMargin = options.forcePageMargin ?? "";
+  // Notes alignment (left/center/right); default left for readability.
+  const notesAlign = options.forceNotesAlign ?? "left";
   const forceGrayscale = options.forceGrayscale ?? false;
   const forceHideBackgrounds = options.forceHideBackgrounds ?? false;
   const forceSlideNumberStamp = options.forceSlideNumberStamp ?? false;
@@ -964,6 +972,7 @@ export function buildIframeHtml(
       margin-top: 1rem;
       border-top: 1px solid #ccc;
       font-size: 0.85em;
+      text-align: ${notesAlign} !important;
       page-break-inside: avoid !important;
     }
     /* When the print-pdf URL flag is set AND showNotes is on, notes
@@ -1095,12 +1104,14 @@ export function buildIframeHtml(
       font-size: 11pt !important;
       line-height: 1.55 !important;
       font-style: normal !important;
+      text-align: ${notesAlign} !important;
       page-break-inside: auto !important;
       break-inside: auto !important;
     }
     html.print-pdf.notes-emphasis .reveal aside.notes::before {
       content: "Notes";
       display: block;
+      text-align: ${notesAlign};
       font-size: 9pt;
       font-weight: 600;
       letter-spacing: 0.05em;
@@ -1733,6 +1744,7 @@ ${sectionsHtml}
                   aside.style.setProperty('padding', '0.25in 0.1in', 'important');
                   aside.style.setProperty('margin', '0.3in 0 0 0', 'important');
                   aside.style.setProperty('border-top', '1px solid #ccc', 'important');
+                  aside.style.setProperty('text-align', '${notesAlign}', 'important');
                   aside.style.setProperty('font-size', '11pt', 'important');
                   aside.style.setProperty('line-height', '1.55', 'important');
                   aside.style.setProperty('page-break-inside', 'auto', 'important');

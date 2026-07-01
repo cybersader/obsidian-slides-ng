@@ -25,6 +25,7 @@ export class ExportPdfOptionsModal extends Modal {
     slideNumberStamp: false,
     headerText: "",
     footerText: "",
+    notesAlign: "left",
   };
   private onSubmit: (options: PdfExportOptions | null) => void;
   /** Theme that the deck would render with by default — shown as the active option. */
@@ -138,6 +139,18 @@ export class ExportPdfOptionsModal extends Modal {
           this.options.showNotes = v;
         });
         this.showNotesToggleEl = t.toggleEl as unknown as HTMLInputElement;
+      });
+
+    new Setting(contentEl)
+      .setName("Notes alignment")
+      .setDesc("Horizontal alignment of the printed notes text. Left is easiest to read.")
+      .addDropdown((d) => {
+        d.addOption("left", "Left");
+        d.addOption("center", "Center");
+        d.addOption("right", "Right");
+        d.setValue(this.options.notesAlign ?? "left").onChange((v) => {
+          this.options.notesAlign = v as PdfExportOptions["notesAlign"];
+        });
       });
 
     const aspectSetting = new Setting(contentEl)

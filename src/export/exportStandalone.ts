@@ -100,6 +100,12 @@ export interface PdfExportOptions {
    * Empty = no footer.
    */
   footerText?: string;
+
+  /**
+   * v0.13.16: horizontal alignment of the printed speaker-notes block.
+   * Default "left" (readable); "center"/"right" available.
+   */
+  notesAlign?: "left" | "center" | "right";
 }
 
 /**
@@ -333,6 +339,7 @@ export async function exportAndOpenForPdf(
   if (pdfOptions.slideNumberStamp) merged.forceSlideNumberStamp = true;
   if (pdfOptions.headerText) merged.forceHeaderText = pdfOptions.headerText;
   if (pdfOptions.footerText) merged.forceFooterText = pdfOptions.footerText;
+  if (pdfOptions.notesAlign) merged.forceNotesAlign = pdfOptions.notesAlign;
   const result = await exportDeckToFile(app, file, timestamp, merged);
   const suffix = buildPdfUrlSuffix(pdfOptions);
   const opened = await openExternalInBrowser(result.absolutePath, suffix);
