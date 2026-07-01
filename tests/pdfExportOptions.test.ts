@@ -180,26 +180,32 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toContain("aspect-ratio: var(--slides-ng-aspect");
   });
 
-  test("forceNotesEmphasis renders as 'Notes Pages' handout: slide visual on top, flowing notes (v0.11.50)", () => {
+  test("forceNotesEmphasis renders a FAITHFUL scaled thumbnail + flowing notes (v0.13.15)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {
       forcePrintMode: true,
       forceShowNotes: true,
       forceNotesEmphasis: true,
     });
     expect(html).toContain("classList.add('notes-emphasis')");
-    // v0.11.50/v0.11.51: notes-emphasis = Notes Pages handout.
+    // v0.13.15: notes-emphasis = the deck's ACTUAL slide, scaled down
+    // (zoom), preserving its theme + custom CSS, with notes flowing below.
     // - section is a block-flow page container (position:static)
-    // - .slides-ng-layout is the slide visual at top, hardcoded
-    //   dark bg + light text (v0.11.51: hardcoded after v0.11.50
-    //   `aspect-ratio + var(--r-background-color)` rendered the
-    //   slide card INVISIBLE — variable did not resolve in print
-    //   media context, leaving white card with light headings).
+    // - .slides-ng-layout is a scaled thumbnail (zoom) using the deck's
+    //   own theme background (NOT a hardcoded dark card)
     // - aside.notes flows below, can wrap to next page.
     expect(html).toContain("html.print-pdf.notes-emphasis .reveal .slides > section");
     expect(html).toContain("page-break-after: always");
-    // Hardcoded dark bg + light text (v0.11.51).
-    expect(html).toMatch(/notes-emphasis[\s\S]{0,2000}\.slides-ng-layout\s*\{[\s\S]{0,800}background-color:\s*#191919/);
-    expect(html).toMatch(/notes-emphasis[\s\S]{0,4000}\.slides-ng-layout h1\b[\s\S]{0,500}color:\s*#ffffff/);
+    // Faithful thumbnail: the layout is scaled with zoom.
+    expect(html).toMatch(/notes-emphasis[\s\S]{0,2000}\.slides-ng-layout\s*\{[\s\S]{0,800}zoom:/);
+    // The runtime JS scales via NE_SCALE and uses the deck's OWN theme
+    // background (revealBg) / per-slide data-background-color — no more
+    // hardcoded #191919 card or forced-white headings.
+    expect(html).toContain("var NE_SCALE");
+    expect(html).toContain("var revealBg");
+    expect(html).not.toMatch(/\.slides-ng-layout h1\b[\s\S]{0,300}color:\s*#ffffff\s*!important/);
+    // reveal's per-slide .slide-background is hidden so a dark
+    // data-background-color doesn't bleed across the whole handout page.
+    expect(html).toContain(".reveal .slide-background");
     // Notes block: NO fixed min-height (the v0.11.45 bug),
     // page-break-inside auto so they can flow.
     expect(html).toMatch(/notes-emphasis[^{}]*aside\.notes\s*\{[\s\S]{0,1500}?min-height:\s*0/);

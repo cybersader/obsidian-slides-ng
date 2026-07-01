@@ -1042,78 +1042,41 @@ export function buildIframeHtml(
      * render entirely INVISIBLE with the headings missing — root
      * cause was the variable not resolving in the cascade combined
      * with media:print CSS interactions). */
+    /* v0.13.15: render the slide as a FAITHFUL scaled thumbnail of the
+     * deck's own styling. The previous force-styled dark card ignored the
+     * deck's theme + custom CSS (navy-on-forced-dark went invisible,
+     * forced flex-centering collapsed grid/bar layouts, fixed 4in +
+     * overflow-hidden clipped content). CSS zoom shrinks the layout AND
+     * its content together and reflows the notes below, while the deck's
+     * own theme background + colors + grid layouts are preserved. The JS
+     * below re-applies the same inline (it wins over reveal print CSS). */
     html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout {
-      display: flex !important;
-      flex-direction: column !important;
-      justify-content: center !important;
-      align-items: center !important;
-      text-align: center !important;
+      zoom: 0.6;
+      display: block !important;
+      text-align: initial !important;
       width: 100% !important;
-      height: 4in !important;
-      min-height: 4in !important;
-      max-height: 4in !important;
-      background: #191919 !important;
-      background-color: #191919 !important;
-      color: #ffffff !important;
-      padding: 0.35in 0.5in !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      /* Use the deck theme's own background + text color (fallback light)
+       * so the thumbnail looks like the actual slide, not a generic card. */
+      background: var(--r-background-color, #ffffff) !important;
+      color: var(--r-main-color, #222222) !important;
+      padding: 0.35in 0.45in !important;
       box-sizing: border-box !important;
       overflow: hidden !important;
-      border: 1px solid #444 !important;
+      border: 1px solid #ccc !important;
       border-radius: 4px !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
       margin: 0 !important;
-      gap: 0.2in !important;
-      /* v0.11.52: force the browser to render the dark slide-card
-       * background even when the user has Chrome\\'s "Background
-       * graphics" print option turned off (it\\'s OFF by default,
-       * which is why the v0.11.51 user-reported "white empty card,
-       * no headings" PDF bug happened: bg dropped to white, color
-       * stayed white = white-on-white, invisible). */
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    /* Headings inside the slide card — explicit light color so the
-     * H1 doesn\\'t inherit the page-body dark color and disappear
-     * against the dark slide card. */
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h1,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h2,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h3,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h4,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h5,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h6 {
-      color: #ffffff !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      line-height: 1.15 !important;
-      text-shadow: none !important;
-    }
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h1 {
-      font-size: 28pt !important;
-      font-weight: 800 !important;
-      letter-spacing: 0.02em !important;
-    }
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout h2 {
-      font-size: 22pt !important;
-      font-weight: 700 !important;
-    }
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout p,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout li,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout span,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout strong,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout em {
-      color: #e8e8e8 !important;
-      font-size: 14pt !important;
-      line-height: 1.4 !important;
-      margin: 0 !important;
-    }
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout ul,
-    html.print-pdf.notes-emphasis .reveal .slides > section > .slides-ng-layout ol {
-      color: #e8e8e8 !important;
-      text-align: left !important;
-      margin: 0 !important;
-      padding-left: 1.2em !important;
-    }
+    /* v0.13.15: NO forced heading/text colors or sizes — the deck's own
+     * theme + custom CSS style the thumbnail content, so it matches the
+     * live preview instead of a generic card. (The old force-white rules
+     * existed only because the card used to be hardcoded dark.) */
     /* Notes flow naturally below the slide card, no fixed sizes.
      * Can overflow to the next page if too long. */
     html.print-pdf.notes-emphasis .reveal aside.notes {
@@ -1152,12 +1115,16 @@ export function buildIframeHtml(
     html.print-pdf.notes-emphasis .speaker-notes {
       display: none !important;
     }
-    /* Hide reveal print-mode UI clutter inside notes-emphasis. */
+    /* Hide reveal print-mode UI clutter inside notes-emphasis. Also hide
+     * the per-slide .slide-background divs — reveal paints those full-page
+     * in print, so a dark data-background-color would bleed across the
+     * whole handout page; the faithful thumbnail carries its own bg. */
     html.print-pdf.notes-emphasis .reveal .controls,
     html.print-pdf.notes-emphasis .reveal .progress,
     html.print-pdf.notes-emphasis .reveal .slide-menu-button,
     html.print-pdf.notes-emphasis #slides-ng-grid-btn,
-    html.print-pdf.notes-emphasis .reveal .backgrounds {
+    html.print-pdf.notes-emphasis .reveal .backgrounds,
+    html.print-pdf.notes-emphasis .reveal .slide-background {
       display: none !important;
     }
     /* Notes-emphasis sets its own @page margin to leave room for the
@@ -1685,58 +1652,50 @@ ${sectionsHtml}
           try {
             /* v0.11.69: hideBackgrounds opts out of the dark slide-card
              * theme. Use white card + dark text instead. */
+            /* v0.13.15: read the deck's OWN theme background so the scaled
+             * thumbnail looks like the real slide, and do NOT force any
+             * text colors/sizes — the deck's custom CSS styles it. */
             var hideBg = document.documentElement.classList.contains('pdf-hide-backgrounds');
-            var cardBg = hideBg ? '#ffffff' : '#191919';
-            var cardColor = hideBg ? '#222222' : '#ffffff';
-            var headColor = hideBg ? '#222222' : '#ffffff';
-            var bodyColor = hideBg ? '#444444' : '#e8e8e8';
-            var borderCol = hideBg ? '#c0c0c0' : '#444';
+            var revealBg = '#ffffff';
+            try {
+              var rEl0 = document.querySelector('.reveal');
+              if (rEl0) {
+                var csBg = getComputedStyle(rEl0).backgroundColor;
+                if (csBg && csBg !== 'rgba(0, 0, 0, 0)' && csBg !== 'transparent') revealBg = csBg;
+              }
+            } catch (_) {}
+            var NE_SCALE = 0.66; /* thumbnail scale — slide stays faithful, notes get room */
             var layouts = document.querySelectorAll('.slides-ng-layout');
             for (var li = 0; li < layouts.length; li++) {
               var el = layouts[li];
-              el.style.setProperty('display', 'flex', 'important');
-              el.style.setProperty('flex-direction', 'column', 'important');
-              el.style.setProperty('justify-content', 'center', 'important');
-              el.style.setProperty('align-items', 'center', 'important');
-              el.style.setProperty('text-align', 'center', 'important');
+              /* Per-slide data-background-color (e.g. a dark title slide)
+               * keeps its own card colour; otherwise the theme background.
+               * hideBackgrounds forces a white card (ink-saving handout). */
+              var secEl0 = el.parentElement;
+              var cardBg = hideBg ? '#ffffff' : revealBg;
+              if (!hideBg && secEl0 && secEl0.getAttribute) {
+                var dbc = secEl0.getAttribute('data-background-color');
+                if (dbc) cardBg = dbc;
+              }
+              /* Faithful scaled thumbnail: zoom shrinks the layout AND its
+               * content together, the deck's own CSS/theme styles it, and
+               * notes reflow below. No forced dark/center/white/fixed-4in. */
+              el.style.setProperty('zoom', String(NE_SCALE), 'important');
+              el.style.setProperty('display', 'block', 'important');
+              el.style.setProperty('text-align', 'initial', 'important');
               el.style.setProperty('width', '100%', 'important');
-              el.style.setProperty('height', '4in', 'important');
-              el.style.setProperty('min-height', '4in', 'important');
-              el.style.setProperty('max-height', '4in', 'important');
+              el.style.setProperty('height', 'auto', 'important');
+              el.style.setProperty('min-height', '0', 'important');
+              el.style.setProperty('max-height', 'none', 'important');
               el.style.setProperty('background', cardBg, 'important');
-              el.style.setProperty('background-color', cardBg, 'important');
-              el.style.setProperty('color', cardColor, 'important');
-              el.style.setProperty('padding', '0.35in 0.5in', 'important');
+              el.style.setProperty('padding', '0.28in 0.36in', 'important');
               el.style.setProperty('box-sizing', 'border-box', 'important');
               el.style.setProperty('overflow', 'hidden', 'important');
-              el.style.setProperty('border', '1px solid ' + borderCol, 'important');
+              el.style.setProperty('border', '1px solid #ccc', 'important');
               el.style.setProperty('border-radius', '4px', 'important');
-              el.style.setProperty('margin', '0 0 0.3in 0', 'important');
+              el.style.setProperty('margin', '0', 'important');
               el.style.setProperty('-webkit-print-color-adjust', 'exact', 'important');
               el.style.setProperty('print-color-adjust', 'exact', 'important');
-              /* Force every heading inside to theme-card-color + larger size. */
-              var heads = el.querySelectorAll('h1, h2, h3, h4, h5, h6');
-              for (var hi = 0; hi < heads.length; hi++) {
-                heads[hi].style.setProperty('color', headColor, 'important');
-                heads[hi].style.setProperty('margin', '0', 'important');
-                heads[hi].style.setProperty('padding', '0', 'important');
-                heads[hi].style.setProperty('text-shadow', 'none', 'important');
-                heads[hi].style.setProperty('line-height', '1.15', 'important');
-                if (heads[hi].tagName === 'H1') {
-                  heads[hi].style.setProperty('font-size', '28pt', 'important');
-                  heads[hi].style.setProperty('font-weight', '800', 'important');
-                } else if (heads[hi].tagName === 'H2') {
-                  heads[hi].style.setProperty('font-size', '22pt', 'important');
-                  heads[hi].style.setProperty('font-weight', '700', 'important');
-                }
-              }
-              var paras = el.querySelectorAll('p, li, span, strong, em');
-              for (var pi = 0; pi < paras.length; pi++) {
-                paras[pi].style.setProperty('color', bodyColor, 'important');
-                paras[pi].style.setProperty('font-size', '14pt', 'important');
-                paras[pi].style.setProperty('line-height', '1.4', 'important');
-                paras[pi].style.setProperty('margin', '0', 'important');
-              }
               /* The parent <section> must let our card shape through.
                * v0.11.56: position:relative (not static) so a
                * pseudo-element like the slide-number-stamp ::before
