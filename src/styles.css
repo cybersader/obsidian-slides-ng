@@ -10,26 +10,42 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  /* Single tidy row. Previously `wrap`, which let the 9 buttons spill
+   * onto a second row at medium widths — ugly. Now the row never wraps;
+   * labels collapse to icons (container query below) and, only if the
+   * pane is pathologically narrow, the row scrolls horizontally. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox — hide the (rarely-needed) scrollbar */
   gap: 0.5rem;
   padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
 }
+/* WebKit/Blink — hide the horizontal scrollbar for a clean toolbar. */
+.slides-ng-toolbar::-webkit-scrollbar {
+  display: none;
+}
 .slides-ng-toolbar-group {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.35rem;
   min-width: 0;
+  /* Groups keep their natural width; the spacer absorbs the slack. */
+  flex: 0 0 auto;
 }
 .slides-ng-toolbar-spacer {
-  flex: 1 1 auto;
+  /* Grows to push the right group to the edge when there's room; shrinks
+   * to 0 when the buttons need every pixel (then the toolbar scrolls). */
+  flex: 1 1 0;
   min-width: 0;
 }
 .slides-ng-toolbar-btn {
   display: inline-flex;
   align-items: center;
+  /* Never squish a button — keep icons/labels legible; overflow scrolls. */
+  flex: 0 0 auto;
   gap: 0.4rem;
   font-size: 0.85em;
   line-height: 1;
@@ -81,9 +97,10 @@
     padding: 0.4rem;
   }
 }
-/* Very narrow leaves (< 220px): collapse the spacer entirely so the
- * left-group and right-group wrap onto one row's worth of buttons.
- * Toolbar's flex-wrap then puts overflow on a second row. */
+/* Very narrow leaves (< 220px): drop the spacer and tighten gaps/padding
+ * so the icon-only buttons pack together. The row stays single-line; if
+ * the buttons still don't fit, the toolbar scrolls horizontally rather
+ * than wrapping to a second row. */
 @container (max-width: 220px) {
   .slides-ng-toolbar-spacer {
     display: none;
