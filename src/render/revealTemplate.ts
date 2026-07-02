@@ -2122,7 +2122,18 @@ ${sectionsHtml}
             /* v0.13.25: drop empty leftover sections FIRST so the stamp
              * loop can't number a blank vertical-stack wrapper page. */
             slidesNgHideEmptyPages();
-            var sections = document.querySelectorAll('.reveal .slides > section');
+            /* v0.13.30: match sections whether or not reveal has wrapped
+             * them in a .pdf-page. In print-pdf reveal wraps each slide in
+             * a .pdf-page div, so the plain "> section" child selector
+             * matched NOTHING in plain/slides+notes modes — the stamp,
+             * header, footer and auto-shrink loops all silently no-op'd
+             * (reported: slide-number stamp not showing). notes-emphasis
+             * unwraps those wrappers, but pdfPostInit can still race AHEAD
+             * of the unwrap on a slow/complex deck and see wrapped sections.
+             * This selector covers wrapped (.pdf-page > section), unwrapped
+             * (> section), and pre-wrap states alike, so stamping is
+             * timing-independent. */
+            var sections = document.querySelectorAll('.reveal .slides > section, .reveal .slides > .pdf-page > section');
             ${forceSlideNumberStamp ? `var total = 0;
             for (var st = 0; st < sections.length; st++) if (!slidesNgSectionEmpty(sections[st])) total++;
             var num = 0;

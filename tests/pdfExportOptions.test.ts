@@ -153,6 +153,12 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(on).toContain("0.4in"); // narrow margin
     expect(on).toContain("data-slide-number");
     expect(on).toContain("data-slide-total");
+    // v0.13.30: the stamp/header/footer/auto-shrink loops must select
+    // sections whether or not reveal has wrapped them in a .pdf-page. In
+    // print-pdf reveal wraps each slide, so a plain "> section" child
+    // selector matched nothing in plain/slides+notes modes and the stamp
+    // silently didn't render. The wrap-aware selector is timing-independent.
+    expect(on).toContain(".reveal .slides > .pdf-page > section");
     // Auto-shrink + header/footer logic
     expect(on).toContain("scrollHeight");
     expect(on).toContain("CS-101");
