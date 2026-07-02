@@ -243,6 +243,11 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(html).toMatch(/notes-emphasis[^{}]*aside\.notes\s*\{[\s\S]{0,1500}?box-sizing:\s*border-box/);
     // and the JS inline re-applies border-box (wins over any late reveal CSS).
     expect(html).toMatch(/setProperty\('box-sizing', 'border-box', 'important'\)/);
+    // v0.13.29: the notes-emphasis @page has real TOP/BOTTOM margins
+    // (was margin:0, which jammed the card to the top edge and started
+    // overflow-notes continuation pages at the very top pixel). Vertical
+    // margin, horizontal 0 (insets come from the card + notes padding).
+    expect(html).toContain("margin: 0.45in 0px");
   });
 
   test("notes default to LEFT alignment (v0.13.16)", () => {

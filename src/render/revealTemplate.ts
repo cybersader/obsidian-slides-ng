@@ -1847,7 +1847,18 @@ ${sectionsHtml}
                 pgStyle = document.createElement('style');
                 pgStyle.id = 'slides-ng-ne-page';
               }
-              pgStyle.textContent = '@page{size:' + pageW + 'px ' + pageH + 'px; margin: 0px;}';
+              /* v0.13.29: give the page real TOP/BOTTOM margins. With
+               * margin:0 the card was jammed flush to the top edge (0
+               * top margin) and, worse, overflow-notes continuation
+               * pages started at the very top pixel and could run to the
+               * bottom edge. @page vertical margins apply to EVERY page —
+               * first slide + every continuation page — so the whole
+               * handout gets consistent top/bottom breathing room the
+               * same way the browser paginates. Left/right stay 0: the
+               * horizontal insets come from the centered card + the
+               * notes' 0.6in side padding (v0.13.28), so adding an @page
+               * horizontal margin would double-inset. */
+              pgStyle.textContent = '@page{size:' + pageW + 'px ' + pageH + 'px; margin: 0.45in 0px;}';
               /* (re-)append LAST so it wins over reveal's own @page. */
               document.head.appendChild(pgStyle);
             }
