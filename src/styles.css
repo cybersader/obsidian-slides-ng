@@ -10,36 +10,28 @@
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  /* Single tidy row. Previously `wrap`, which let the 9 buttons spill
-   * onto a second row at medium widths — ugly. Now the row never wraps;
-   * labels collapse to icons (container query below) and, only if the
-   * pane is pathologically narrow, the row scrolls horizontally. */
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none; /* Firefox — hide the (rarely-needed) scrollbar */
-  gap: 0.5rem;
+  /* WRAP to as many rows as needed. The old nowrap + overflow-x:auto +
+   * hidden scrollbar meant that at medium widths the buttons were simply
+   * CUT OFF at the right edge — unreachable with a mouse (no visible
+   * scrollbar, no wrap). Wrapping keeps every button reachable; `gap`
+   * gives wrapped rows clean vertical spacing. Labels still collapse to
+   * icons first (container query below) to delay wrapping. */
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
   padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
 }
-/* WebKit/Blink — hide the horizontal scrollbar for a clean toolbar. */
-.slides-ng-toolbar::-webkit-scrollbar {
-  display: none;
-}
 .slides-ng-toolbar-group {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 0.35rem;
-  min-width: 0;
-  /* Groups keep their natural width; the spacer absorbs the slack. */
-  flex: 0 0 auto;
+  /* display:contents flattens the group so ALL buttons are direct flex
+   * children of the toolbar and wrap as one uniform, left-aligned flow —
+   * no group-boundary or spacer-induced awkward rows. */
+  display: contents;
 }
 .slides-ng-toolbar-spacer {
-  /* Grows to push the right group to the edge when there's room; shrinks
-   * to 0 when the buttons need every pixel (then the toolbar scrolls). */
-  flex: 1 1 0;
-  min-width: 0;
+  /* Removed from layout: the right-edge push fought a tidy uniform wrap.
+   * A wrapping toolbar reads cleaner with every button left-aligned. */
+  display: none;
 }
 .slides-ng-toolbar-btn {
   display: inline-flex;

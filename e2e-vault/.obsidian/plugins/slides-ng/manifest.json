@@ -1,7 +1,7 @@
 {
 	"id": "slides-ng",
 	"name": "Slides NG",
-	"version": "0.13.25",
+	"version": "0.13.26",
 	"minAppVersion": "1.4.0",
 	"description": "Markdown-based slide decks for Obsidian. Zero localhost ports, no spawned dev server, no external runtime — renders reveal.js + Shiki directly into an iframe inside Obsidian.",
 	"author": "cybersader",
