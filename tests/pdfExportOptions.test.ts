@@ -231,6 +231,18 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     // Notes block: NO fixed min-height (the v0.11.45 bug),
     // page-break-inside auto so they can flow.
     expect(html).toMatch(/notes-emphasis[^{}]*aside\.notes\s*\{[\s\S]{0,1500}?min-height:\s*0/);
+    // v0.13.28: the body/canvas is pinned to 100% of the page box.
+    // reveal writes an inline LANDSCAPE width (slideW*(1+margin)) on
+    // body.reveal-viewport; after the portrait @page swap that made
+    // the whole width:100% chain (incl. aside.notes) overflow the page's
+    // right margin. Force body to 100% so notes wrap inside the page.
+    expect(html).toMatch(/notes-emphasis body[^{]*\{[\s\S]{0,300}?width:\s*100%\s*!important/);
+    // v0.13.28: aside.notes is border-box, so its width:100% INCLUDES
+    // the side padding instead of adding it on top (content-box added
+    // the 0.6in padding beyond the page edge → mid-word clipping).
+    expect(html).toMatch(/notes-emphasis[^{}]*aside\.notes\s*\{[\s\S]{0,1500}?box-sizing:\s*border-box/);
+    // and the JS inline re-applies border-box (wins over any late reveal CSS).
+    expect(html).toMatch(/setProperty\('box-sizing', 'border-box', 'important'\)/);
   });
 
   test("notes default to LEFT alignment (v0.13.16)", () => {

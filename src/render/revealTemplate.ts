@@ -1100,6 +1100,42 @@ export function buildIframeHtml(
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
+    /* v0.13.28: pin the print canvas to the actual PAGE width. In
+     * print-pdf reveal sizes .reveal/.slides to the deck's DESIGN width
+     * (e.g. ~998px for a landscape deck) which is WIDER than a portrait
+     * page (~800px). The card is margin:0-auto centered so it mostly
+     * survives, but aside.notes at width:100% inherits that 998px and
+     * its lines run clean off the page's right margin (words cut
+     * mid-word: "disaste[r]"). Force the canvas to 100% of the page so
+     * the section + notes wrap inside the printable area. transform:none
+     * + left:0 drop reveal's centering offset. */
+     * The FIXED width lives on body.reveal-viewport (reveal writes an
+     * inline width:998px there — the LANDSCAPE canvas, 960*(1+margin) —
+     * even after we swap @page to portrait). Everything below is
+     * width:100%, so it all inherits that 998px. Pinning body to 100%
+     * of the actual page box (whatever @page resolves to: portrait,
+     * landscape, or an explicit paper size) makes the whole chain wrap
+     * inside the printable width. CSS !important beats reveal's
+     * non-important inline, so this holds regardless of JS timing. */
+    html.print-pdf.notes-emphasis body,
+    html.print-pdf.notes-emphasis body.reveal-viewport {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      height: auto !important;
+    }
+    html.print-pdf.notes-emphasis .reveal,
+    html.print-pdf.notes-emphasis .reveal .slides,
+    html.print-pdf.notes-emphasis .reveal .slides > section {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      left: 0 !important;
+      top: 0 !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      transform: none !important;
+    }
     /* v0.13.15: NO forced heading/text colors or sizes — the deck's own
      * theme + custom CSS style the thumbnail content, so it matches the
      * live preview instead of a generic card. (The old force-white rules
@@ -1111,12 +1147,20 @@ export function buildIframeHtml(
       display: block !important;
       visibility: visible !important;
       width: 100% !important;
+      /* border-box so width:100% INCLUDES the 0.6in side padding —
+       * content-box would add the padding on top and overflow the
+       * page's right margin by exactly the padding (v0.13.28). */
+      box-sizing: border-box !important;
       height: auto !important;
       min-height: 0 !important;
       max-height: none !important;
       background: transparent !important;
       color: #222 !important;
-      padding: 0.25in 0.1in 0.1in 0.1in !important;
+      /* v0.13.28: 0.6in side inset. @page margin is 0, so the notes'
+       * only horizontal margin comes from here. 0.6in ≈ the centered
+       * card's side gap, so notes line up under the card instead of
+       * running edge-to-edge. */
+      padding: 0.25in 0.6in 0.1in 0.6in !important;
       margin: 0.3in 0 0 0 !important;
       border-top: 1px solid #ccc !important;
       font-size: 11pt !important;
@@ -1807,6 +1851,17 @@ ${sectionsHtml}
               /* (re-)append LAST so it wins over reveal's own @page. */
               document.head.appendChild(pgStyle);
             }
+            /* v0.13.28: reveal pins body.reveal-viewport to a fixed
+             * LANDSCAPE canvas width (slideW*(1+margin)); after the
+             * portrait @page swap that body is WIDER than the page, so
+             * everything below (all width:100%) overflows the right
+             * margin and notes get cut mid-word. Release the body to
+             * flow at 100% of the actual page box. The CSS rule already
+             * covers this; this is belt-and-suspenders for timing. */
+            document.body.style.setProperty('width', '100%', 'important');
+            document.body.style.setProperty('min-width', '0', 'important');
+            document.body.style.setProperty('max-width', '100%', 'important');
+            document.body.style.setProperty('height', 'auto', 'important');
             /* v0.13.23: UNWRAP reveal's .pdf-page wrappers entirely
              * (they used to be merely neutralised). The wrapper sits
              * between .slides and each section, which silently broke
@@ -1944,12 +1999,13 @@ ${sectionsHtml}
                   aside.style.setProperty('display', 'block', 'important');
                   aside.style.setProperty('visibility', 'visible', 'important');
                   aside.style.setProperty('width', '100%', 'important');
+                  aside.style.setProperty('box-sizing', 'border-box', 'important');
                   aside.style.setProperty('height', 'auto', 'important');
                   aside.style.setProperty('min-height', '0', 'important');
                   aside.style.setProperty('max-height', 'none', 'important');
                   aside.style.setProperty('background', 'transparent', 'important');
                   aside.style.setProperty('color', '#222', 'important');
-                  aside.style.setProperty('padding', '0.25in 0.1in', 'important');
+                  aside.style.setProperty('padding', '0.25in 0.6in 0.1in 0.6in', 'important');
                   aside.style.setProperty('margin', '0.3in 0 0 0', 'important');
                   aside.style.setProperty('border-top', '1px solid #ccc', 'important');
                   aside.style.setProperty('text-align', '${notesAlign}', 'important');
