@@ -1688,6 +1688,45 @@ ${sectionsHtml}
             } catch (_) {}
           }, 5000);
         })();
+        ${!embedded && forcePrintMode ? `
+        /* v0.13.25: reveal's print setup moves each slide into a .pdf-page
+         * wrapper, but for a VERTICAL stack it moves the inner sub-slides
+         * out and leaves the empty OUTER section as a stray direct child of
+         * .slides. That empty section prints as a BLANK page (and the
+         * slide-number stamp loop numbered it). Hide any content-free
+         * section/.pdf-page so no blank page is emitted. Mode-agnostic:
+         * plain slides keep .pdf-page (real slides are inside them),
+         * notes-emphasis unwraps them (real slides are direct) — either
+         * way, only the genuinely empty leftovers get hidden. */
+        function slidesNgSectionEmpty(el) {
+          if (!el) return false;
+          /* Empty = no element children EXCEPT a slide-number badge, and no
+           * non-whitespace text (badge text ignored). A real slide always
+           * has element children (headings/divs/.slides-ng-layout/section);
+           * the leftover vertical-stack wrapper reveal leaves behind has
+           * none. Badge-aware so ordering vs the stamp loop doesn't matter. */
+          for (var i = 0; i < el.children.length; i++) {
+            if (!el.children[i].classList.contains('slides-ng-slide-number-badge')) return false;
+          }
+          return (el.textContent || '').replace(/Slide\\s*\\d+\\s*\\/\\s*\\d+/g, '').trim().length === 0;
+        }
+        function slidesNgHideEmptyPages() {
+          try {
+            var nodes = document.querySelectorAll('.reveal .slides > section, .reveal .slides > .pdf-page');
+            for (var i = 0; i < nodes.length; i++) {
+              if (slidesNgSectionEmpty(nodes[i])) {
+                nodes[i].style.setProperty('display', 'none', 'important');
+              }
+            }
+          } catch (_) {}
+        }
+        /* Always run in print mode, even when no stamp/notes/etc. option is
+         * set (those code paths call it too, but this covers the bare case). */
+        if (revealInit && typeof revealInit.then === 'function') {
+          revealInit.then(function () { setTimeout(slidesNgHideEmptyPages, 60); });
+        }
+        setTimeout(slidesNgHideEmptyPages, 850);
+        ` : ""}
         ${!embedded && forceNotesEmphasis ? `
         /* v0.11.55: NUCLEAR option for the notes-emphasis slide-card.
          * Pure CSS kept failing across versions (variable resolution,
@@ -1914,6 +1953,21 @@ ${sectionsHtml}
                 }
               }
             }
+            /* v0.13.25: hide empty leftover vertical-stack wrapper sections
+             * (now exposed as direct children after the unwrap) so they
+             * don't print as blank pages. */
+            slidesNgHideEmptyPages();
+            /* The LAST real slide must NOT force a page-break-after, or a
+             * trailing BLANK page is emitted — the per-section inline
+             * 'always' above beats the CSS :last-of-type avoid rule. */
+            var allNeSecs = document.querySelectorAll('.reveal .slides > section');
+            for (var lz = allNeSecs.length - 1; lz >= 0; lz--) {
+              if (getComputedStyle(allNeSecs[lz]).display !== 'none' && !slidesNgSectionEmpty(allNeSecs[lz])) {
+                allNeSecs[lz].style.setProperty('page-break-after', 'avoid', 'important');
+                allNeSecs[lz].style.setProperty('break-after', 'avoid', 'important');
+                break;
+              }
+            }
             /* Also escape reveal\\'s absolute slides positioning. */
             var slidesEl = document.querySelector('.reveal .slides');
             if (slidesEl) {
@@ -1991,10 +2045,17 @@ ${sectionsHtml}
          * mode and only if the user picked one of these options. */
         function pdfPostInit() {
           try {
+            /* v0.13.25: drop empty leftover sections FIRST so the stamp
+             * loop can't number a blank vertical-stack wrapper page. */
+            slidesNgHideEmptyPages();
             var sections = document.querySelectorAll('.reveal .slides > section');
-            ${forceSlideNumberStamp ? `var total = sections.length;
+            ${forceSlideNumberStamp ? `var total = 0;
+            for (var st = 0; st < sections.length; st++) if (!slidesNgSectionEmpty(sections[st])) total++;
+            var num = 0;
             for (var si = 0; si < sections.length; si++) {
-              sections[si].setAttribute('data-slide-number', String(si + 1));
+              if (slidesNgSectionEmpty(sections[si])) continue;
+              num++;
+              sections[si].setAttribute('data-slide-number', String(num));
               sections[si].setAttribute('data-slide-total', String(total));
               /* v0.11.65: inject a REAL DOM element for the slide-
                * number stamp. The ::before pseudo-element approach
@@ -2006,7 +2067,7 @@ ${sectionsHtml}
               if (!sections[si].querySelector('.slides-ng-slide-number-badge')) {
                 var badge = document.createElement('div');
                 badge.className = 'slides-ng-slide-number-badge';
-                badge.textContent = 'Slide ' + (si + 1) + ' / ' + total;
+                badge.textContent = 'Slide ' + num + ' / ' + total;
                 /* v0.11.72: badge styling adapts to the layout.
                  *  - notes-emphasis: section is a white page; anchor
                  *    the badge INSIDE the dark slide-card so it sits

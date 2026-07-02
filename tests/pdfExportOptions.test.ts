@@ -307,6 +307,27 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(esc).toContain("<title>a &amp; b &lt;weird></title>");
   });
 
+  test("v0.13.25: empty vertical-stack wrapper sections are hidden, not printed as blank numbered pages", () => {
+    const md = "# A\n\nintro\n\n---\n\n## Vert\n\ncontent\n\n--\n\nmore\n\n---\n\n# End\n";
+    const html = renderDeckStandalone(md, "deck.md", {
+      forcePrintMode: true,
+      forceSlideNumberStamp: true,
+    });
+    // helper that detects + hides content-free leftover sections, run in print
+    expect(html).toContain("function slidesNgSectionEmpty");
+    expect(html).toContain("function slidesNgHideEmptyPages");
+    // stamp loop skips empties (so a blank wrapper can't be numbered)
+    expect(html).toContain("if (slidesNgSectionEmpty(sections[si])) continue;");
+    // notes-emphasis: the last real slide gets page-break-after:avoid so no
+    // trailing blank page is emitted
+    const ne = renderDeckStandalone(md, "deck.md", {
+      forcePrintMode: true,
+      forceShowNotes: true,
+      forceNotesEmphasis: true,
+    });
+    expect(ne).toMatch(/page-break-after', 'avoid', 'important'/);
+  });
+
   test("forceMaxPagesPerSlide bakes pdfMaxPagesPerSlide into initOpts (v0.11.44)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {
       forcePrintMode: true,
