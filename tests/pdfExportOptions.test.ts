@@ -212,6 +212,12 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     // child-combinator rules (preview matched them, export didn't).
     expect(html).toContain(".pdf-page");
     expect(html).toContain("ppParent.insertBefore(pp.firstChild, pp)");
+    // v0.13.24: CSS also neutralizes reveal's fixed-height .pdf-page
+    // wrapper (overflow/height/position) so notes can't be clipped even
+    // if the JS unwrap loses a timing race to reveal's async print setup +
+    // auto-print on a slow machine. This is the timing-independent backstop.
+    expect(html).toMatch(/\.reveal \.slides \.pdf-page \{[^}]*overflow:\s*visible\s*!important/);
+    expect(html).toMatch(/\.reveal \.slides \.pdf-page \{[^}]*height:\s*auto\s*!important/);
     // v0.13.23: deterministic white-on-dark base colour from the card's
     // actual background luminance (has-dark-background timing was flaky).
     expect(html).toMatch(/lum < 140 \? '#f5f5f5' : '#1a1a1a', 'important'/);

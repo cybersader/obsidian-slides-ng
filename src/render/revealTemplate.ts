@@ -1156,6 +1156,26 @@ export function buildIframeHtml(
     html.print-pdf.notes-emphasis .reveal .slide-background {
       display: none !important;
     }
+    /* v0.13.24: neutralize reveal's fixed-height .pdf-page wrapper via CSS,
+     * not only the JS unwrap. reveal's own rule sets that wrapper to
+     * overflow hidden plus a fixed inline height it assigns in JS — so on
+     * a slow machine (SMB share) where reveal's print setup + the auto
+     * window.print() can fire BEFORE our JS unwrap runs, the wrapper clips
+     * the flowing notes. This CSS holds regardless of timing; the
+     * important flag beats reveal's inline height (set without important)
+     * and its overflow hidden, so notes flow across pages. */
+    html.print-pdf.notes-emphasis .reveal .slides .pdf-page {
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
+      position: static !important;
+      display: block !important;
+      page-break-after: always !important;
+      break-after: page !important;
+      page-break-inside: auto !important;
+      break-inside: auto !important;
+    }
     /* Notes-emphasis sets its own @page margin to leave room for the
      * card + notes layout. Overrides the user\\'s pageMargin pick
      * because the layout depends on knowing the printable area. */
