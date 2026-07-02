@@ -1153,7 +1153,11 @@ export function buildIframeHtml(
     html.print-pdf.notes-emphasis .reveal .slide-menu-button,
     html.print-pdf.notes-emphasis #slides-ng-grid-btn,
     html.print-pdf.notes-emphasis .reveal .backgrounds,
-    html.print-pdf.notes-emphasis .reveal .slide-background {
+    html.print-pdf.notes-emphasis .reveal .slide-background,
+    /* v0.13.27: reveal's built-in slide-number (deck slideNumber:true)
+     * rendered a stray "13" in the notes area of the handout. It's not
+     * wanted here — the optional slide-number STAMP handles PDF numbering. */
+    html.print-pdf.notes-emphasis .reveal .slide-number {
       display: none !important;
     }
     /* v0.13.24: neutralize reveal's fixed-height .pdf-page wrapper via CSS,
@@ -1898,11 +1902,14 @@ ${sectionsHtml}
                   }
                 }
               } catch (_) {}
-              /* v0.13.22: auto-shrink fits overflowing slide content
-               * INSIDE the fixed card via a uniform zoom on a content
-               * wrapper (slidesNgFitToBox hoists from the pdfPostInit
-               * chunk — emitted whenever autoShrink is on). */
-              if (${forceAutoShrink ? "true" : "false"} && typeof slidesNgFitToBox === 'function') {
+              /* v0.13.27: ALWAYS fit the slide content inside the fixed
+               * card via a uniform zoom on a content wrapper — the card is
+               * a fixed-size thumbnail, so content taller than it must
+               * SCALE (like the preview letterboxes it), not clip at the
+               * overflow:hidden edge (user saw the tech-stack grid + legend
+               * cut off). No longer gated on the auto-shrink checkbox;
+               * slidesNgFitToBox is emitted whenever notes-emphasis. */
+              if (typeof slidesNgFitToBox === 'function') {
                 var csEl = getComputedStyle(el);
                 var padV = (parseFloat(csEl.paddingTop) || 0) + (parseFloat(csEl.paddingBottom) || 0);
                 var padH = (parseFloat(csEl.paddingLeft) || 0) + (parseFloat(csEl.paddingRight) || 0);
@@ -1999,8 +2006,8 @@ ${sectionsHtml}
         }
         setTimeout(applyNotesEmphasisInline, 800);
         ` : ""}
-        ${!embedded && (forceAutoShrink || forceSlideNumberStamp || forceHeaderText || forceFooterText) ? `
-        ${forceAutoShrink ? `/* v0.13.22: TRUE uniform auto-shrink. The old
+        ${!embedded && (forceAutoShrink || forceSlideNumberStamp || forceHeaderText || forceFooterText || forceNotesEmphasis) ? `
+        ${(forceAutoShrink || forceNotesEmphasis) ? `/* v0.13.22: TRUE uniform auto-shrink. The old
          * implementation shrank font-size only, which does nothing for
          * px-based layout (grids like minmax(88px,1fr), min-height card
          * tiles, borders, px paddings) — px-heavy slides still

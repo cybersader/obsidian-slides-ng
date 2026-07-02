@@ -328,6 +328,22 @@ describe("standalone enhancements bundled (v0.11.33)", () => {
     expect(ne).toMatch(/page-break-after', 'avoid', 'important'/);
   });
 
+  test("v0.13.27: notes-emphasis hides reveal's slide-number + always fits the card", () => {
+    // reveal's built-in .slide-number (slideNumber:true) is hidden so it
+    // can't render a stray number in the handout notes area.
+    const ne = renderDeckStandalone(SAMPLE, "deck.md", {
+      forcePrintMode: true,
+      forceShowNotes: true,
+      forceNotesEmphasis: true,
+    });
+    expect(ne).toMatch(/notes-emphasis[\s\S]{0,400}\.reveal \.slide-number/);
+    // the card ALWAYS fits its content (fit fn emitted + called
+    // unconditionally in notes-emphasis, NOT gated on the auto-shrink flag).
+    expect(ne).toContain("function slidesNgFitToBox");
+    expect(ne).toContain("if (typeof slidesNgFitToBox === 'function')");
+    expect(ne).not.toContain("if (false && typeof slidesNgFitToBox");
+  });
+
   test("forceMaxPagesPerSlide bakes pdfMaxPagesPerSlide into initOpts (v0.11.44)", () => {
     const html = renderDeckStandalone(SAMPLE, "deck.md", {
       forcePrintMode: true,
