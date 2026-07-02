@@ -8,6 +8,7 @@ import { warmHighlighter } from "./render/shiki";
 import {
   exportAndOpen,
   exportAndOpenForPdf,
+  exportPortableHtmlWithPrompt,
   type PdfExportOptions,
 } from "./export/exportStandalone";
 import { checkPdfExportContrast } from "./export/contrastCheck";
@@ -145,6 +146,14 @@ export default class SlidesNGPlugin extends Plugin {
     });
 
     this.addCommand({
+      id: "export-portable-html",
+      name: "Export deck as portable HTML",
+      callback: () => {
+        void this.exportActiveDeckHtml();
+      },
+    });
+
+    this.addCommand({
       id: "open-speaker-view",
       name: "Open speaker view",
       callback: () => {
@@ -204,6 +213,37 @@ export default class SlidesNGPlugin extends Plugin {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       new Notice(`Open-in-browser failed: ${msg}`);
+    }
+  }
+
+  private async exportActiveDeckHtml(): Promise<void> {
+    const file = this.resolveDeckFile();
+    if (!file) {
+      new Notice("Open a Markdown deck before running this command.");
+      return;
+    }
+    try {
+      // Inline referenced images as data URIs so the saved HTML is truly
+      // portable (app:// URLs only load inside Obsidian). Same self-
+      // contained output as Open-in-browser, saved where the user picks.
+      const resolveImage = await buildImageDataUriResolver(this.app, file);
+      const result = await exportPortableHtmlWithPrompt(this.app, file, {
+        defaultTheme: this.settings.defaultTheme,
+        defaultTransition: this.settings.defaultTransition,
+        scenes: this.settings.scenes,
+        resolveImage,
+      });
+      if (result.canceled) return;
+      if (result.usedVaultFallback) {
+        new Notice(
+          `Save dialog unavailable — wrote ${result.savedPath} to the vault root.`
+        );
+      } else {
+        new Notice(`Saved portable HTML → ${result.savedPath}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(`Export HTML failed: ${msg}`);
     }
   }
 

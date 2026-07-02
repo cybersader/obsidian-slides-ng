@@ -190,6 +190,140 @@ export async function exportDeckToFile(
 }
 
 /**
+ * v0.13.31: build the filename for a PORTABLE, user-facing HTML export.
+ * Unlike buildExportFilename (the hidden, dot-prefixed, timestamped
+ * throwaway the PDF/browser flows use), this is a clean, deck-named file
+ * the user saves to hand to someone — no dot prefix, no timestamp.
+ */
+export function buildPortableHtmlFilename(deckBasename?: string): string {
+  const slug = (deckBasename ?? "")
+    .replace(/\.md$/i, "")
+    .replace(/[\\/:*?"<>|#^[\]]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .trim();
+  return `${slug || "deck"}.html`;
+}
+
+/**
+ * Render the deck to a self-contained HTML string + a suggested filename,
+ * WITHOUT writing anything. Shares the image-inlining + standalone
+ * template with exportDeckToFile; returns the HTML so the caller can hand
+ * it to a native "Save As" dialog (the "Export HTML" button) rather than
+ * the hidden throwaway path the browser/PDF flows use. The output is the
+ * interactive reveal.js deck (same as Open-in-browser), not print mode.
+ */
+export async function buildPortableDeckHtml(
+  app: App,
+  file: TFile,
+  defaults: RenderDefaults = {}
+): Promise<{ html: string; suggestedName: string }> {
+  const markdown = await app.vault.read(file);
+  const resolveImage =
+    defaults.resolveImage ??
+    (await buildImageDataUriResolver(app, file, sharedImageDataUriCache));
+  const html = renderDeckStandalone(markdown, file.path, {
+    ...defaults,
+    resolveImage,
+  });
+  return {
+    html,
+    suggestedName: buildPortableHtmlFilename(file.basename ?? file.name),
+  };
+}
+
+/** Result of a portable "Export HTML" run. */
+export interface PortableExportResult {
+  /** Absolute path chosen in the dialog, or the vault-relative fallback
+   *  path; null when the user cancelled the save dialog. */
+  savedPath: string | null;
+  canceled: boolean;
+  /** True when the OS save dialog wasn't reachable and we wrote a
+   *  deck-named file to the vault root instead. */
+  usedVaultFallback: boolean;
+}
+
+/**
+ * Show the OS "Save As" dialog for the portable HTML. Returns a string
+ * path if the user picked one, `null` if they cancelled, or `undefined`
+ * if the dialog module isn't reachable (headless / unit tests) so the
+ * caller can fall back to a vault write. Host modules are required
+ * through dynamic specifiers so esbuild leaves them external, mirroring
+ * openExternalInBrowser's electron access.
+ */
+async function showHtmlSaveDialog(
+  defaultName: string
+): Promise<string | null | undefined> {
+  type SaveDialog = {
+    dialog?: {
+      showSaveDialog: (
+        opts: unknown
+      ) => Promise<{ canceled: boolean; filePath?: string }>;
+    };
+  };
+  try {
+    let remote: SaveDialog | undefined;
+    // Modern Obsidian exposes the save dialog via @electron/remote; older
+    // builds via electron.remote. Try the modern path first.
+    try {
+      const remoteName = "@electron/remote";
+      remote = require(remoteName) as SaveDialog;
+    } catch {
+      /* fall through to the legacy electron.remote below */
+    }
+    if (!remote || !remote.dialog) {
+      const electronName = "electron";
+      const electron = require(electronName) as { remote?: SaveDialog };
+      remote = electron.remote;
+    }
+    if (!remote || !remote.dialog) return undefined;
+    const res = await remote.dialog.showSaveDialog({
+      title: "Export deck as portable HTML",
+      defaultPath: defaultName,
+      filters: [
+        { name: "HTML", extensions: ["html"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    });
+    if (!res || res.canceled || !res.filePath) return null;
+    return res.filePath;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Write a string to an absolute on-disk path via Node fs (external). */
+async function writeFileAbsolute(absPath: string, content: string): Promise<void> {
+  const fsName = "fs";
+  const fs = require(fsName) as typeof import("fs");
+  await fs.promises.writeFile(absPath, content, "utf8");
+}
+
+/**
+ * The "Export HTML" workflow: render the self-contained deck, prompt for
+ * a save location (native dialog), write it there. If the dialog isn't
+ * reachable, fall back to writing a deck-named file at the vault root so
+ * the feature still produces a portable file. Returns where it landed
+ * (or canceled) for the caller's Notice.
+ */
+export async function exportPortableHtmlWithPrompt(
+  app: App,
+  file: TFile,
+  defaults: RenderDefaults = {}
+): Promise<PortableExportResult> {
+  const { html, suggestedName } = await buildPortableDeckHtml(app, file, defaults);
+  const chosen = await showHtmlSaveDialog(suggestedName);
+  if (chosen === undefined) {
+    await app.vault.adapter.write(suggestedName, html);
+    return { savedPath: suggestedName, canceled: false, usedVaultFallback: true };
+  }
+  if (chosen === null) {
+    return { savedPath: null, canceled: true, usedVaultFallback: false };
+  }
+  await writeFileAbsolute(chosen, html);
+  return { savedPath: chosen, canceled: false, usedVaultFallback: false };
+}
+
+/**
  * v0.11.31: convert an absolute filesystem path to a `file:///` URL.
  * On Windows `C:\path\file.html` must become `file:///C:/path/file.html`
  * (three slashes, forward slashes only). On Unix `/home/.../file.html`

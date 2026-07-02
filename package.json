@@ -1,6 +1,6 @@
 {
   "name": "obsidian-slides-ng",
-  "version": "0.13.30",
+  "version": "0.13.31",
   "description": "Markdown slide decks for Obsidian — zero localhost ports, no spawned dev server, reveal.js + Shiki bundled.",
   "main": "main.js",
   "private": true,

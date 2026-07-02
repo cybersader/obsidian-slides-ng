@@ -2,7 +2,10 @@ import { test, expect, describe } from "bun:test";
 import {
   buildExportFilename,
   buildPdfUrlSuffix,
+  buildPortableHtmlFilename,
+  buildPortableDeckHtml,
   exportDeckToFile,
+  exportPortableHtmlWithPrompt,
 } from "../src/export/exportStandalone";
 import { renderDeckStandalone, renderDeck } from "../src/render/renderDeck";
 
@@ -80,6 +83,81 @@ class MockApp {
     read: async (_file: unknown) => "---\n---\n\n# Title\n\nBody.\n",
   };
 }
+
+describe("buildPortableHtmlFilename (v0.13.31)", () => {
+  test("is a clean deck-named .html — no dot prefix, no timestamp", () => {
+    expect(buildPortableHtmlFilename("Q2 Security Update")).toBe(
+      "Q2 Security Update.html"
+    );
+    expect(buildPortableHtmlFilename("deck.md")).toBe("deck.html");
+  });
+
+  test("sanitizes filesystem-unsafe characters", () => {
+    expect(buildPortableHtmlFilename('we/ird:na*me?"x"')).toBe("we-ird-na-me-x.html");
+  });
+
+  test("falls back to 'deck' when the name is empty/all-unsafe", () => {
+    expect(buildPortableHtmlFilename("")).toBe("deck.html");
+    expect(buildPortableHtmlFilename("///")).toBe("deck.html");
+    expect(buildPortableHtmlFilename(undefined)).toBe("deck.html");
+  });
+
+  test("does NOT match the transient-export gitignore patterns", () => {
+    // Portable exports are deck-named, so they are intentionally NOT
+    // caught by `.slides-ng-export-*` / `slides-ng-export-*` rules.
+    expect(buildPortableHtmlFilename("Deck")).not.toMatch(/slides-ng-export-/);
+  });
+});
+
+describe("buildPortableDeckHtml (v0.13.31)", () => {
+  function htmlApp(md: string): Parameters<typeof buildPortableDeckHtml>[0] {
+    return {
+      vault: {
+        async read() {
+          return md;
+        },
+        adapter: { async readBinary() { throw new Error("no img"); } },
+      },
+      metadataCache: { getFirstLinkpathDest: () => null },
+    } as unknown as Parameters<typeof buildPortableDeckHtml>[0];
+  }
+
+  test("returns self-contained interactive HTML + a deck-named suggestion", async () => {
+    const app = htmlApp("---\n---\n\n# Title\n\nBody.\n");
+    const file = { path: "Decks/My Talk.md", basename: "My Talk" } as unknown as Parameters<
+      typeof buildPortableDeckHtml
+    >[1];
+    const { html, suggestedName } = await buildPortableDeckHtml(app, file);
+    expect(suggestedName).toBe("My Talk.html");
+    // interactive standalone (not print), and self-contained (no network).
+    expect(html).toContain('"embedded":false');
+    expect(html).not.toMatch(/https?:\/\/(cdn|unpkg)/);
+    expect(html).not.toMatch(/localhost/);
+    expect(html.length).toBeGreaterThan(100_000);
+  });
+});
+
+describe("exportPortableHtmlWithPrompt (v0.13.31)", () => {
+  test("falls back to a vault write when the save dialog is unreachable", async () => {
+    // No Electron in bun's test env → showHtmlSaveDialog returns undefined
+    // → the deck-named file is written to the vault root via the adapter.
+    const app = new MockApp() as unknown as Parameters<
+      typeof exportPortableHtmlWithPrompt
+    >[0];
+    const file = { path: "Decks/example.md", basename: "example" } as unknown as Parameters<
+      typeof exportPortableHtmlWithPrompt
+    >[1];
+    const result = await exportPortableHtmlWithPrompt(app, file);
+    expect(result.canceled).toBe(false);
+    expect(result.usedVaultFallback).toBe(true);
+    expect(result.savedPath).toBe("example.html");
+
+    const written = (app as unknown as { vault: { adapter: MockAdapter } }).vault
+      .adapter.written.get("example.html");
+    expect(written).toBeDefined();
+    expect(written).toContain('"embedded":false');
+  });
+});
 
 describe("buildPdfUrlSuffix", () => {
   test("defaults to ?print-pdf only", () => {

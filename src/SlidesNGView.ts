@@ -14,6 +14,7 @@ import { renderDeck } from "./render/renderDeck";
 import {
   exportAndOpen,
   exportAndOpenForPdf,
+  exportPortableHtmlWithPrompt,
   type PdfExportOptions,
 } from "./export/exportStandalone";
 import { ExportPdfOptionsModal } from "./ExportPdfOptionsModal";
@@ -341,6 +342,17 @@ export class SlidesNGView extends ItemView {
       label: "Export PDF",
       tooltip: "Export + open in print-mode for browser PDF save",
       onClick: () => void this.openInBrowserForPdf(),
+    });
+
+    // v0.13.31: save a single self-contained .html the user can share.
+    // Same interactive deck as "Open in browser", but written to a
+    // location the user picks (native Save-As dialog) as a permanent,
+    // deck-named file rather than the hidden throwaway artifact.
+    this.addToolbarButton(rightGroup, {
+      icon: "save",
+      label: "Export HTML",
+      tooltip: "Save a self-contained, portable .html of this deck",
+      onClick: () => void this.exportPortableHtml(),
     });
 
     // Iframe
@@ -878,6 +890,30 @@ export class SlidesNGView extends ItemView {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       new Notice(`Open-in-browser failed: ${msg}`);
+    }
+  }
+
+  async exportPortableHtml(): Promise<void> {
+    const file = await this.resolveCurrentFile();
+    if (!file) return;
+    this.debug?.log("export/html/click", { filePath: file.path });
+    try {
+      const result = await exportPortableHtmlWithPrompt(
+        this.app,
+        file,
+        this.renderDefaults()
+      );
+      if (result.canceled) return;
+      if (result.usedVaultFallback) {
+        new Notice(
+          `Save dialog unavailable — wrote ${result.savedPath} to the vault root.`
+        );
+      } else {
+        new Notice(`Saved portable HTML → ${result.savedPath}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(`Export HTML failed: ${msg}`);
     }
   }
 
