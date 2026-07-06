@@ -102,6 +102,16 @@ export interface SlidesNGSettings {
   codeBlockOverflowScroll: boolean;
 
   /**
+   * v0.13.33: auto-fit overflowing slides. Reveal scales the whole slide
+   * canvas to the window but never shrinks content that overflows the
+   * canvas, so dense slides spill at large sizes. When true (default),
+   * any slide taller than the canvas is zoomed down to fit — in the
+   * preview and the interactive HTML export alike. A single slide can
+   * still opt out with `slides-ng-fit: false` in its frontmatter.
+   */
+  autoFitSlides: boolean;
+
+  /**
    * Reveal.js animation pace. `default` is reveal's stock; `fast` is
    * 300 ms transitions; `slow` is 1200 ms.
    */
@@ -448,6 +458,7 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   // overflowed the slide on tall monitors / full browser tabs).
   codeBlockMaxHeight: "calc(60 * var(--sng-vh))",
   codeBlockOverflowScroll: true,
+  autoFitSlides: true,
   transitionSpeed: "default",
   magicMoveDurationMs: 500,
   scenes: DEFAULT_SCENES.map((s) => ({ ...s })),

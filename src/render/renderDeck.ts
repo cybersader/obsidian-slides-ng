@@ -151,6 +151,12 @@ export interface RenderDefaults {
   forceNotesEmphasis?: boolean;
   /** v0.11.46: misc PDF experimentation knobs. */
   forceAutoShrink?: boolean;
+  /**
+   * v0.13.33: auto-fit overflowing slides in the live deck (default true).
+   * Set false to disable globally (a slide can still opt out individually
+   * with `slides-ng-fit: false`).
+   */
+  autoFit?: boolean;
   forcePageSize?: "a4" | "letter" | "legal";
   forcePageMargin?: "normal" | "narrow" | "wide" | "none";
   forceGrayscale?: boolean;
@@ -299,6 +305,9 @@ export function renderDeckFromAst(
   }
   // v0.11.46: thread the experiment knobs through.
   if (defaults.forceAutoShrink) defaultLayer.forceAutoShrink = true;
+  // v0.13.33: live-deck auto-fit. Default is on (template default), so we
+  // only thread it when the caller explicitly set it (e.g. false to disable).
+  if (defaults.autoFit !== undefined) defaultLayer.autoFit = defaults.autoFit;
   if (defaults.forcePageSize) defaultLayer.forcePageSize = defaults.forcePageSize;
   if (defaults.forcePageMargin) defaultLayer.forcePageMargin = defaults.forcePageMargin;
   if (defaults.forceGrayscale) defaultLayer.forceGrayscale = true;
@@ -566,6 +575,19 @@ function renderSlidePart(
     if (list.length > 0) {
       slideAttrs["data-hide-panels"] = list.join(",");
     }
+  }
+
+  // v0.13.33: per-slide opt-out from auto-fit. `slides-ng-fit: false`
+  // emits data-sng-fit="false" so the iframe's auto-fit leaves this slide
+  // at natural size (for a deliberately tall / scrolling slide).
+  const fitRaw = slide.frontmatter["slides-ng-fit"];
+  if (
+    fitRaw === false ||
+    fitRaw === "false" ||
+    fitRaw === "no" ||
+    fitRaw === "off"
+  ) {
+    slideAttrs["data-sng-fit"] = "false";
   }
 
   // 4. Slide-level annotations land on the `<section>` tag itself.

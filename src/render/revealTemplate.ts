@@ -103,6 +103,15 @@ export interface DeckRenderOptions {
   forceNotesEmphasis?: boolean;
   /** v0.11.46: auto-shrink slide content via JS-measured CSS scale. */
   forceAutoShrink?: boolean;
+  /**
+   * v0.13.33: auto-fit overflowing slides in the LIVE deck (preview +
+   * interactive HTML export). Default true. Reveal scales the whole
+   * canvas to the window but never shrinks content that overflows the
+   * canvas, so dense slides spill at large sizes. When true, each slide
+   * whose content exceeds the canvas height is zoomed down to fit.
+   * Per-slide opt-out: `slides-ng-fit: false` → data-sng-fit="false".
+   */
+  autoFit?: boolean;
   /** v0.11.46: override @page paper size. */
   forcePageSize?: "a4" | "letter" | "legal";
   /**
@@ -194,6 +203,10 @@ export function buildIframeHtml(
   const forcePrintDocument = options.forcePrintDocument ?? false;
   const forceNotesEmphasis = options.forceNotesEmphasis ?? false;
   const forceAutoShrink = options.forceAutoShrink ?? false;
+  // v0.13.33: live-deck auto-fit (default on). Only in the interactive
+  // deck — print/PDF modes have their own fit/pagination handling.
+  const autoFit = options.autoFit ?? true;
+  const emitAutoFit = autoFit && !forcePrintMode;
   const forcePageSize = options.forcePageSize ?? "";
   const forcePageMargin = options.forcePageMargin ?? "";
   // Notes alignment (left/center/right); default left for readability.
@@ -1796,6 +1809,57 @@ ${sectionsHtml}
           revealInit.then(function () { setTimeout(slidesNgHideEmptyPages, 60); });
         }
         setTimeout(slidesNgHideEmptyPages, 850);
+        ` : ""}
+        ${emitAutoFit ? `
+        /* v0.13.33: AUTO-FIT overflowing slides in the LIVE deck (preview
+         * AND interactive HTML export share this code path). Reveal scales
+         * the whole design canvas to the window but never shrinks content
+         * that OVERFLOWS the canvas, so a dense slide (e.g. a 30-tool grid)
+         * spills past the slide edge at large sizes while a small pane just
+         * hid it. We zoom the section down uniformly when its natural height
+         * exceeds the canvas height so it always fits — the same idea the
+         * notes-emphasis PDF card uses. The fit is relative to the FIXED
+         * design canvas, so it only needs to run when the slide/deck changes,
+         * NOT on window resize (reveal handles canvas->window scaling). That
+         * also avoids any layout<->resize feedback loop. Per-slide opt-out:
+         * data-sng-fit="false" (frontmatter slides-ng-fit: false). */
+        var slidesNgFitBusy = false;
+        function slidesNgFitOne(sec) {
+          try {
+            if (!sec || sec.getAttribute('data-sng-fit') === 'false') return;
+            /* vertical-stack PARENT holds child sections, not content */
+            if (sec.querySelector(':scope > section')) return;
+            var cfg = (typeof Reveal !== 'undefined' && Reveal.getConfig) ? Reveal.getConfig() : {};
+            var slideH = (cfg && cfg.height) || 700;
+            /* reset before measuring so it's idempotent across re-runs */
+            sec.style.zoom = '1';
+            var natH = sec.scrollHeight;
+            if (natH > slideH + 1 && natH > 0) {
+              /* 0.985 leaves a hair of breathing room; floor at 0.2 */
+              sec.style.zoom = String(Math.max(0.2, (slideH / natH) * 0.985));
+            }
+          } catch (_) {}
+        }
+        function slidesNgFitCurrent() {
+          if (slidesNgFitBusy) return;
+          slidesNgFitBusy = true;
+          try {
+            var cur = (typeof Reveal !== 'undefined' && Reveal.getCurrentSlide)
+              ? Reveal.getCurrentSlide() : null;
+            if (cur) slidesNgFitOne(cur);
+            /* re-center the now-shorter section (Reveal.layout does NOT emit
+             * slidechanged, and we don't listen to resize, so no loop) */
+            if (typeof Reveal !== 'undefined' && Reveal.layout) Reveal.layout();
+          } catch (_) {}
+          slidesNgFitBusy = false;
+        }
+        if (typeof Reveal !== 'undefined' && typeof Reveal.on === 'function') {
+          Reveal.on('ready', function () { slidesNgFitCurrent(); setTimeout(slidesNgFitCurrent, 350); });
+          Reveal.on('slidechanged', function () { slidesNgFitCurrent(); setTimeout(slidesNgFitCurrent, 250); });
+        }
+        if (revealInit && typeof revealInit.then === 'function') {
+          revealInit.then(function () { setTimeout(slidesNgFitCurrent, 40); });
+        }
         ` : ""}
         ${!embedded && forceNotesEmphasis ? `
         /* v0.11.55: NUCLEAR option for the notes-emphasis slide-card.

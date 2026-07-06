@@ -201,6 +201,7 @@ export default class SlidesNGPlugin extends Plugin {
         defaultTheme: this.settings.defaultTheme,
         defaultTransition: this.settings.defaultTransition,
         scenes: this.settings.scenes,
+        autoFit: this.settings.autoFitSlides,
         resolveImage,
       });
       if (result.opened) {
@@ -231,6 +232,7 @@ export default class SlidesNGPlugin extends Plugin {
         defaultTheme: this.settings.defaultTheme,
         defaultTransition: this.settings.defaultTransition,
         scenes: this.settings.scenes,
+        autoFit: this.settings.autoFitSlides,
         resolveImage,
       });
       if (result.canceled) return;

@@ -181,6 +181,18 @@ export class SlidesNGSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("Auto-fit overflowing slides")
+      .setDesc(
+        "Shrink any slide whose content is taller than the slide to fit — in the preview and the exported HTML alike. Reveal only scales the whole slide to the window, so without this a dense slide overflows at large sizes. A single slide can opt out with `slides-ng-fit: false` in its frontmatter."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.autoFitSlides).onChange(async (v) => {
+          this.plugin.settings.autoFitSlides = v;
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
       .setName("Magic-move animation duration (ms)")
       .setDesc(
         "Duration of the token-morph animation between paired magic-move code blocks. Stock library default is five hundred milliseconds."
