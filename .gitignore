@@ -56,6 +56,11 @@ Thumbs.db
 # real deck content — must NEVER reach GitHub.
 .slides-ng-export-*.html
 slides-ng-export-*.html
+# Belt-and-suspenders: ANY root-level .html is a dropped export / debug
+# artifact (the plugin's real source is TS — no root .html is ever
+# committed). Keeps confidential decks dropped for debugging out of git
+# even when renamed (e.g. test-autosize-bug.html).
+/*.html
 
 # --- Logs ---
 debug.log
