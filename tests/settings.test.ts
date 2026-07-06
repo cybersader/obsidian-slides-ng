@@ -212,8 +212,10 @@ describe("renderDeck toggleOverview bridge command", () => {
 });
 
 describe("0.6.0 settings defaults", () => {
-  test("codeBlockMaxHeight is '60vh'", () => {
-    expect(DEFAULT_SETTINGS.codeBlockMaxHeight).toBe("60vh");
+  test("codeBlockMaxHeight defaults to a canvas-relative cap (v0.13.32)", () => {
+    // Was "60vh" (relative to the window → overflowed the slide on tall
+    // monitors). Now 60% of the SLIDE height via --sng-vh.
+    expect(DEFAULT_SETTINGS.codeBlockMaxHeight).toBe("calc(60 * var(--sng-vh))");
   });
   test("codeBlockOverflowScroll is true", () => {
     expect(DEFAULT_SETTINGS.codeBlockOverflowScroll).toBe(true);
@@ -243,6 +245,36 @@ describe("renderDeck threads 0.6.0 settings into iframe HTML", () => {
     const md = "---\n---\n\n# Slide\n";
     const html = renderDeck(md, "deck.md", { codeBlockMaxHeight: "none" });
     expect(html).not.toContain(".reveal .shiki,\n    .reveal pre code");
+  });
+
+  // v0.13.32: slide content must size against reveal's DESIGN CANVAS, not
+  // the browser window — else a `60vh` hero is ~57% of the slide in a
+  // small preview pane but ~99% on a tall monitor, overflowing in a full
+  // browser tab (the "Export HTML overflows at 100%" report).
+  test("exposes canvas-relative --sng-vh/-vw/-vmin from the design canvas", () => {
+    const html = renderDeck("---\n---\n\n# S\n", "deck.md");
+    // default canvas 960x700 → 1% = 9.6px / 7px
+    expect(html).toContain("--sng-vh: 7px");
+    expect(html).toContain("--sng-vw: 9.6px");
+    expect(html).toContain("--sng-vmin: 7px");
+  });
+
+  test("hero + image sizes are canvas-relative, not raw vh", () => {
+    const html = renderDeck("---\n---\n\n# S\n", "deck.md");
+    expect(html).toContain("min-height: calc(60 * var(--sng-vh))"); // hero
+    expect(html).toContain("max-height: calc(80 * var(--sng-vh))"); // image
+    // the interactive slide-content rules must not use window-relative vh
+    expect(html).not.toContain("min-height: 60vh");
+    expect(html).not.toContain("max-height: 80vh");
+  });
+
+  test("--sng-vh tracks the aspect-ratio override (1% of that height)", () => {
+    const html = renderDeck("---\n---\n\n# S\n", "deck.md", {
+      pdfAspectWidth: 1280,
+      pdfAspectHeight: 720,
+    });
+    expect(html).toContain("--sng-vh: 7.2px");
+    expect(html).toContain("--sng-vw: 12.8px");
   });
 
   test("codeBlockOverflowScroll=false → overflow-y: hidden", () => {

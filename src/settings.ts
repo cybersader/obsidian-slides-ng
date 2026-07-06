@@ -443,7 +443,10 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   showRevealControlsEmbedded: false,
   showRevealMenuEmbedded: true,
   clickToProgress: false,
-  codeBlockMaxHeight: "60vh",
+  // v0.13.32: canvas-relative default (60% of the SLIDE height, via the
+  // --sng-vh var) instead of "60vh" (60% of the browser window, which
+  // overflowed the slide on tall monitors / full browser tabs).
+  codeBlockMaxHeight: "calc(60 * var(--sng-vh))",
   codeBlockOverflowScroll: true,
   transitionSpeed: "default",
   magicMoveDurationMs: 500,

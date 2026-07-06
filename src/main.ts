@@ -330,6 +330,14 @@ export default class SlidesNGPlugin extends Plugin {
     if (this.settings.speakerPickerOrientation === ("vertical" as unknown)) {
       this.settings.speakerPickerOrientation = "vertical-1";
     }
+    // v0.13.32 migration: the old "60vh" default was window-relative, so
+    // long code blocks overflowed the slide on tall monitors / full
+    // browser tabs. That exact string was only ever the default, so
+    // upgrade it to the canvas-relative default; explicit user values are
+    // left untouched.
+    if (this.settings.codeBlockMaxHeight === "60vh") {
+      this.settings.codeBlockMaxHeight = DEFAULT_SETTINGS.codeBlockMaxHeight;
+    }
   }
 
   async saveSettings(): Promise<void> {

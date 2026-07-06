@@ -228,12 +228,28 @@ export function buildIframeHtml(
   const footerTextSafe = forceFooterText ? escapeHtml(forceFooterText) : "";
   const imageSplit = options.imageLayoutSplit ?? "50/50";
   const lineStepDim = options.lineStepDimOpacity ?? 0.32;
-  const codeBlockMaxHeight = options.codeBlockMaxHeight ?? "60vh";
+  // Default is canvas-relative (see --sng-vh below) so a long code block
+  // caps at 60% of the SLIDE height, not 60% of the browser window.
+  const codeBlockMaxHeight = options.codeBlockMaxHeight ?? "calc(60 * var(--sng-vh))";
   const codeBlockOverflow = options.codeBlockOverflowScroll ?? true;
   const transitionSpeed = options.transitionSpeed ?? "default";
   const magicMoveDuration = options.magicMoveDurationMs ?? 500;
   const pdfAspectWidth = options.pdfAspectWidth;
   const pdfAspectHeight = options.pdfAspectHeight;
+  // v0.13.32: reveal scales a fixed design canvas (width x height) to fit
+  // any viewport via a CSS transform. Viewport units (vh/vw) in slide
+  // content resolve against the ACTUAL window, NOT this canvas, so they
+  // DON'T scale with the transform — a `60vh` hero measured ~57% of the
+  // slide in a short preview pane but ~99% on a tall monitor, overflowing
+  // the slide in a full browser tab while the small embedded preview
+  // looked fine. Expose canvas-relative pseudo-viewport units (--sng-vh
+  // /-vw/-vmin) = 1% of the design canvas so slide layouts size against
+  // the canvas and render identically in preview and standalone.
+  const designW = typeof pdfAspectWidth === "number" ? pdfAspectWidth : 960;
+  const designH = typeof pdfAspectHeight === "number" ? pdfAspectHeight : 700;
+  const sngVh = +(designH / 100).toFixed(4);
+  const sngVw = +(designW / 100).toFixed(4);
+  const sngVmin = +(Math.min(designW, designH) / 100).toFixed(4);
   const customCss = options.customCSS ?? "";
   // v0.11.13: scenes inherit the theme's body bg + text color by
   // default. Override per-deck via frontmatter
@@ -368,7 +384,10 @@ export function buildIframeHtml(
   <style>
     /* slides-ng iframe overrides */
     html, body { margin: 0; padding: 0; height: 100%; background: var(--r-background-color, #111); }
-    .reveal { height: 100%; }
+    /* --sng-vh/-vw/-vmin: 1% of reveal's DESIGN CANVAS (not the window),
+     * so slide content sizes scale with reveal's transform and look the
+     * same in a small preview pane and a full browser tab (v0.13.32). */
+    .reveal { height: 100%; --sng-vh: ${sngVh}px; --sng-vw: ${sngVw}px; --sng-vmin: ${sngVmin}px; }
 
     /* Slidev-style code line-stepping (M5). All step blocks live in the
      * same grid cell so they stack visually. Step 0 is visible by default.
@@ -450,7 +469,8 @@ export function buildIframeHtml(
       text-align: center;
       gap: 0.4em;
       padding: 0.5em 0;
-      min-height: 60vh;
+      /* canvas-relative (see --sng-vh) — 60% of the slide, not the window. */
+      min-height: calc(60 * var(--sng-vh));
     }
     .reveal .slides section .hero > h1,
     .reveal .slides section .hero > h2 {
@@ -582,7 +602,9 @@ export function buildIframeHtml(
     .reveal .slides section .image-left > img,
     .reveal .slides section .image-right > img {
       max-width: 100%;
-      max-height: 80vh;
+      /* canvas-relative (see --sng-vh) so images cap at 80% of the SLIDE
+       * height, not the window — identical in preview and full browser. */
+      max-height: calc(80 * var(--sng-vh));
       object-fit: contain;
       border-radius: 0.2em;
     }

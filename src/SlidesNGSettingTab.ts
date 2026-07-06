@@ -9,6 +9,7 @@ import {
   SPEAKER_PANEL_LABELS,
   DEFAULT_SPEAKER_PANEL_VISIBILITY,
 } from "./settings";
+import { DEFAULT_SETTINGS } from "./settings";
 import type { SceneDefinition, SpeakerPanelId } from "./settings";
 import { availableThemes } from "./render/revealAssets";
 import { KNOWN_LAYOUTS } from "./render/layouts";
@@ -156,11 +157,11 @@ export class SlidesNGSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Code block max height")
       .setDesc(
-        "Any valid CSS length (e.g. `60vh`, `400px`). Long code blocks scroll internally instead of overflowing the slide. Set to `none` to disable the cap entirely."
+        "Any valid CSS length. Long code blocks scroll internally instead of overflowing the slide. Prefer canvas-relative sizes so it looks the same in the preview and a full browser tab: `var(--sng-vh)` is 1% of the slide height (default `calc(60 * var(--sng-vh))`). Fixed lengths like `400px` also work. Avoid `vh`/`vw` (relative to the window, not the slide). Set to `none` to disable the cap."
       )
       .addText((t) => {
         t.setValue(this.plugin.settings.codeBlockMaxHeight).onChange(async (v) => {
-          this.plugin.settings.codeBlockMaxHeight = v.trim() || "60vh";
+          this.plugin.settings.codeBlockMaxHeight = v.trim() || DEFAULT_SETTINGS.codeBlockMaxHeight;
           await this.plugin.saveSettings();
         });
       });
