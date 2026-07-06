@@ -1847,7 +1847,7 @@ ${sectionsHtml}
              * ran + what it decided (a silent no-op almost always means the
              * plugin wasn't reloaded after a BRAT update, so the export used
              * stale code). Only logs when it actually shrinks. */
-            if (s < 1) { try { console.log('[slides-ng] auto-fit build 0.13.34: content ' + natW + 'x' + natH + 'px -> canvas ' + slideW + 'x' + slideH + 'px, zoom ' + sec.style.zoom); } catch (_) {} }
+            if (s < 1) { try { console.log('[slides-ng] auto-fit build 0.13.35: content ' + natW + 'x' + natH + 'px -> canvas ' + slideW + 'x' + slideH + 'px, zoom ' + sec.style.zoom); } catch (_) {} }
           } catch (_) {}
         }
         function slidesNgFitCurrent() {
@@ -1868,11 +1868,36 @@ ${sectionsHtml}
          * / laying out yet — it measures a too-short height, then the content
          * grows and spills. Re-fit as late content settles: on a few delays,
          * on each image's load event, and when web-fonts finish. */
+        /* v0.13.35: a ResizeObserver on the current slide is the catch-all —
+         * it re-fits whenever the slide's content changes size for ANY
+         * reason the timed passes might miss (theme web-font swapping in
+         * late in a real browser, image decode, reflow). Loop-guarded: our
+         * own zoom change settles to a stable size, so once content is
+         * static the observer goes quiet (rAF debounce + the fit's busy
+         * flag prevent a tight loop). */
+        var slidesNgRO = null, slidesNgROqueued = false;
+        function slidesNgObserveCurrent() {
+          try {
+            if (typeof ResizeObserver !== 'function') return;
+            if (slidesNgRO) { slidesNgRO.disconnect(); slidesNgRO = null; }
+            var cur = (typeof Reveal !== 'undefined' && Reveal.getCurrentSlide)
+              ? Reveal.getCurrentSlide() : null;
+            if (!cur) return;
+            slidesNgRO = new ResizeObserver(function () {
+              if (slidesNgROqueued) return;
+              slidesNgROqueued = true;
+              requestAnimationFrame(function () { slidesNgROqueued = false; slidesNgFitCurrent(); });
+            });
+            slidesNgRO.observe(cur);
+          } catch (_) {}
+        }
         function slidesNgFitSoon() {
           slidesNgFitCurrent();
           setTimeout(slidesNgFitCurrent, 150);
           setTimeout(slidesNgFitCurrent, 500);
           setTimeout(slidesNgFitCurrent, 1200);
+          setTimeout(slidesNgFitCurrent, 2500);
+          slidesNgObserveCurrent();
           try {
             var cur = (typeof Reveal !== 'undefined' && Reveal.getCurrentSlide)
               ? Reveal.getCurrentSlide() : null;
@@ -1890,12 +1915,15 @@ ${sectionsHtml}
             }
           } catch (_) {}
         }
+        /* window 'load' fires only after EVERY sub-resource (fonts, all
+         * inlined images) is in — the last safety net for a heavy export. */
+        try { window.addEventListener('load', slidesNgFitCurrent); } catch (_) {}
         if (typeof Reveal !== 'undefined' && typeof Reveal.on === 'function') {
           Reveal.on('ready', function () {
             /* Always-on marker so you can confirm in devtools that THIS
              * build's auto-fit is running (its absence = the plugin wasn't
              * reloaded after the BRAT update, so the export used old code). */
-            try { console.log('[slides-ng] auto-fit build 0.13.34 active'); } catch (_) {}
+            try { console.log('[slides-ng] auto-fit build 0.13.35 active'); } catch (_) {}
             slidesNgFitSoon();
           });
           Reveal.on('slidechanged', slidesNgFitSoon);
