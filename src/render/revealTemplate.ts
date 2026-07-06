@@ -1831,13 +1831,23 @@ ${sectionsHtml}
             if (sec.querySelector(':scope > section')) return;
             var cfg = (typeof Reveal !== 'undefined' && Reveal.getConfig) ? Reveal.getConfig() : {};
             var slideH = (cfg && cfg.height) || 700;
+            var slideW = (cfg && cfg.width) || 960;
             /* reset before measuring so it's idempotent across re-runs */
             sec.style.zoom = '1';
             var natH = sec.scrollHeight;
-            if (natH > slideH + 1 && natH > 0) {
-              /* 0.985 leaves a hair of breathing room; floor at 0.2 */
-              sec.style.zoom = String(Math.max(0.2, (slideH / natH) * 0.985));
-            }
+            var natW = sec.scrollWidth;
+            var s = 1;
+            /* v0.13.34: fit BOTH axes. Height is the common overflow (extra
+             * grid rows), but a wide table/grid can overflow width too. */
+            if (natH > slideH + 1 && natH > 0) s = Math.min(s, slideH / natH);
+            if (natW > slideW + 1 && natW > 0) s = Math.min(s, slideW / natW);
+            /* 0.985 leaves a hair of breathing room; floor at 0.2 */
+            sec.style.zoom = s < 1 ? String(Math.max(0.2, s * 0.985)) : '1';
+            /* Diagnostic: lets the user confirm in devtools whether auto-fit
+             * ran + what it decided (a silent no-op almost always means the
+             * plugin wasn't reloaded after a BRAT update, so the export used
+             * stale code). Only logs when it actually shrinks. */
+            if (s < 1) { try { console.log('[slides-ng] auto-fit build 0.13.34: content ' + natW + 'x' + natH + 'px -> canvas ' + slideW + 'x' + slideH + 'px, zoom ' + sec.style.zoom); } catch (_) {} }
           } catch (_) {}
         }
         function slidesNgFitCurrent() {
@@ -1853,12 +1863,45 @@ ${sectionsHtml}
           } catch (_) {}
           slidesNgFitBusy = false;
         }
+        /* v0.13.34: a single fit at slidechanged time under-shrinks when the
+         * slide's IMAGES (e.g. dozens of tool logos) haven't finished loading
+         * / laying out yet — it measures a too-short height, then the content
+         * grows and spills. Re-fit as late content settles: on a few delays,
+         * on each image's load event, and when web-fonts finish. */
+        function slidesNgFitSoon() {
+          slidesNgFitCurrent();
+          setTimeout(slidesNgFitCurrent, 150);
+          setTimeout(slidesNgFitCurrent, 500);
+          setTimeout(slidesNgFitCurrent, 1200);
+          try {
+            var cur = (typeof Reveal !== 'undefined' && Reveal.getCurrentSlide)
+              ? Reveal.getCurrentSlide() : null;
+            if (cur) {
+              var imgs = cur.querySelectorAll('img');
+              for (var i = 0; i < imgs.length; i++) {
+                if (!imgs[i].complete) {
+                  imgs[i].addEventListener('load', slidesNgFitCurrent, { once: true });
+                  imgs[i].addEventListener('error', slidesNgFitCurrent, { once: true });
+                }
+              }
+            }
+            if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+              document.fonts.ready.then(slidesNgFitCurrent);
+            }
+          } catch (_) {}
+        }
         if (typeof Reveal !== 'undefined' && typeof Reveal.on === 'function') {
-          Reveal.on('ready', function () { slidesNgFitCurrent(); setTimeout(slidesNgFitCurrent, 350); });
-          Reveal.on('slidechanged', function () { slidesNgFitCurrent(); setTimeout(slidesNgFitCurrent, 250); });
+          Reveal.on('ready', function () {
+            /* Always-on marker so you can confirm in devtools that THIS
+             * build's auto-fit is running (its absence = the plugin wasn't
+             * reloaded after the BRAT update, so the export used old code). */
+            try { console.log('[slides-ng] auto-fit build 0.13.34 active'); } catch (_) {}
+            slidesNgFitSoon();
+          });
+          Reveal.on('slidechanged', slidesNgFitSoon);
         }
         if (revealInit && typeof revealInit.then === 'function') {
-          revealInit.then(function () { setTimeout(slidesNgFitCurrent, 40); });
+          revealInit.then(function () { setTimeout(slidesNgFitSoon, 40); });
         }
         ` : ""}
         ${!embedded && forceNotesEmphasis ? `
