@@ -13,6 +13,7 @@ import { renderLineStep } from "./lineStepRenderer";
 import { parseMagicMoveKey } from "../parser/magicMoveKey";
 import { renderMagicMoveBlock } from "./magicMoveRenderer";
 import { pandocFencedDivs } from "../parser/pandocFencedDivs";
+import { obsidianCallouts } from "../parser/obsidianCallouts";
 import {
   preprocessObsidianImageEmbeds,
   buildImgTag,
@@ -48,13 +49,20 @@ function decodeMarkedText(s: string): string {
 // just a different render config).
 function buildMarked(
   codeTheme: string | undefined,
-  resolveImage?: (path: string) => string | null
+  resolveImage?: (path: string) => string | null,
+  renderCallouts: boolean = true
 ): Marked {
   const inst = new Marked();
   // v0.12.0: Pandoc fenced divs extension. Enables `::: classname ... :::`
   // structural blocks that compose with reveal.js without needing custom
   // parse-time logic per-snippet. See src/parser/pandocFencedDivs.ts.
   inst.use(pandocFencedDivs);
+  // v0.13.36: Obsidian native callouts (`> [!info]` …). Emits the same
+  // Obsidian-compatible `.callout[data-callout]` DOM; styling + colours
+  // live in CSS (fully overridable). Only transforms `[!type]` blockquotes;
+  // ordinary quotes pass through. Default on; the `renderObsidianCallouts`
+  // setting can disable it. See src/parser/obsidianCallouts.ts.
+  if (renderCallouts) inst.use(obsidianCallouts);
   inst.use({
     renderer: {
       code(token: Tokens.Code): string {
@@ -121,6 +129,11 @@ export interface RenderDefaults {
   defaultLayout?: string;
   /** Shiki theme for code blocks. Defaults to the renderer's built-in. */
   codeTheme?: string;
+  /**
+   * v0.13.36: render Obsidian native callouts (`> [!info]` …) as callout
+   * boxes. Default true. When false, they stay plain blockquotes.
+   */
+  renderObsidianCallouts?: boolean;
   /** Column split ratio for image-left / image-right layouts. */
   imageLayoutSplit?: "50/50" | "60/40" | "40/60";
   /** Line-step dimming opacity (0–1). */
@@ -269,7 +282,11 @@ export function renderDeckFromAst(
   overrides: Partial<DeckRenderOptions> = {},
   defaults: RenderDefaults = {}
 ): string {
-  const md = buildMarked(defaults.codeTheme, defaults.resolveImage);
+  const md = buildMarked(
+    defaults.codeTheme,
+    defaults.resolveImage,
+    defaults.renderObsidianCallouts !== false
+  );
   const notesMd = buildNotesMarked();
   const slides = deck.slides.map((s) => slideToHtml(s, md, notesMd, defaults));
   const defaultLayer: Partial<DeckRenderOptions> = {};

@@ -112,6 +112,14 @@ export interface SlidesNGSettings {
   autoFitSlides: boolean;
 
   /**
+   * v0.13.36: render Obsidian native callouts (`> [!info] …`) as callout
+   * boxes (default true). When false they stay plain blockquotes. This is
+   * also the hook for future callout-plugin mapping/customisation. Per-deck
+   * / per-type look is overridable in CSS — see the callout styles.
+   */
+  renderObsidianCallouts: boolean;
+
+  /**
    * Reveal.js animation pace. `default` is reveal's stock; `fast` is
    * 300 ms transitions; `slow` is 1200 ms.
    */
@@ -459,6 +467,7 @@ export const DEFAULT_SETTINGS: SlidesNGSettings = {
   codeBlockMaxHeight: "calc(60 * var(--sng-vh))",
   codeBlockOverflowScroll: true,
   autoFitSlides: true,
+  renderObsidianCallouts: true,
   transitionSpeed: "default",
   magicMoveDurationMs: 500,
   scenes: DEFAULT_SCENES.map((s) => ({ ...s })),

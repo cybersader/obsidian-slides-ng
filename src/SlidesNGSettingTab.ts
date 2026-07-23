@@ -193,6 +193,20 @@ export class SlidesNGSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName("Render Obsidian callouts")
+      .setDesc(
+        "Turn `> [!info]` / `> [!warning]` (and other Obsidian callout types) into callout boxes. Off leaves them as plain blockquotes. Colours and icons are overridable per type in your deck's CSS via `.callout[data-callout=\"…\"]` and the `--callout-color` / `--callout-icon` variables."
+      )
+      .addToggle((t) => {
+        t.setValue(this.plugin.settings.renderObsidianCallouts).onChange(
+          async (v) => {
+            this.plugin.settings.renderObsidianCallouts = v;
+            await this.plugin.saveSettings();
+          }
+        );
+      });
+
+    new Setting(containerEl)
       .setName("Magic-move animation duration (ms)")
       .setDesc(
         "Duration of the token-morph animation between paired magic-move code blocks. Stock library default is five hundred milliseconds."

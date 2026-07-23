@@ -516,6 +516,85 @@ export function buildIframeHtml(
       background: color-mix(in srgb, #10b981 12%, transparent);
     }
 
+    /* ================================================================
+     * v0.13.36: Obsidian native callouts — \`> [!type] Title\`.
+     * DOM mirrors Obsidian (.callout[data-callout] > .callout-title +
+     * .callout-content). ALL colour/icon is driven by two CSS variables
+     * per type, so a deck/theme can override any level with plain CSS:
+     *   .callout[data-callout="warning"] { --callout-color: 200,120,0 }
+     *   .callout-icon { display: none }         (drop icons)
+     *   .callout { ... }                         (restyle every callout)
+     * The title-row rules are scoped to .callout-title/.callout-content,
+     * which the simpler \`::: {.callout}\` boxes don't have — so the two
+     * authoring paths coexist without clashing. Colours are rgb triples
+     * so rgba(var(--callout-color), a) can tint at any opacity. */
+    .reveal .slides section .callout[data-callout] {
+      --callout-color: 122, 122, 122;
+      --callout-icon: "\\1F4A1";
+      border: 1px solid rgba(var(--callout-color), 0.35);
+      border-left: 0.28em solid rgb(var(--callout-color));
+      background: rgba(var(--callout-color), 0.10);
+      padding: 0;
+      border-radius: 0.3em;
+      text-align: left;
+      margin: 0.6em 0;
+      overflow: hidden;
+    }
+    .reveal .slides section .callout[data-callout] > .callout-title {
+      display: flex;
+      align-items: center;
+      gap: 0.45em;
+      padding: 0.45em 0.7em;
+      background: rgba(var(--callout-color), 0.18);
+      color: rgb(var(--callout-color));
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .reveal .slides section .callout[data-callout] > .callout-title .callout-icon {
+      display: inline-flex;
+      flex: 0 0 auto;
+      line-height: 1;
+    }
+    .reveal .slides section .callout[data-callout] > .callout-title .callout-icon::before {
+      content: var(--callout-icon);
+      font-size: 1.05em;
+      line-height: 1;
+    }
+    .reveal .slides section .callout[data-callout] > .callout-content {
+      padding: 0.55em 0.8em;
+    }
+    .reveal .slides section .callout[data-callout] > .callout-content > *:first-child { margin-top: 0; }
+    .reveal .slides section .callout[data-callout] > .callout-content > *:last-child { margin-bottom: 0; }
+    /* Per-type colour + icon. Aliases grouped per Obsidian's own set;
+     * unknown types fall back to the neutral default above. */
+    .reveal .slides section .callout[data-callout="note"] { --callout-color: 8,109,221; --callout-icon: "\\270F\\FE0F"; }
+    .reveal .slides section .callout[data-callout="info"] { --callout-color: 8,109,221; --callout-icon: "\\2139\\FE0F"; }
+    .reveal .slides section .callout[data-callout="todo"] { --callout-color: 8,109,221; --callout-icon: "\\2611\\FE0F"; }
+    .reveal .slides section .callout[data-callout="abstract"],
+    .reveal .slides section .callout[data-callout="summary"],
+    .reveal .slides section .callout[data-callout="tldr"] { --callout-color: 0,191,188; --callout-icon: "\\1F4CB"; }
+    .reveal .slides section .callout[data-callout="tip"],
+    .reveal .slides section .callout[data-callout="hint"],
+    .reveal .slides section .callout[data-callout="important"] { --callout-color: 0,191,188; --callout-icon: "\\1F525"; }
+    .reveal .slides section .callout[data-callout="success"],
+    .reveal .slides section .callout[data-callout="check"],
+    .reveal .slides section .callout[data-callout="done"] { --callout-color: 8,185,78; --callout-icon: "\\2705"; }
+    .reveal .slides section .callout[data-callout="question"],
+    .reveal .slides section .callout[data-callout="help"],
+    .reveal .slides section .callout[data-callout="faq"] { --callout-color: 236,117,0; --callout-icon: "\\2753"; }
+    .reveal .slides section .callout[data-callout="warning"],
+    .reveal .slides section .callout[data-callout="caution"],
+    .reveal .slides section .callout[data-callout="attention"] { --callout-color: 236,117,0; --callout-icon: "\\26A0\\FE0F"; }
+    .reveal .slides section .callout[data-callout="failure"],
+    .reveal .slides section .callout[data-callout="fail"],
+    .reveal .slides section .callout[data-callout="missing"] { --callout-color: 233,49,71; --callout-icon: "\\274C"; }
+    .reveal .slides section .callout[data-callout="danger"],
+    .reveal .slides section .callout[data-callout="error"] { --callout-color: 233,49,71; --callout-icon: "\\26A1"; }
+    .reveal .slides section .callout[data-callout="bug"] { --callout-color: 233,49,71; --callout-icon: "\\1F41B"; }
+    .reveal .slides section .callout[data-callout="example"] { --callout-color: 120,82,238; --callout-icon: "\\1F4D1"; }
+    .reveal .slides section .callout[data-callout="quote"],
+    .reveal .slides section .callout[data-callout="cite"] { --callout-color: 158,158,158; --callout-icon: "\\1F4AC"; }
+
     /* Big-number stat. \`::: bignum\` — paragraph 1 is the number,
      * paragraph 2 is the label. */
     .reveal .slides section .bignum {
